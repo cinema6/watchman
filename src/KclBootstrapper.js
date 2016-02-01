@@ -205,7 +205,8 @@ KclBootstrapper.prototype = {
                 }
             },
             eventProcessors: 'processors',
-            log: 'object'
+            log: 'object',
+            secrets: 'file'
         };
         return validate(config, schema) || validateConsumerIndex(index);
     },

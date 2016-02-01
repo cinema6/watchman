@@ -51,7 +51,8 @@ describe('KclBootstrapper.js', function() {
                     }
                 }
             },
-            log: { }
+            log: { },
+            secrets: '/valid-file'
         };
         KclBootstrapper = proxyquire('../../src/KclBootstrapper.js', {
             'mockConfig': config
@@ -64,7 +65,6 @@ describe('KclBootstrapper.js', function() {
         spyOn(bootstrapper, 'checkConfig');
         spyOn(bootstrapper, 'parseCmdLine');
         spyOn(fs, 'statSync').and.callFake(function(path) {
-            console.log(path);
             return {
                 isFile: function() {
                     return (path.slice(1) === 'valid-file' ||
@@ -284,6 +284,26 @@ describe('KclBootstrapper.js', function() {
                 expect(configError).toBe('log: Not an object');
             });
         });
+
+        describe('secrets', function() {
+            it('should return an error message if missing', function() {
+                delete config.secrets;
+                var configError = bootstrapper.checkConfig(config, 0);
+                expect(configError).toBe('secrets: Missing value');
+            });
+            
+            it('should return an error message if not a file', function() {
+                config.secrets = '/invalid-file';
+                var configError = bootstrapper.checkConfig(config, 0);
+                expect(configError).toBe('secrets: Not a valid absolute file path');
+            });
+            
+            it('should return an error message if not an absolute path', function() {
+                config.secrets = 'valid-file';
+                var configError = bootstrapper.checkConfig(config, 0);
+                expect(configError).toBe('secrets: Not a valid absolute file path');
+            });
+        });
     });
     
     describe('run', function() {
@@ -399,7 +419,6 @@ describe('KclBootstrapper.js', function() {
                 bootstrapper.parseCmdLine();
                 done.fail();
             } catch(error) {
-                console.log(error);
                 expect(error).toBeDefined();
                 done();
             }

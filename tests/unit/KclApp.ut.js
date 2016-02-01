@@ -55,7 +55,8 @@ describe('KclApp.js', function() {
                     }
                 }
             },
-            log: { }
+            log: { },
+            secrets: '/valid-file-secrets'
         };
         runSpy = jasmine.createSpy('run()');
         mockKcl = jasmine.createSpy('kcl').and.returnValue({
@@ -73,7 +74,8 @@ describe('KclApp.js', function() {
             'mockConfig': config,
             'aws-kcl': mockKcl,
             './event_processors/ValidProcessor.js': mockEventProcessor,
-            './record_processors/RecordProcessor.js': mockRecordProcessor
+            './record_processors/RecordProcessor.js': mockRecordProcessor,
+            '/valid-file-secrets': 'so secret'
         });
         app = new KclApp();
         spyOn(fs, 'writeFileSync');
@@ -142,6 +144,12 @@ describe('KclApp.js', function() {
                 expect(error).toBeDefined();
                 done();
             }
+        });
+        
+        it('should update the config with service secrets', function() {
+            process.argv = ['', '', '-c', 'mockConfig', '-i', '0'];
+            var options = app.parseCmdLine();
+            expect(options.config.secrets).toBe('so secret');
         });
     });
     

@@ -60,6 +60,11 @@ KclApp.prototype = {
         var configPath = program.config;
         var config = require(configPath);
 
+        // Read the secrets file
+        var secretsPath = config.secrets;
+        var secrets = require(secretsPath);
+        config.secrets = secrets;
+
         // Validate the consumer index
         var index = parseInt(program.index);
         if(isNaN(index)) {
