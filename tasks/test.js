@@ -1,3 +1,5 @@
 module.exports = function(grunt) {
-    grunt.registerTask('test:unit', 'runs unit tests', 'jasmine_nodejs');
+    grunt.registerMultiTask('test', 'runs tests', function() {
+        grunt.task.run('jasmine_nodejs:' + this.target);
+    });
 };
