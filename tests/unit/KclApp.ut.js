@@ -2,7 +2,7 @@
 
 var KclApp;
 var fs = require('fs');
-var logger = require('../../lib/logger.js');
+var logger = require('cwrx/lib/logger.js');
 var proxyquire = require('proxyquire').noCallThru();
 
 describe('KclApp.js', function() {

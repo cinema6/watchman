@@ -2,7 +2,7 @@
 
 var RecordProcessor = require('../../src/record_processors/RecordProcessor.js');
 var Q = require('q');
-var logger = require('../../lib/logger.js');
+var logger = require('cwrx/lib/logger.js');
 
 describe('RecordProcessor.js', function() {
     var recordProcessor;

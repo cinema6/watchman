@@ -3,7 +3,7 @@
 var EventProcessor;
 var Q = require('q');
 var proxyquire = require('proxyquire').noCallThru();
-var logger = require('../../lib/logger.js');
+var logger = require('cwrx/lib/logger.js');
 
 describe('EventProcessor.js', function() {
     var eventProcessor;

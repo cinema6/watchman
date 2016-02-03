@@ -3,7 +3,7 @@
 var RecordProcessor = require('./record_processors/RecordProcessor.js');
 var fs = require('fs');
 var kcl = require('aws-kcl');
-var logger = require('../lib/logger.js');
+var logger = require('cwrx/lib/logger.js');
 var path = require('path');
 var program = require('commander');
 
