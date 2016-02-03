@@ -52,7 +52,10 @@ describe('KclBootstrapper.js', function() {
                 }
             },
             log: { },
-            secrets: '/valid-file'
+            secrets: '/valid-file',
+            cwrx: {
+                api: { }
+            }
         };
         KclBootstrapper = proxyquire('../../src/KclBootstrapper.js', {
             'mockConfig': config
@@ -302,6 +305,20 @@ describe('KclBootstrapper.js', function() {
                 config.secrets = 'valid-file';
                 var configError = bootstrapper.checkConfig(config, 0);
                 expect(configError).toBe('secrets: Not a valid absolute file path');
+            });
+        });
+
+        describe('cwrx.api', function() {
+            it('should return an error message if missing', function() {
+                delete config.cwrx.api;
+                var configError = bootstrapper.checkConfig(config, 0);
+                expect(configError).toBe('cwrx: api: Missing value');
+            });
+            
+            it('should return an error emssage if not an object', function() {
+                config.cwrx.api = 'not object';
+                var configError = bootstrapper.checkConfig(config, 0);
+                expect(configError).toBe('cwrx: api: Not an object');
             });
         });
     });

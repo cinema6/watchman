@@ -206,7 +206,10 @@ KclBootstrapper.prototype = {
             },
             eventProcessors: 'processors',
             log: 'object',
-            secrets: 'file'
+            secrets: 'file',
+            cwrx: {
+                api: 'object'
+            }
         };
         return validate(config, schema) || validateConsumerIndex(index);
     },
