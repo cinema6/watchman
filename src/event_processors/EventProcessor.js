@@ -18,6 +18,8 @@ function EventProcessor(name, config) {
     }
     this.config = config;
     this.name = name;
+    this.actions = { };
+    this.loadActions();
 }
 EventProcessor.prototype = {
     /**
@@ -28,7 +30,7 @@ EventProcessor.prototype = {
     * @return {Promise} Resolves when the event has been processed.
     */
     process: function(object) {
-        var processorConfig = this.config.eventProcessors[this.name];
+        var processorConfig = this.config.eventHandlers;
 
         var event = this.recordToEvent(object);
         if(event && event.name && processorConfig[event.name]) {
@@ -65,7 +67,7 @@ EventProcessor.prototype = {
         log.info('[%1 event processor] Event %2 performing actions %3', self.name, event.name,
             actionNames);
         return Q.allSettled(actions.map(function(action, index) {
-            var actionModule = require('../actions/' + actionNames[index] + '.js');
+            var actionModule = self.actions[actionNames[index]];
             var actionOptions = action.options || null;
             return actionModule(event.data, actionOptions, self.config);
         })).then(function(results) {
@@ -92,6 +94,53 @@ EventProcessor.prototype = {
     */
     recordToEvent: function() {
         return null;
+    },
+    
+    /**
+    * Returns the path to the action module given the action's name.
+    *
+    * @param {String} actionName The name of the action.
+    * @return {String} Relative path to the named action module for use with require.
+    */
+    getActionPath: function(actionName) {
+        return '../actions/' + actionName + '.js';
+    },
+    
+    /**
+    * Loads any actions that could be used by the event processor. New actions are added, existing
+    * actions are updated, and actions no longer being used are deleted.
+    */
+    loadActions: function() {
+        var actionNames = { };
+        var eventHandlers = this.config.eventHandlers;
+        var self = this;
+        
+        // Get a list of required actions
+        Object.keys(eventHandlers).forEach(function(event) {
+            var eventHandler = eventHandlers[event];
+            eventHandler.actions.forEach(function(action) {
+                var actionName = action.name || action;
+                actionNames[actionName] = null;
+            });
+        });
+        
+        // Load the required actions
+        Object.keys(actionNames).forEach(function(actionName) {
+            var modulePath = self.getActionPath(actionName);
+            if(actionName in self.actions) {
+                delete require.cache[require.resolve(modulePath)];
+            }
+            self.actions[actionName] = require(modulePath);
+        });
+        
+        // Remove unused actions
+        Object.keys(self.actions).forEach(function(actionName) {
+            if(!(actionName in actionNames)) {
+                var modulePath = self.getActionPath(actionName);
+                delete require.cache[require.resolve(modulePath)];
+                delete self.actions[actionName];
+            }
+        });
     }
 };
 

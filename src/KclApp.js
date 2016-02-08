@@ -7,6 +7,8 @@ var logger = require('cwrx/lib/logger.js');
 var path = require('path');
 var program = require('commander');
 
+var PROJECT_ROOT = path.resolve(path.dirname(require.main.filename), '..');
+
 var __ut__ = (global.jasmine !== undefined) ? true : false;
 
 /**
@@ -22,8 +24,156 @@ var __ut__ = (global.jasmine !== undefined) ? true : false;
 * @constructor
 */
 function KclApp() {
+    this.config = null;
+    this.configPath = null;
+    this.recordProcessor = null;
 }
 KclApp.prototype = {
+    /**
+    * Checks the validity of a watchman configuration file. The configuration must match the
+    * defined schema. Configuration file and directory paths must be specified as absolute paths.
+    *
+    * @param {Object} config A watchman configuration object to be checked for errors.
+    * @return {String} Returns an error message if one exists or null otherwise.
+    */
+    checkConfig: function(config) {
+        function isAbsolute(path) {
+            return (path.charAt(0) === '/');
+        }
+
+        function isFile(path) {
+            try {
+                return fs.statSync(path).isFile();
+            } catch(error) {
+                return false;
+            }
+        }
+
+        function isDirectory(path) {
+            try {
+                return fs.statSync(path).isDirectory();
+            } catch(error) {
+                return false;
+            }
+        }
+
+        function checkFile(val) {
+            return (isAbsolute(val) && isFile(val)) ? null : 'Not a valid absolute file path';
+        }
+        
+        function checkDir(val) {
+            return (isAbsolute(val) && isDirectory(val)) ? null :
+                'Not a valid absolute directory path';
+        }
+
+        function checkString(val) {
+            return (typeof val === 'string') ? null : 'Not a string';
+        }
+
+        function checkObject(val) {
+            return (typeof val === 'object') ? null : 'Not an object';
+        }
+        
+        // Checks that the specified event processor exists.
+        function checkProcessor(val) {
+            var processorPath = path.resolve(PROJECT_ROOT, 'src/event_processors', val);
+            return checkFile(processorPath);
+        }
+        
+        // Checks that the given value is valid configuration for the event processors. Makes sure
+        // that any specified actions exist.
+        function checkHandlers(val) {
+            var configError = checkObject(val);
+            if(configError) {
+                return configError;
+            }
+            var eventNames = Object.keys(val);
+            for(var j=0;j<eventNames.length;j++) {
+                var eventName = eventNames[j];
+                var eventConfig = val[eventName];
+                var actions = eventConfig.actions;
+                if(!actions || actions.length === 0) {
+                    return eventName + ': ' + 'Must contain actions';
+                }
+                for(var k=0;k<actions.length;k++) {
+                    var actionName = actions[k].name || actions[k];
+                    configError = checkFile(path.resolve(PROJECT_ROOT, 'src/actions/' +
+                        actionName + '.js'));
+                    if(configError) {
+                        return eventName + ': actions: ' + k + ': Invalid action';
+                    }
+                }
+            }
+            return null;
+        }
+        
+        // Gets the validation function for a given schema type
+        function getValidationFn(schemaType) {
+            switch(schemaType) {
+            case 'file':
+                return checkFile;
+            case 'dir':
+                return checkDir;
+            case 'string':
+                return checkString;
+            case 'object':
+                return checkObject;
+            case 'processor':
+                return checkProcessor;
+            case 'handlers':
+                return checkHandlers;
+            default:
+                throw new Error('Invalid schema type \'' + schemaType + '\'');
+            }
+        }
+
+        // Validates a given piece of configuration against a given piece of schema
+        function validate(configValue, schemaValue) {
+            if(typeof schemaValue === 'object') {
+                var keys = Object.keys(schemaValue);
+                for(var i=0;i<keys.length;i++) {
+                    var key = keys[i];
+                    var configVal = configValue[key];
+                    var schemaVal = schemaValue[key];
+                    if(configVal) {
+                        var configError = validate(configVal, schemaVal);
+                        if(configError) {
+                            return key + ': ' + configError;
+                        }
+                    } else {
+                        return key + ': Missing value';
+                    }
+                }
+            } else {
+                var fn = getValidationFn(schemaValue);
+                return fn(configValue);
+            }
+            return null;
+        }
+
+        // Validates the configuration occurding to the defined schema
+        var schema = {
+            log: 'object',
+            secrets: 'file',
+            cwrx: {
+                api: 'object'
+            },
+            pidPath: 'dir',
+            kinesis: {
+                consumer: {
+                    processor: 'processor',
+                    appName: 'string'
+                },
+                producer: {
+                    stream: 'string',
+                    region: 'string'
+                }
+            },
+            eventHandlers: 'handlers'
+        };
+        return validate(config, schema);
+    },
+
     /**
     * Writes this scripts' process id to a given file path.
     *
@@ -44,37 +194,59 @@ KclApp.prototype = {
     },
     
     /**
-    * Parses command line options to get the watchman configuration and consumer configuration
-    * object.
+    * Parses command line options to get the path to this application's configuration.
     *
     * @return {Object} An options object containing the parsed entities.
     */
     parseCmdLine: function() {
         program
             .option('-c, --config <config file>', 'configuration file for the service')
-            .option('-i, --index <consumer index>',
-                'the index in the consumers array configuration')
             .parse(process.argv);
 
-        // Load the config
+        // Ensure config was specified
         var configPath = program.config;
-        var config = require(configPath);
+        if(!configPath) {
+            throw new Error('You must specify a config');
+        }
+
+        return {
+            configPath: configPath
+        };
+    },
+    
+    /**
+    * Loads configuration from the configPath. If configuration already exists, the application log
+    * is refreshed and event processor actions are updated.
+    */
+    loadConfig: function() {
+        var configPath = this.configPath;
+        var config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+
+        // Validate the config
+        var configError = this.checkConfig(config);
+        if(configError) {
+            throw new Error(configError);
+        }
 
         // Read the secrets file
         var secretsPath = config.secrets;
         var secrets = require(secretsPath);
         config.secrets = secrets;
-
-        // Validate the consumer index
-        var index = parseInt(program.index);
-        if(isNaN(index)) {
-            throw new Error('You must specify a valid consumer index');
+        
+        // Handle changes to the config
+        if(this.config) {
+            // Refresh the log
+            var log = logger.getLog();
+            log.refresh();
+            
+            // Reload required actions
+            var eventProcessor = this.recordProcessor.processor;
+            eventProcessor.config = config;
+            eventProcessor.loadActions();
         }
-
-        return {
-            config: config,
-            index: index
-        };
+        
+        // Update the config
+        this.config = config;
     },
     
     /**
@@ -83,17 +255,22 @@ KclApp.prototype = {
     run: function() {
         var self = this;
         var options = self.parseCmdLine();
-        var log = logger.createLog(options.config.log);
-        var consumerConfig = options.config.kinesis.consumers[options.index];
-        var pidFile = path.resolve(options.config.kinesis.pidPath, consumerConfig.appName + '.pid');
+
+        self.configPath = options.configPath;
+        self.loadConfig();
+
+        var config = self.config;
+        var log = logger.createLog(config.log);
+        var consumerConfig = config.kinesis.consumer;
+        var pidFile = path.resolve(config.pidPath, consumerConfig.appName + '.pid');
 
         try {
             var AppEventProcessor = require('./event_processors/' + consumerConfig.processor);
-            var eventProcessor = new AppEventProcessor(options.config);
-            var recordProcessor = new RecordProcessor(eventProcessor);
+            var eventProcessor = new AppEventProcessor(config);
+            self.recordProcessor = new RecordProcessor(eventProcessor);
             log.info('[%1] Starting application', consumerConfig.appName);
             self.writePid(pidFile);
-            kcl(recordProcessor).run();
+            kcl(self.recordProcessor).run();
         } catch(error) {
             log.error('[%1] Error running application: %2', consumerConfig.appName, error);
             process.exit(1);
@@ -104,7 +281,12 @@ KclApp.prototype = {
             self.removePid(pidFile);
         });
         process.on('SIGHUP', function() {
-            log.info('[%1] Received SIGHUP', consumerConfig.appName);
+            log.info('[%1] Reloading configuration', consumerConfig.appName);
+            try {
+                self.loadConfig();
+            } catch(error) {
+                log.error('[%1] Error reloading configuration: %2', consumerConfig.appName, error);
+            }
         });
     }
 };

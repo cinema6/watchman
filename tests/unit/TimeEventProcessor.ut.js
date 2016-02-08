@@ -7,6 +7,7 @@ describe('TimeEventProcessor.js', function() {
     var timeEventProcessor;
 
     beforeEach(function() {
+        spyOn(EventProcessor.prototype, 'loadActions');
         timeEventProcessor = new TimeEventProcessor('config');
     });
     

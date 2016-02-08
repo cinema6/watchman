@@ -1,8 +1,7 @@
 'use strict';
 
-var EventProcessor;
+var EventProcessor = require('../../src/event_processors/EventProcessor.js');
 var Q = require('q');
-var proxyquire = require('proxyquire').noCallThru();
 var logger = require('cwrx/lib/logger.js');
 
 describe('EventProcessor.js', function() {
@@ -20,20 +19,21 @@ describe('EventProcessor.js', function() {
         };
         mockGoodAction = jasmine.createSpy('mockGoodAction()').and.returnValue(Q.resolve());
         mockBadAction = jasmine.createSpy('mockBadAction()').and.returnValue(Q.reject());
-        EventProcessor = proxyquire('../../src/event_processors/EventProcessor.js', {
-            '../actions/good_action.js': mockGoodAction,
-            '../actions/bad_action.js': mockBadAction
-        });
+        spyOn(EventProcessor.prototype, 'loadActions');
         eventProcessor = new EventProcessor('time', 'config');
+        spyOn(eventProcessor, 'getActionPath').and.callFake(function(actionName) {
+            return '../../tests/helpers/' + actionName + '.js';
+        });
         spyOn(eventProcessor, 'handleEvent').and.callThrough();
         spyOn(eventProcessor, 'recordToEvent').and.callThrough();
         spyOn(logger, 'getLog').and.returnValue(mockLog);
     });
     
     describe('the constructor', function() {
-        it('should set the config and name', function() {
+        it('should set the config, name, and actions', function() {
             expect(eventProcessor.config).toBe('config');
             expect(eventProcessor.name).toBe('time');
+            expect(eventProcessor.actions).toEqual({ });
         });
         
         it('should throw an error if not provided with a name', function() {
@@ -55,16 +55,18 @@ describe('EventProcessor.js', function() {
             }
             expect(error).not.toBeNull();
         });
+        
+        it('should load the required actions', function() {
+            expect(eventProcessor.loadActions).toHaveBeenCalledWith();
+        });
     });
     
     describe('the process method', function() {
         beforeEach(function() {
             eventProcessor.config = {
-                eventProcessors: {
-                    time: {
-                        tick: {
-                            actions: []
-                        }
+                eventHandlers: {
+                    tick: {
+                        actions: []
                     }
                 }
             };
@@ -109,6 +111,10 @@ describe('EventProcessor.js', function() {
         });
         
         it('should perform the configured list of actions', function(done) {
+            eventProcessor.actions = {
+                'good_action': mockGoodAction,
+                'bad_action': mockBadAction
+            };
             eventProcessor.handleEvent({
                 name: 'tick',
                 data: 'data'
@@ -129,6 +135,10 @@ describe('EventProcessor.js', function() {
         });
         
         it('log a warning but still resolve if some actions fail', function(done) {
+            eventProcessor.actions = {
+                'good_action': mockGoodAction,
+                'bad_action': mockBadAction
+            };
             eventProcessor.handleEvent({
                 name: 'tick'
             }, {
@@ -143,6 +153,63 @@ describe('EventProcessor.js', function() {
     describe('the recordToEvent method', function() {
         it('should return null', function() {
             expect(eventProcessor.recordToEvent()).toBeNull();
+        });
+    });
+    
+    describe('the loadActions method', function() {
+        var loadedActions;
+        
+        beforeEach(function() {
+            eventProcessor.loadActions.and.callThrough();
+            eventProcessor.config = {
+                eventHandlers: {
+                    tick: {
+                        actions: ['action3', 'action4']
+                    }
+                }
+            };
+            eventProcessor.loadActions();
+            loadedActions = { };
+            Object.keys(eventProcessor.actions).forEach(function(action) {
+                loadedActions[action] = eventProcessor.actions[action];
+            });
+        });
+
+        it('should be able to load actions', function() {
+            expect(eventProcessor.actions.action3).toContain('my name is mock action three');
+            expect(eventProcessor.actions.action4).toContain('my name is mock action four');
+        });
+        
+        describe('reloading actions at some point in the future', function() {
+            beforeEach(function() {
+                eventProcessor.config = {
+                    eventHandlers: {
+                        tick: {
+                            actions: ['action1', 'action2']
+                        },
+                        foo: {
+                            actions: [{
+                                name: 'action3'
+                            }]
+                        }
+                    }
+                };
+                eventProcessor.loadActions();
+            });
+            
+            it('should require newly added actions', function() {
+                expect(eventProcessor.actions.action1).toContain('my name is mock action one');
+                expect(eventProcessor.actions.action2).toContain('my name is mock action two');
+            });
+            
+            it('should update existing actions', function() {
+                expect(eventProcessor.actions.action3).toContain('my name is mock action three');
+                expect(eventProcessor.actions.action3).not.toBe(loadedActions.action3);
+            });
+            
+            it('should remove unused actions', function() {
+                expect(eventProcessor.actions.action4).not.toBeDefined();
+            });
         });
     });
 });

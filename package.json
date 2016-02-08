@@ -14,7 +14,7 @@
     "aws-kcl": "^0.5.0",
     "aws-sdk": "^2.2.29",
     "commander": "^2.9.0",
-    "cwrx": "git+ssh://git@github.com:cinema6/cwrx#master",
+    "cwrx": "git+ssh://git@github.com:cinema6/cwrx#player-2.5.1",
     "q": "^1.4.1"
   },
   "devDependencies": {

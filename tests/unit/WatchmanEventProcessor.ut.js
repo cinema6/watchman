@@ -7,6 +7,7 @@ describe('WatchmanEventProcessor.js', function() {
     var watchmanEventProcessor;
 
     beforeEach(function() {
+        spyOn(EventProcessor.prototype, 'loadActions');
         watchmanEventProcessor = new WatchmanEventProcessor('config');
     });
     
