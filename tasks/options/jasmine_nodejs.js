@@ -5,8 +5,7 @@ module.exports = {
         reporters: {
             console: {
                 colors: true,
-                indent: true,
-                activity: true
+                indent: true
             }
         }
     },

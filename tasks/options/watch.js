@@ -1,8 +1,4 @@
 module.exports = {
-    vagrant: {
-        files: ['src/**/*.js'],
-        tasks: ['exec:rsync']
-    },
     tdd: {
         files: [
             'src/**/*.js',
@@ -11,5 +7,14 @@ module.exports = {
             'scripts/**/*.js'
         ],
         tasks: ['jshint', 'test:unit']
+    },
+    vagrant: {
+        files: [
+            'src/**/*.js',
+            'tests/**/*.js',
+            'Gruntfile.js',
+            'scripts/**/*.js'
+        ],
+        tasks: ['jshint', 'test:unit', 'exec:rsync']
     }
 };
