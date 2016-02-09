@@ -1,7 +1,6 @@
 'use strict';
 
 var childProcess = require('child_process');
-var fs = require('fs');
 var path = require('path');
 var program = require('commander');
 
@@ -27,212 +26,29 @@ function KclBootstrapper() {
 }
 KclBootstrapper.prototype = {
     /**
-    * Checks the validity of a watchman configuration file. The configuration must match the
-    * defined schema. Configuration file and directory paths must be specified as absolute paths.
-    *
-    * @param {Object} config A watchman configuration object to be checked for errors.
-    * @return {String} Returns an error message if one exists or null otherwise.
-    */
-    checkConfig: function(config, index) {
-        function isAbsolute(path) {
-            return (path.charAt(0) === '/');
-        }
-
-        function isFile(path) {
-            try {
-                return fs.statSync(path).isFile();
-            } catch(error) {
-                return false;
-            }
-        }
-
-        function isDirectory(path) {
-            try {
-                return fs.statSync(path).isDirectory();
-            } catch(error) {
-                return false;
-            }
-        }
-
-        function checkFile(val) {
-            return (isAbsolute(val) && isFile(val)) ? null : 'Not a valid absolute file path';
-        }
-        
-        function checkDir(val) {
-            return (isAbsolute(val) && isDirectory(val)) ? null :
-                'Not a valid absolute directory path';
-        }
-
-        function checkString(val) {
-            return (typeof val === 'string') ? null : 'Not a string';
-        }
-
-        function checkObject(val) {
-            return (typeof val === 'object') ? null : 'Not an object';
-        }
-        
-        function checkEmptyObject(val) {
-            return (Object.keys(val).length === 0) ? 'Empty object' : null;
-        }
-        
-        // Checks that the given value is valid configuration for a consumer and that the specified
-        // event processor exists.
-        function checkConsumers(val) {
-            if(!Array.isArray(val)) {
-                return 'Not an array';
-            }
-            var consumers = val.map(function(consumer) {
-                var result = consumer;
-                if(consumer.processor) {
-                    result.processor = path.resolve(PROJECT_ROOT, 'src/event_processors/' +
-                        consumer.processor);
-                }
-                return result;
-            });
-            var schema = {
-                appName: 'string',
-                processor: 'file',
-                properties: 'file'
-            };
-            for(var i=0;i<consumers.length;i++) {
-                var consumer = consumers[i];
-                var configError = validate(consumer, schema);
-                if(configError) {
-                    return i + ': ' + configError;
-                }
-            }
-            return null;
-        }
-        
-        // Checks that the given value is valid configuration for the event processors. Makes sure
-        // that any specified actions exist.
-        function checkProcessors(val) {
-            var configError = checkObject(val);
-            if(configError) {
-                return configError;
-            }
-            var processorNames = Object.keys(val);
-            for(var i=0;i<processorNames.length;i++) {
-                var processorName = processorNames[i];
-                var processorConfig = val[processorName];
-                configError = checkObject(processorConfig) || checkEmptyObject(processorConfig);
-                if(configError) {
-                    return processorName + ': ' + configError;
-                }
-                var eventNames = Object.keys(processorConfig);
-                for(var j=0;j<eventNames.length;j++) {
-                    var eventName = eventNames[j];
-                    var eventConfig = processorConfig[eventName];
-                    var actions = eventConfig.actions;
-                    if(!actions || actions.length === 0) {
-                        return processorName + ': ' + eventName + ': ' + 'Must contain actions';
-                    }
-                    for(var k=0;k<actions.length;k++) {
-                        var actionName = actions[k].name || actions[k];
-                        configError = checkFile(path.resolve(PROJECT_ROOT, 'src/actions/' +
-                            actionName + '.js'));
-                        if(configError) {
-                            return processorName +  ': ' + eventName + ': actions: ' + k +
-                                ': Invalid action';
-                        }
-                    }
-                }
-            }
-            return null;
-        }
-        
-        // Gets the validation function for a given schema type
-        function getValidationFn(schemaType) {
-            switch(schemaType) {
-            case 'file':
-                return checkFile;
-            case 'dir':
-                return checkDir;
-            case 'consumers':
-                return checkConsumers;
-            case 'string':
-                return checkString;
-            case 'processors':
-                return checkProcessors;
-            case 'object':
-                return checkObject;
-            default:
-                throw new Error('Invalid schema type \'' + schemaType + '\'');
-            }
-        }
-
-        // Validates a given piece of configuration against a given piece of schema
-        function validate(configValue, schemaValue) {
-            if(typeof schemaValue === 'object') {
-                var keys = Object.keys(schemaValue);
-                for(var i=0;i<keys.length;i++) {
-                    var key = keys[i];
-                    var configVal = configValue[key];
-                    var schemaVal = schemaValue[key];
-                    if(configVal) {
-                        var configError = validate(configVal, schemaVal);
-                        if(configError) {
-                            return key + ': ' + configError;
-                        }
-                    } else {
-                        return key + ': Missing value';
-                    }
-                }
-            } else {
-                var fn = getValidationFn(schemaValue);
-                return fn(configValue);
-            }
-            return null;
-        }
-
-        // Validates that the given index corresponds to a consumer in the configuration
-        function validateConsumerIndex(index) {
-            return config.kinesis.consumers[index] ? null : 'Invalid consumer index';
-        }
-
-        // Validates the configuration occurding to the defined schema
-        var schema = {
-            java: {
-                jarPath: 'dir',
-                path: 'file'
-            },
-            kinesis: {
-                pidPath: 'dir',
-                consumers: 'consumers',
-                watchmanProducer: {
-                    stream: 'string',
-                    region: 'string'
-                }
-            },
-            eventProcessors: 'processors',
-            log: 'object'
-        };
-        return validate(config, schema) || validateConsumerIndex(index);
-    },
-    
-    /**
-    * Parses command line options to get the watchman configuration object, consumer configuration
-    * object, user, and group.
+    * Parses command line options to get the java path, MultiLangDaemon properties file, user, and
+    * group options.
     *
     * @return {Object} An options object containing the parsed entities.
     */
     parseCmdLine: function() {
         program
-            .option('-c, --config <config file>', 'configuration for the service')
-            .option('-i, --index <consumer index>',
-                'the index in the consumers array configuration')
+            .option('-j --java <java path>', 'path to java binary')
+            .option('-p --properties <properties file>', 'path to MutiLangDaemon properties file')
             .option('-u --user <user name>', 'the name of the user ')
             .option('-g --group <group name>', 'the name of the group ')
             .parse(process.argv);
 
-        // Load the config
-        var configPath = program.config;
-        var config = require(configPath);
-
-        // Validate the consumer index
-        var index = parseInt(program.index);
-        if(isNaN(index)) {
-            throw new Error('You must specify a consumer index');
+        // Ensure java path was specified
+        var javaPath = program.java;
+        if(!javaPath) {
+            throw new Error('You must specify a java path');
+        }
+        
+        // Ensure properties path was specified
+        var propertiesPath = program.properties;
+        if(!propertiesPath) {
+            throw new Error('You must specify a properties path');
         }
 
         // Ensure user and group were specified
@@ -243,15 +59,15 @@ KclBootstrapper.prototype = {
         }
 
         return {
-            config: config,
-            index: index,
+            java: javaPath,
+            properties: propertiesPath,
             user: user,
             group: group
         };
     },
     
     /**
-    * Parses command line options, verifies them, and runs the bootstrapper.
+    * Parses command line options and runs the bootstrapper.
     */
     run: function() {
         var options = this.parseCmdLine();
@@ -259,19 +75,10 @@ KclBootstrapper.prototype = {
         process.setgid(options.group);
         process.setuid(options.user);
 
-        var configError = this.checkConfig(options.config, options.index);
-        if(configError) {
-            throw new Error(configError);
-        } 
-        
-        var consumerConfig = options.config.kinesis.consumers[options.index];
-        var javaPath = options.config.java.path;
-        var propertiesFile = consumerConfig.properties;
-
         // Spawn the MultiLangDaemon
         var classpath = path.resolve(PROJECT_ROOT, 'jars', '*') + ':/';
-        var args = ['-cp', classpath,  MULTI_LANG_DAEMON_CLASS, propertiesFile];
-        var child = childProcess.spawn(javaPath, args, {
+        var args = ['-cp', classpath,  MULTI_LANG_DAEMON_CLASS, options.properties];
+        var child = childProcess.spawn(options.java, args, {
             stdio: 'inherit'
         });
 

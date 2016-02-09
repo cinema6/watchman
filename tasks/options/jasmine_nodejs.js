@@ -1,16 +1,18 @@
 module.exports = {
     options: {
-        specNameSuffix: '.ut.js',
+        specNameSuffix: '.js',
         stopOnFailure: false,
         reporters: {
             console: {
                 colors: true,
-                indent: true,
-                activity: true
+                indent: true
             }
         }
     },
-    all: {
-        specs: 'tests/unit/**'
+    unit: {
+        specs: 'tests/unit/**/*.ut.js'
+    },
+    e2e: {
+        specs: 'tests/e2e/**/*.e2e.js'
     }
 };

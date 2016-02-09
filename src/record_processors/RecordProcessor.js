@@ -1,7 +1,7 @@
 'use strict';
 
 var Q = require('q');
-var logger = require('../../lib/logger.js');
+var logger = require('cwrx/lib/logger.js');
 
 /**
 * The record processor must provide three functions:

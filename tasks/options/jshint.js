@@ -6,6 +6,7 @@ module.exports = {
         'src/**/*.js',
         'tests/**/*.js',
         'Gruntfile.js',
-        'scripts/**/*.js'
+        'scripts/**/*.js',
+        'tasks/**/*.js'
     ]
 };
