@@ -5,7 +5,7 @@ var JsonProducer = require('../../src/producers/JsonProducer.js');
 var Q = require('q');
 var testUtils = require('cwrx/test/e2e/testUtils.js');
 
-var TIME_STREAM = 'devTimeStream';
+var TIME_STREAM = process.env.timeStream;
 var WAIT_TIME = 1000;
 
 describe('timeStream', function() {
