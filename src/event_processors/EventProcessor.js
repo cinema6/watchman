@@ -79,7 +79,7 @@ EventProcessor.prototype = {
                 } else {
                     var reason = result.reason;
                     log.warn('[%1 event processor] Error performing action %2: %3', self.name,
-                        actionNames[index], reason);
+                        actionNames[index], JSON.stringify(reason));
                 }
             });
         });
