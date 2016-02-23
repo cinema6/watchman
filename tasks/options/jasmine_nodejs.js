@@ -1,18 +1,36 @@
 module.exports = {
     options: {
         specNameSuffix: '.js',
-        stopOnFailure: false,
-        reporters: {
-            console: {
-                colors: true,
-                indent: true
+        stopOnFailure: false
+    },
+    unit: {
+        specs: 'tests/unit/**/*.ut.js',
+        options: {
+            reporters: {
+                console: {
+                    colors: true,
+                    indent: true
+                },
+                junit: {
+                    savePath: 'reports',
+                    filePrefix: 'unit_test_results'
+                }
             }
         }
     },
-    unit: {
-        specs: 'tests/unit/**/*.ut.js'
-    },
     e2e: {
-        specs: 'tests/e2e/**/*.e2e.js'
+        specs: 'tests/e2e/**/*.e2e.js',
+        options: {
+            reporters: {
+                console: {
+                    colors: true,
+                    indent: true
+                },
+                junit: {
+                    savePath: 'reports',
+                    filePrefix: 'e2e_test_results'
+                }
+            }
+        }
     }
 };
