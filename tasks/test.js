@@ -2,11 +2,17 @@
 
 var AWS = require('aws-sdk');
 var Q = require('q');
-var cloudFormation = new AWS.CloudFormation({
-    region: 'us-east-1'
-});
+var path = require('path');
 
 module.exports = function(grunt) {
+    var cloudFormation;
+    
+    function initCloudFormation(auth, region) {
+        AWS.config.loadFromPath(auth);
+        AWS.config.update({ region: region });
+        cloudFormation = new AWS.CloudFormation();
+    }
+    
     function getStackOutputs(stack) {
         return Q.Promise(function(resolve, reject) {
             cloudFormation.describeStacks({
@@ -32,10 +38,14 @@ module.exports = function(grunt) {
             done();
             break;
         case 'e2e':
+            var auth = grunt.option('awsAuth') || path.join(process.env.HOME, '.aws.json');
             var cloudStack = grunt.option('formation');
             var mongoHost = options.mongoHost;
+            var region = grunt.option('region') || 'us-east-1';
             var timeStream = options.timeStream;
             var watchmanStream = options.watchmanStream;
+            
+            initCloudFormation(auth, region);
             
             Q.resolve().then(function() {
                 if(cloudStack) {
