@@ -18,6 +18,7 @@ describe('KclApp.js', function() {
         config = {
             log: { },
             secrets: '/valid-file-secrets',
+            appCreds: '/valid-file-secrets',
             cwrx: {
                 api: { }
             },
@@ -138,6 +139,26 @@ describe('KclApp.js', function() {
                 config.secrets = 'valid-file';
                 var configError = app.checkConfig(config, 0);
                 expect(configError).toBe('secrets: Not a valid absolute file path');
+            });
+        });
+
+        describe('appCreds', function() {
+            it('should return an error message if missing', function() {
+                delete config.appCreds;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('appCreds: Missing value');
+            });
+            
+            it('should return an error message if not a file', function() {
+                config.appCreds = '/invalid-file';
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('appCreds: Not a valid absolute file path');
+            });
+            
+            it('should return an error message if not an absolute path', function() {
+                config.appCreds = 'valid-file';
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('appCreds: Not a valid absolute file path');
             });
         });
 
@@ -432,11 +453,12 @@ describe('KclApp.js', function() {
             }
         });
         
-        it('should set the config property with added secrets', function() {
+        it('should set the config property with added secrets and appCreds', function() {
             expect(app.config).toBeNull();
             app.loadConfig();
             expect(fs.readFileSync).toHaveBeenCalledWith('mockConfig', 'utf8');
             config.secrets = 'so secret';
+            config.appCreds = 'so secret';
             expect(app.config).toEqual(config);
         });
         
@@ -459,6 +481,7 @@ describe('KclApp.js', function() {
             
             it('should update the config of the event processor', function() {
                 config.secrets = 'so secret';
+                config.appCreds = 'so secret';
                 expect(app.recordProcessor.processor.config).toEqual(config);
                 expect(app.recordProcessor.processor.loadActions).toHaveBeenCalledWith();
             });

@@ -36,9 +36,13 @@ describe('set_status.js', function() {
             secrets: {
                 email: 'email',
                 password: 'password'
+            },
+            appCreds: {
+                key: 'key',
+                secret: 'secret'
             }
         };
-        spyOn(requestUtils, 'qRequest').and.callFake(function(method, options) {
+        spyOn(requestUtils, 'makeSignedRequest').and.callFake(function(creds, method, options) {
             switch(options.url) {
             case 'http://hostname/api/auth/login':
                 return Q.resolve();
@@ -58,7 +62,7 @@ describe('set_status.js', function() {
         Q.all(mockDatas.map(function(mockData) {
             return setStatus(mockData, mockOptions, mockConfig);
         })).then(function() {
-            expect(requestUtils.qRequest).not.toHaveBeenCalled();
+            expect(requestUtils.makeSignedRequest).not.toHaveBeenCalled();
             done();
         }).catch(done.fail);
     });
@@ -73,7 +77,7 @@ describe('set_status.js', function() {
             status: null
         };
         setStatus(mockData, mockOptions, mockConfig).then(function() {
-            expect(requestUtils.qRequest).not.toHaveBeenCalled();
+            expect(requestUtils.makeSignedRequest).not.toHaveBeenCalled();
             done();
         }).catch(done.fail);
     });
@@ -95,23 +99,12 @@ describe('set_status.js', function() {
             };
         });
         
-        it('should authenticate', function(done) {
-            setStatus(mockData, mockOptions, mockConfig).then(function() {
-                expect(requestUtils.qRequest).toHaveBeenCalledWith('post', {
-                    url: 'http://hostname/api/auth/login',
-                    json: {
-                        email: 'email',
-                        password: 'password'
-                    },
-                    jar: true
-                });
-                done();
-            }).catch(done.fail);
-        });
-        
         it('should edit the status of the campaign', function(done) {
             setStatus(mockData, mockOptions, mockConfig).then(function() {
-                expect(requestUtils.qRequest).toHaveBeenCalledWith('put', {
+                expect(requestUtils.makeSignedRequest).toHaveBeenCalledWith({
+                    key: 'key',
+                    secret: 'secret'
+                }, 'put', {
                     url: 'http://hostname/api/campaigns/c-123',
                     json: {
                         status: 'status'

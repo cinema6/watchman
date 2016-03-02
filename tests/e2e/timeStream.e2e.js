@@ -5,6 +5,7 @@ var JsonProducer = require('../../src/producers/JsonProducer.js');
 var Q = require('q');
 var testUtils = require('cwrx/test/e2e/testUtils.js');
 
+var APP_CREDS = JSON.parse(process.env.appCreds);
 var TIME_STREAM = process.env.timeStream;
 var WAIT_TIME = 1000;
 
@@ -143,9 +144,29 @@ describe('timeStream', function() {
                 }
             },
         ];
+        var mockApp = {
+            id: 'app-e2e-watchman',
+            key: APP_CREDS.key,
+            status: 'active',
+            secret: APP_CREDS.secret,
+            permissions: {
+                campaigns: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
+                cards: { read: 'all', create: 'all', edit: 'all', delete: 'all' }
+            },
+            entitlements: {
+                'directEditCampaigns': true
+            },
+            fieldValidation: {
+                'campaigns': {
+                    'status': {
+                        '__allowed': true
+                    }
+                }
+            }
+        };
 
         var today = ((new Date()).toISOString()).substr(0, 10);
-        var pgdata_campaign_summary_hourly = [
+        var pgdataCampaignSummaryHourly = [
             'INSERT INTO rpt.campaign_summary_hourly_all VALUES',
             '(\'' + today + ' 01:00:00+00\',\'e2e-cam-1\',\'completedView\',0,0),',
             '(\'' + today + ' 01:00:00+00\',\'e2e-cam-2\',\'completedView\',100,100),',
@@ -160,14 +181,15 @@ describe('timeStream', function() {
         }
         
         function pgInsert() {
-            return pgQuery(pgconn, pgdata_campaign_summary_hourly.join(' '));
+            return pgQuery(pgconn, pgdataCampaignSummaryHourly.join(' '));
         }
         
         pgTruncate().then(function() {
             return Q.all([
                 pgInsert(),
                 testUtils.resetCollection('cards', mockCards),
-                testUtils.resetCollection('campaigns', mockCampaigns)
+                testUtils.resetCollection('campaigns', mockCampaigns),
+                testUtils.mongoUpsert('applications', { key: 'watchman-app' }, mockApp)
             ]);
         }).then(done).catch(function(error) {
             done.fail(error);

@@ -7,8 +7,8 @@ var requestUtils = require('cwrx/lib/requestUtils.js');
 
 module.exports = function(data, options, config) {
     var apiRoot = config.cwrx.api.root;
+    var appCreds = config.appCreds;
     var analyticsEndpoint = apiRoot + config.cwrx.api.analytics.endpoint;
-    var authEndpoint = apiRoot + config.cwrx.api.auth.endpoint + '/login';
     var campaignEndpoint = apiRoot + config.cwrx.api.campaigns.endpoint;
     var fetchAnalytics = options.analytics || false;
     var log = logger.getLog();
@@ -17,19 +17,8 @@ module.exports = function(data, options, config) {
     var statuses = (options.statuses) ? options.statuses : ['active'];
     var watchmanProducer = new JsonProducer(producerConfig.stream, producerConfig);
 
-    function authorize() {
-        return requestUtils.qRequest('post', {
-            url: authEndpoint,
-            json: {
-                email: config.secrets.email,
-                password: config.secrets.password
-            },
-            jar: true
-        });
-    }
-    
     function getCampaigns() {
-        return requestUtils.qRequest('get', {
+        return requestUtils.makeSignedRequest(appCreds, 'get', {
             url: campaignEndpoint,
             json: true,
             jar: true,
@@ -59,7 +48,7 @@ module.exports = function(data, options, config) {
         });
         return Q.resolve().then(function() {
             if(fetchAnalytics && campaignIds.length > 0) {
-                return requestUtils.qRequest('get', {
+                return requestUtils.makeSignedRequest(appCreds, 'get', {
                     url: analyticsEndpoint + '/campaigns',
                     json: true,
                     jar: true,
@@ -105,8 +94,7 @@ module.exports = function(data, options, config) {
         });
     }
 
-    return authorize()
-        .then(getCampaigns)
+    return getCampaigns()
         .then(getAnalytics)
         .then(produceResults);
 };

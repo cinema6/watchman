@@ -45,6 +45,10 @@ describe('fetch_campaigns.js', function() {
             secrets: {
                 email: 'email',
                 password: 'password'
+            },
+            appCreds: {
+                key: 'key',
+                secret: 'secret'
             }
         };
         mockLog = {
@@ -63,7 +67,7 @@ describe('fetch_campaigns.js', function() {
             { views: 200 },
             { views: 300 }
         ];
-        spyOn(requestUtils, 'qRequest').and.callFake(function(method, options) {
+        spyOn(requestUtils, 'makeSignedRequest').and.callFake(function(creds, method, options) {
             switch(options.url) {
             case 'http://hostname/api/auth/login':
                 return Q.resolve();
@@ -77,28 +81,6 @@ describe('fetch_campaigns.js', function() {
         spyOn(logger, 'getLog').and.returnValue(mockLog);
     });
     
-    it('should authenticate', function(done) {
-        mockCampaignResponse = {
-            response: {
-                statusCode: 200
-            },
-            body: []
-        };
-        fetchCampaigns(mockData, mockOptions, mockConfig).then(function() {
-            expect(requestUtils.qRequest).toHaveBeenCalledWith('post', {
-                url: 'http://hostname/api/auth/login',
-                json: {
-                    email: 'email',
-                    password: 'password'
-                },
-                jar: true
-            });
-            done();
-        }).catch(function(error) {
-            done.fail(error);
-        });
-    });
-    
     it('should request campaigns', function(done) {
         mockCampaignResponse = {
             response: {
@@ -107,7 +89,10 @@ describe('fetch_campaigns.js', function() {
             body: []
         };
         fetchCampaigns(mockData, mockOptions, mockConfig).then(function() {
-            expect(requestUtils.qRequest).toHaveBeenCalledWith('get', {
+            expect(requestUtils.makeSignedRequest).toHaveBeenCalledWith({
+                key: 'key',
+                secret: 'secret'
+            }, 'get', {
                 url: 'http://hostname/api/campaigns',
                 json: true,
                 jar: true,
@@ -146,7 +131,10 @@ describe('fetch_campaigns.js', function() {
                 
                 it('should fetch analytics', function(done) {
                     fetchCampaigns(mockData, mockOptions, mockConfig).then(function() {
-                        expect(requestUtils.qRequest).toHaveBeenCalledWith('get', {
+                        expect(requestUtils.makeSignedRequest).toHaveBeenCalledWith({
+                            key: 'key',
+                            secret: 'secret'
+                        }, 'get', {
                             url: 'http://hostname/api/analytics/campaigns',
                             json: true,
                             jar: true,
@@ -223,8 +211,8 @@ describe('fetch_campaigns.js', function() {
                 
                 it('should not fetch analytics', function(done) {
                     fetchCampaigns(mockData, mockOptions, mockConfig).then(function() {
-                        expect(requestUtils.qRequest.calls.allArgs().map(function(args) {
-                            return args[1].url;
+                        expect(requestUtils.makeSignedRequest.calls.allArgs().map(function(args) {
+                            return args[2].url;
                         })).not.toContain('http://hostname/api/analytics/campaigns');
                         done();
                     }).catch(done.fail);

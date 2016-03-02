@@ -38,6 +38,8 @@ module.exports = function(grunt) {
             done();
             break;
         case 'e2e':
+            var appKey = grunt.option('appKey');
+            var appSecret = grunt.option('appSecret');
             var auth = grunt.option('awsAuth') || path.join(process.env.HOME, '.aws.json');
             var cloudStack = grunt.option('formation');
             var mongoHost = options.mongoHost;
@@ -66,6 +68,15 @@ module.exports = function(grunt) {
                     });
                 }
             }).then(function() {
+                var appCreds;
+                try {
+                    appCreds = grunt.file.readJSON('.rcAppCreds.json');
+                } catch(error) {
+                    appCreds = {
+                        key: appKey,
+                        secret: appSecret
+                    };
+                }
                 var mongoCfg = {
                     host: mongoHost,
                     port: 27017,
@@ -73,6 +84,7 @@ module.exports = function(grunt) {
                     user: 'e2eTests',
                     pass: 'password'
                 };
+                process.env.appCreds = JSON.stringify(appCreds);
                 process.env.mongo = JSON.stringify(mongoCfg);
                 process.env.timeStream = timeStream;
                 process.env.watchmanStream = watchmanStream;

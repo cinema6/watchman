@@ -155,6 +155,7 @@ KclApp.prototype = {
         var schema = {
             log: 'object',
             secrets: 'file',
+            appCreds: 'file',
             cwrx: {
                 api: 'object'
             },
@@ -232,6 +233,11 @@ KclApp.prototype = {
         var secretsPath = config.secrets;
         var secrets = require(secretsPath);
         config.secrets = secrets;
+        
+        // Read the rcAppCreds file
+        var appCredsPath = config.appCreds;
+        var appCreds = require(appCredsPath);
+        config.appCreds = appCreds;
         
         // Handle changes to the config
         if(this.config) {
