@@ -9,19 +9,46 @@ module.exports = function(data, options, config) {
     var producerConfig = config.kinesis.producer;
     var watchmanProducer = new JsonProducer(producerConfig.stream, producerConfig);
 
-    return Q.resolve().then(function() {
+    function campaignEnded() {
         if(data.campaign && data.campaign.cards && data.campaign.cards.length > 0 &&
                 data.campaign.cards[0].campaign && data.campaign.cards[0].campaign.endDate) {
             var endDate = new Date(data.campaign.cards[0].campaign.endDate);
-            if(endDate < Date.now()) {
-                log.trace('Campaign %1 ended at %2', data.campaign.id, endDate);
-                return watchmanProducer.produce({
-                    type: 'campaignExpired',
-                    data: {
-                        campaign: data.campaign
-                    }
-                });
-            }
+            return (endDate < Date.now());
+        } else {
+            return false;
+        }
+    }
+    
+    function campaignReachedBudget() {
+        if(data.analytics && data.analytics.summary && data.analytics.summary.totalSpend &&
+                data.campaign && data.campaign.pricing && data.campaign.pricing.budget) {
+            var budget = parseInt(parseFloat(data.campaign.pricing.budget) * 1000, 10);
+            var spend = parseInt(parseFloat(data.analytics.summary.totalSpend) *  1000, 10);
+            return (spend >= budget);
+        } else {
+            return false;
+        }
+    }
+
+    return Q.resolve().then(function() {
+        if(campaignEnded()) {
+            log.trace('Campaign %1 ended at %2', data.campaign.id,
+                data.campaign.cards[0].campaign.endDate);
+            return watchmanProducer.produce({
+                type: 'campaignExpired',
+                data: {
+                    campaign: data.campaign
+                }
+            });
+        } else if(campaignReachedBudget()) {
+            log.trace('Campaign %1 reached budget of %2', data.campaign.id,
+                data.campaign.pricing.budget);
+            return watchmanProducer.produce({
+                type: 'campaignReachedBudget',
+                data: {
+                    campaign: data.campaign
+                }
+            });
         }
     });
 };

@@ -7,16 +7,19 @@ var logger = require('cwrx/lib/logger.js');
 var requestUtils = require('cwrx/lib/requestUtils.js');
 
 describe('fetch_campaigns.js', function() {
+    var mockAnalyticsResponse;
     var mockCampaignResponse;
     var mockData;
     var mockOptions;
     var mockConfig;
     var mockLog;
+    var mockCampaigns;
+    var mockAnalytics;
     
     beforeEach(function() {
         mockData = { };
         mockOptions = {
-            status: 'status',
+            statuses: ['status1','status2'],
             prefix: 'prefix'
         };
         mockConfig = {
@@ -33,6 +36,9 @@ describe('fetch_campaigns.js', function() {
                     },
                     campaigns: {
                         endpoint: '/api/campaigns'
+                    },
+                    analytics: {
+                        endpoint: '/api/analytics'
                     }
                 }
             },
@@ -47,12 +53,24 @@ describe('fetch_campaigns.js', function() {
             warn: jasmine.createSpy('warn()'),
             error: jasmine.createSpy('error()')
         };
+        mockCampaigns = [
+            { id: 'cam-1' },
+            { id: 'cam-2' },
+            { id: 'cam-3' }
+        ];
+        mockAnalytics = [
+            { views: 100 },
+            { views: 200 },
+            { views: 300 }
+        ];
         spyOn(requestUtils, 'qRequest').and.callFake(function(method, options) {
             switch(options.url) {
             case 'http://hostname/api/auth/login':
                 return Q.resolve();
             case 'http://hostname/api/campaigns':
                 return Q.resolve(mockCampaignResponse);
+            case 'http://hostname/api/analytics/campaigns':
+                return Q.resolve(mockAnalyticsResponse);
             }
         });
         spyOn(JsonProducer.prototype, 'produce');
@@ -94,7 +112,7 @@ describe('fetch_campaigns.js', function() {
                 json: true,
                 jar: true,
                 qs: {
-                    statuses: 'status'
+                    statuses: 'status1,status2'
                 }
             });
             done();
@@ -105,27 +123,125 @@ describe('fetch_campaigns.js', function() {
     
     describe('the request for campaigns', function() {
         describe('when it responded with a status code of 200', function() {
-            beforeEach(function(done) {
+            beforeEach(function() {
                 mockCampaignResponse = {
                     response: {
                         statusCode: 200
                     },
-                    body: ['cam-1', 'cam-2', 'cam-3']
+                    body: mockCampaigns
                 };
                 JsonProducer.prototype.produce.and.returnValue(Q.resolve());
-                fetchCampaigns(mockData, mockOptions, mockConfig).then(done).catch(function(error) {
-                    done.fail(error);
+            });
+            
+            describe('when analytics are set to be fetched', function() {
+                beforeEach(function() {
+                    mockOptions.analytics = true;
+                    mockAnalyticsResponse = {
+                        response: {
+                            statusCode: 200
+                        },
+                        body: []
+                    };
+                });
+                
+                it('should fetch analytics', function(done) {
+                    fetchCampaigns(mockData, mockOptions, mockConfig).then(function() {
+                        expect(requestUtils.qRequest).toHaveBeenCalledWith('get', {
+                            url: 'http://hostname/api/analytics/campaigns',
+                            json: true,
+                            jar: true,
+                            qs: {
+                                ids: 'cam-1,cam-2,cam-3'
+                            }
+                        });
+                        done();
+                    }).catch(done.fail);
+                });
+
+                describe('when the request for analytics succeeds', function() {
+                    beforeEach(function() {
+                        mockAnalyticsResponse = {
+                            response: {
+                                statusCode: 200
+                            },
+                            body: mockAnalytics
+                        };
+                    });
+                    
+                    it('should produce campaigns with analytics into a stream', function(done) {
+                        fetchCampaigns(mockData, mockOptions, mockConfig).then(function() {
+                            mockCampaigns.forEach(function(mockCampaign, index) {
+                                expect(JsonProducer.prototype.produce).toHaveBeenCalledWith({
+                                    type: 'prefix_campaignPulse',
+                                    data: {
+                                        campaign: mockCampaign,
+                                        analytics: mockAnalytics[index]
+                                    }
+                                });
+                            });
+                            done();
+                        }).catch(done.fail);
+                    });
+                });
+                
+                describe('when the request for analytics fails', function() {
+                    beforeEach(function() {
+                        mockAnalyticsResponse = {
+                            response: {
+                                statusCode: 500
+                            }
+                        };
+                    });
+                    
+                    it('should produce campaigns without analytics into a stream', function(done) {
+                        fetchCampaigns(mockData, mockOptions, mockConfig).then(function() {
+                            mockCampaigns.forEach(function(mockCampaign) {
+                                expect(JsonProducer.prototype.produce).toHaveBeenCalledWith({
+                                    type: 'prefix_campaignPulse',
+                                    data: {
+                                        campaign: mockCampaign
+                                    }
+                                });
+                            });
+                            done();
+                        }).catch(done);
+                    });
+                    
+                    it('should log a warning', function(done) {
+                        fetchCampaigns(mockData, mockOptions, mockConfig).then(function() {
+                            expect(mockLog.warn).toHaveBeenCalled();
+                            done();
+                        }).catch(done);
+                    });
                 });
             });
             
-            it('should produce each campaign into a stream', function() {
-                ['cam-1', 'cam-2', 'cam-3'].forEach(function(campaign) {
-                    expect(JsonProducer.prototype.produce).toHaveBeenCalledWith({
-                        type: 'prefix_campaignPulse',
-                        data: {
-                            campaign: campaign
-                        }
-                    });
+            describe('when analytics are not set to be fetched', function() {
+                beforeEach(function() {
+                    mockOptions.analytics = false;
+                });
+                
+                it('should not fetch analytics', function(done) {
+                    fetchCampaigns(mockData, mockOptions, mockConfig).then(function() {
+                        expect(requestUtils.qRequest.calls.allArgs().map(function(args) {
+                            return args[1].url;
+                        })).not.toContain('http://hostname/api/analytics/campaigns');
+                        done();
+                    }).catch(done.fail);
+                });
+
+                it('should produce each campaign into a stream', function(done) {
+                    fetchCampaigns(mockData, mockOptions, mockConfig).then(function() {
+                        mockCampaigns.forEach(function(mockCampaign) {
+                            expect(JsonProducer.prototype.produce).toHaveBeenCalledWith({
+                                type: 'prefix_campaignPulse',
+                                data: {
+                                    campaign: mockCampaign
+                                }
+                            });
+                        });
+                        done();
+                    }).catch(done.fail);
                 });
             });
         });
