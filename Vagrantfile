@@ -6,14 +6,15 @@ VAGRANTFILE_API_VERSION = "2"
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   # Box to build off of
-  config.vm.box = "Berkshelf-CentOS-6.3-x86_64-minimal--bigger"
-  config.vm.box_url = "https://s3.amazonaws.com/c6.dev/VagrantBoxes/Berkshelf-CentOS-6.3-x86_64-minimal--bigger.box"
+  config.vm.box = "Reelcontent-CentOS-6.3-x86_64-1.0.0.box"
+  config.vm.box_url = "https://s3.amazonaws.com/c6.dev/VagrantBoxes/Reelcontent-CentOS-6.3-x86_64-1.0.0.box"
 
   # Create a private network, which allows host-only access to the machine
   # using a specific IP.
   config.vm.network "private_network", ip: "33.33.33.20"
   config.vm.provider :virtualbox do |vb|
     vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+    vb.memory = 1024
   end
 
   # Use the default insecure key
