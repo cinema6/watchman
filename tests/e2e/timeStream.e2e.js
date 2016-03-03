@@ -143,6 +143,19 @@ describe('timeStream', function() {
                     budget: 300
                 }
             },
+            // outOfBudget, reached end date, reached total budget
+            {
+                id: 'e2e-cam-7',
+                name: 'camp 7',
+                status: 'outOfBudget',
+                user: 'e2e-user',
+                org: 'o-selfie',
+                advertiserId: 'advertiser',
+                cards: [ { id: 'e2e-rc-1' } ],
+                pricing: {
+                    budget: 300
+                }
+            }
         ];
         var mockApp = {
             id: 'app-e2e-watchman',
@@ -173,7 +186,8 @@ describe('timeStream', function() {
             '(\'' + today + ' 01:00:00+00\',\'e2e-cam-3\',\'completedView\',200,200),',
             '(\'' + today + ' 01:00:00+00\',\'e2e-cam-4\',\'completedView\',300,300),',
             '(\'' + today + ' 01:00:00+00\',\'e2e-cam-5\',\'completedView\',400,400),',
-            '(\'' + today + ' 01:00:00+00\',\'e2e-cam-6\',\'completedView\',500,500);'
+            '(\'' + today + ' 01:00:00+00\',\'e2e-cam-6\',\'completedView\',500,500),',
+            '(\'' + today + ' 01:00:00+00\',\'e2e-cam-7\',\'completedView\',600,600);'
         ];
         
         function pgTruncate() {
@@ -202,7 +216,8 @@ describe('timeStream', function() {
         });
     });
 
-    it('should expire active or paused campaigns upon reaching their end date', function(done) {
+    it('should expire active, paused, or outOfBudget campaigns upon reaching their end date',
+            function(done) {
         function waitForEnded() {
             return testUtils.mongoFind('campaigns', { id: 'e2e-cam-1' }).then(function(campaigns) {
                 if(campaigns[0].status !== 'expired') {
@@ -218,13 +233,14 @@ describe('timeStream', function() {
         producer.produce({ type: 'hourly' }).then(function() {
             return waitForEnded();
         }).then(function() {
-            var ids = ['e2e-cam-1', 'e2e-cam-2', 'e2e-cam-3', 'e2e-cam-4'];
+            var ids = ['e2e-cam-1', 'e2e-cam-2', 'e2e-cam-3', 'e2e-cam-4', 'e2e-cam-7'];
             return testUtils.mongoFind('campaigns', { id: { $in: ids } }, { id: 1 });
         }).then(function(campaigns) {
             expect(campaigns[0].status).toBe('expired');
             expect(campaigns[1].status).toBe('expired');
             expect(campaigns[2].status).toBe('active');
             expect(campaigns[3].status).toBe('draft');
+            expect(campaigns[4].status).toBe('expired');
             done();
         }).catch(done.fail);
     });

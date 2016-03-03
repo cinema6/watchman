@@ -45,7 +45,7 @@ describe('check_expiry.js', function() {
                 campaign: {
                     cards: [
                         {
-                            campsign: {
+                            campaign: {
                                 endDate: new Date(3000, 11, 17)
                             }
                         }
@@ -79,6 +79,27 @@ describe('check_expiry.js', function() {
                         campaign: mockData.campaign
                     }
                 });
+                done();
+            }).catch(function(error) {
+                done.fail(error);
+            });
+        });
+        
+        it('should not produce if the status is already expired', function(done) {
+            var mockData = {
+                campaign: {
+                    status: 'expired',
+                    cards: [
+                        {
+                            campaign: {
+                                endDate: new Date(2000, 11, 17)
+                            }
+                        }
+                    ]
+                }
+            };
+            checkExpiry(mockData, mockOptions, mockConfig).then(function() {
+                expect(JsonProducer.prototype.produce).not.toHaveBeenCalled();
                 done();
             }).catch(function(error) {
                 done.fail(error);
@@ -164,6 +185,28 @@ describe('check_expiry.js', function() {
                         campaign: mockData.campaign
                     }
                 });
+                done();
+            }).catch(function(error) {
+                done.fail(error);
+            });
+        });
+        
+        it('should not produce if the status is already outOfBudget', function(done) {
+            var mockData = {
+                campaign: {
+                    status: 'outOfBudget',
+                    pricing: {
+                        budget: 9000
+                    }
+                },
+                analytics: {
+                    summary: {
+                        totalSpend: 13500
+                    }
+                }
+            };
+            checkExpiry(mockData, mockOptions, mockConfig).then(function() {
+                expect(JsonProducer.prototype.produce).not.toHaveBeenCalled();
                 done();
             }).catch(function(error) {
                 done.fail(error);

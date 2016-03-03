@@ -31,7 +31,7 @@ module.exports = function(data, options, config) {
     }
 
     return Q.resolve().then(function() {
-        if(campaignEnded()) {
+        if(campaignEnded() && data.campaign.status !== 'expired') {
             log.trace('Campaign %1 ended at %2', data.campaign.id,
                 data.campaign.cards[0].campaign.endDate);
             return watchmanProducer.produce({
@@ -40,7 +40,7 @@ module.exports = function(data, options, config) {
                     campaign: data.campaign
                 }
             });
-        } else if(campaignReachedBudget()) {
+        } else if(campaignReachedBudget() && data.campaign.status !== 'outOfBudget') {
             log.trace('Campaign %1 reached budget of %2', data.campaign.id,
                 data.campaign.pricing.budget);
             return watchmanProducer.produce({
