@@ -1,7 +1,9 @@
 'use strict';
 
+var CloudWatchReporter = require('cwrx/lib/cloudWatchReporter.js');
 var Q = require('q');
 var logger = require('cwrx/lib/logger.js');
+var util = require('util');
 
 /**
 * This class is an event processor whose process method is called by a corresponding record
@@ -19,6 +21,7 @@ function EventProcessor(name, config) {
     this.config = config;
     this.name = name;
     this.actions = { };
+    this.cloudWatchReporters = { };
     this.loadActions();
 }
 EventProcessor.prototype = {
@@ -54,7 +57,7 @@ EventProcessor.prototype = {
 
         var log = logger.getLog();
         var self = this;
-        
+
         // Resolve if there are no actions in the eventConfig
         if(actions.length === 0) {
             return Q.resolve();
@@ -67,24 +70,24 @@ EventProcessor.prototype = {
         log.info('[%1 event processor] Event %2 performing actions %3', self.name, event.name,
             actionNames);
         return Q.allSettled(actions.map(function(action, index) {
-            var actionModule = self.actions[actionNames[index]];
+            var actionName = actionNames[index];
+            var actionModule = self.actions[actionName];
             var actionOptions = action.options || null;
-            return actionModule(event.data, actionOptions, self.config);
-        })).then(function(results) {
-            // Log the results of each performed action
-            results.forEach(function(result, index) {
-                if(result.state === 'fulfilled') {
+            var cloudWatchReporter = self.cloudWatchReporters[actionName];
+            var start = Date.now();
+            return actionModule(event.data, actionOptions, self.config).then(function() {
+                if(cloudWatchReporter) {
                     log.info('[%1 event processor] Successfully performed action %2',
                         self.name, actionNames[index]);
-                } else {
-                    var reason = result.reason;
-                    log.warn('[%1 event processor] Error performing action %2: %3', self.name,
-                        actionNames[index], JSON.stringify(reason));
+                    cloudWatchReporter.push(Date.now() - start);
                 }
+            }).catch(function(error) {
+                log.warn('[%1 event processor] Error performing action %2: %3', self.name,
+                    actionName, JSON.stringify(error));
             });
-        });
+        }));
     },
-    
+
     /**
     * Maps a decoded record to an event in configuration. This method is meant to be overriden.
     *
@@ -95,7 +98,7 @@ EventProcessor.prototype = {
     recordToEvent: function() {
         return null;
     },
-    
+
     /**
     * Returns the path to the action module given the action's name.
     *
@@ -105,16 +108,21 @@ EventProcessor.prototype = {
     getActionPath: function(actionName) {
         return '../actions/' + actionName + '.js';
     },
-    
+
     /**
     * Loads any actions that could be used by the event processor. New actions are added, existing
-    * actions are updated, and actions no longer being used are deleted.
+    * actions are updated, and actions no longer being used are deleted. CloudWatch reporters are
+    * loaded and configured for any added actions. When removing actions the reporter is flushed
+    * and destroyed.
     */
     loadActions: function() {
         var actionNames = { };
+        var cloudWatchConfig = this.config.cloudWatch;
         var eventHandlers = this.config.eventHandlers;
+        var log = logger.getLog();
+        var reportingActions = null;
         var self = this;
-        
+
         // Get a list of required actions
         Object.keys(eventHandlers).forEach(function(event) {
             var eventHandler = eventHandlers[event];
@@ -123,7 +131,15 @@ EventProcessor.prototype = {
                 actionNames[actionName] = null;
             });
         });
-        
+
+        // Get a list of required cloudWatch reporters
+        reportingActions = Object.keys(actionNames).filter(function(actionName) {
+            var cloudWatchActionConfig = cloudWatchConfig[actionName] || { };
+            var reportingEnabled = ('enabled' in cloudWatchActionConfig) ?
+                cloudWatchActionConfig.enabled : true;
+            return reportingEnabled;
+        });
+
         // Load the required actions
         Object.keys(actionNames).forEach(function(actionName) {
             var modulePath = self.getActionPath(actionName);
@@ -132,13 +148,47 @@ EventProcessor.prototype = {
             }
             self.actions[actionName] = require(modulePath);
         });
-        
+
+        // Load the required cloudWatch reporters
+        reportingActions.forEach(function(actionName) {
+            var cloudWatchActionConfig = cloudWatchConfig[actionName] || { };
+            var sendInterval = ('sendInterval' in cloudWatchActionConfig) ?
+                cloudWatchActionConfig.sendInterval : cloudWatchConfig.sendInterval;
+            if(!(actionName in self.cloudWatchReporters)) {
+                var metricName = actionName + '-Time';
+                self.cloudWatchReporters[actionName] = new CloudWatchReporter(
+                        cloudWatchConfig.namespace, {
+                    MetricName: metricName,
+                    Unit: 'Milliseconds',
+                    Dimensions: cloudWatchConfig.dimensions
+                }, {
+                    region: cloudWatchConfig.region
+                });
+                self.cloudWatchReporters[actionName].on('flush', function(data) {
+                    log.info('[%1 event processor] Sending %2 metrics to CloudWatch: %3', self.name,
+                        metricName, util.inspect(data));
+                });
+            }
+            self.cloudWatchReporters[actionName].autoflush(sendInterval);
+        });
+
         // Remove unused actions
         Object.keys(self.actions).forEach(function(actionName) {
             if(!(actionName in actionNames)) {
                 var modulePath = self.getActionPath(actionName);
                 delete require.cache[require.resolve(modulePath)];
                 delete self.actions[actionName];
+            }
+        });
+
+        // Remove unused cloudWatch reporters
+        Object.keys(self.cloudWatchReporters).forEach(function(actionName) {
+            if(reportingActions.indexOf(actionName) === -1) {
+                var cloudWatchReporter = self.cloudWatchReporters[actionName];
+                cloudWatchReporter.autoflush(0);
+                cloudWatchReporter.flush();
+                cloudWatchReporter.removeAllListeners();
+                delete self.cloudWatchReporters[actionName];
             }
         });
     }

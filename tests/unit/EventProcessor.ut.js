@@ -1,5 +1,6 @@
 'use strict';
 
+var CloudWatchReporter = require('cwrx/lib/cloudWatchReporter.js');
 var EventProcessor = require('../../src/event_processors/EventProcessor.js');
 var Q = require('q');
 var logger = require('cwrx/lib/logger.js');
@@ -9,7 +10,7 @@ describe('EventProcessor.js', function() {
     var mockLog;
     var mockGoodAction;
     var mockBadAction;
-    
+
     beforeEach(function() {
         mockLog = {
             trace: jasmine.createSpy('trace()'),
@@ -27,15 +28,20 @@ describe('EventProcessor.js', function() {
         spyOn(eventProcessor, 'handleEvent').and.callThrough();
         spyOn(eventProcessor, 'recordToEvent').and.callThrough();
         spyOn(logger, 'getLog').and.returnValue(mockLog);
+        spyOn(CloudWatchReporter.prototype, 'autoflush');
+        spyOn(CloudWatchReporter.prototype, 'flush');
+        spyOn(CloudWatchReporter.prototype, 'on');
+        spyOn(CloudWatchReporter.prototype, 'removeAllListeners');
     });
-    
+
     describe('the constructor', function() {
         it('should set the config, name, and actions', function() {
             expect(eventProcessor.config).toBe('config');
             expect(eventProcessor.name).toBe('time');
             expect(eventProcessor.actions).toEqual({ });
+            expect(eventProcessor.cloudWatchReporters).toEqual({ });
         });
-        
+
         it('should throw an error if not provided with a name', function() {
             var error = null;
             try {
@@ -45,7 +51,7 @@ describe('EventProcessor.js', function() {
             }
             expect(error).not.toBeNull();
         });
-        
+
         it('should throw an error if not provided with a config', function() {
             var error = null;
             try {
@@ -55,12 +61,12 @@ describe('EventProcessor.js', function() {
             }
             expect(error).not.toBeNull();
         });
-        
+
         it('should load the required actions', function() {
             expect(eventProcessor.loadActions).toHaveBeenCalledWith();
         });
     });
-    
+
     describe('the process method', function() {
         beforeEach(function() {
             eventProcessor.config = {
@@ -82,7 +88,7 @@ describe('EventProcessor.js', function() {
                 done();
             }).catch(done.fail);
         });
-        
+
         it('should not handle unmappable records', function(done) {
             eventProcessor.recordToEvent.and.returnValue(null);
             eventProcessor.process({ foo: 'bar' }).then(function() {
@@ -91,7 +97,7 @@ describe('EventProcessor.js', function() {
                 done();
             }).catch(done.fail);
         });
-        
+
         it('should not handle unsupported events', function(done) {
             eventProcessor.recordToEvent.and.returnValue('unsupported');
             eventProcessor.process({ foo: 'bar' }).then(function() {
@@ -101,7 +107,7 @@ describe('EventProcessor.js', function() {
             }).catch(done.fail);
         });
     });
-    
+
     describe('the handleEvent method', function() {
         it('should not attempt to handle events with no actions', function(done) {
             eventProcessor.handleEvent({ name: 'tick' }, { actions: [] }).then(function() {
@@ -109,7 +115,7 @@ describe('EventProcessor.js', function() {
                 done();
             }).catch(done.fail);
         });
-        
+
         it('should perform the configured list of actions', function(done) {
             eventProcessor.actions = {
                 'good_action': mockGoodAction,
@@ -133,7 +139,7 @@ describe('EventProcessor.js', function() {
                 done();
             }).catch(done.fail);
         });
-        
+
         it('log a warning but still resolve if some actions fail', function(done) {
             eventProcessor.actions = {
                 'good_action': mockGoodAction,
@@ -148,17 +154,51 @@ describe('EventProcessor.js', function() {
                 done();
             }).catch(done.fail);
         });
+
+        it('should push metrics to cloudWatch for actions that succeed', function(done) {
+            var pushGoodAction = jasmine.createSpy('pushGoodAction()');
+            var pushBadAction = jasmine.createSpy('pushBadAction()');
+            eventProcessor.actions = {
+                'good_action': mockGoodAction,
+                'bad_action': mockBadAction
+            };
+            eventProcessor.cloudWatchReporters = {
+                'good_action': {
+                    push: pushGoodAction
+                },
+                'bad_action': {
+                    push: pushBadAction
+                }
+            };
+            eventProcessor.handleEvent({
+                name: 'tick',
+                data: 'data'
+            }, {
+                actions: [
+                    {
+                        name: 'good_action',
+                        options: 'options'
+                    },
+                    'bad_action'
+                ]
+            }).then(function() {
+                expect(pushGoodAction).toHaveBeenCalledWith(jasmine.any(Number));
+                expect(pushBadAction).not.toHaveBeenCalled();
+                done();
+            }).catch(done.fail);
+        });
     });
-    
+
     describe('the recordToEvent method', function() {
         it('should return null', function() {
             expect(eventProcessor.recordToEvent()).toBeNull();
         });
     });
-    
+
     describe('the loadActions method', function() {
         var loadedActions;
-        
+        var loadedReporters;
+
         beforeEach(function() {
             eventProcessor.loadActions.and.callThrough();
             eventProcessor.config = {
@@ -166,12 +206,25 @@ describe('EventProcessor.js', function() {
                     tick: {
                         actions: ['action3', 'action4']
                     }
+                },
+                cloudWatch: {
+                    namespace: 'namespace',
+                    region: 'region',
+                    dimensions: 'dimensions',
+                    sendInterval: 1000,
+                    action3: {
+                        sendInterval: 2000
+                    }
                 }
             };
             eventProcessor.loadActions();
             loadedActions = { };
+            loadedReporters = { };
             Object.keys(eventProcessor.actions).forEach(function(action) {
                 loadedActions[action] = eventProcessor.actions[action];
+            });
+            Object.keys(eventProcessor.cloudWatchReporters).forEach(function(action) {
+                loadedReporters[action] = eventProcessor.cloudWatchReporters[action];
             });
         });
 
@@ -179,36 +232,119 @@ describe('EventProcessor.js', function() {
             expect(eventProcessor.actions.action3).toContain('my name is mock action three');
             expect(eventProcessor.actions.action4).toContain('my name is mock action four');
         });
-        
+
+        it('should be able to load all enabled cloudWatch reporters', function() {
+            expect(eventProcessor.cloudWatchReporters.action3).toEqual(
+                jasmine.any(CloudWatchReporter));
+            expect(eventProcessor.cloudWatchReporters.action3.namespace).toBe('namespace');
+            expect(eventProcessor.cloudWatchReporters.action3.metricData).toEqual({
+                MetricName: 'action3-Time',
+                Unit: 'Milliseconds',
+                Dimensions: 'dimensions'
+            });
+            expect(eventProcessor.cloudWatchReporters.action3.on).toHaveBeenCalledWith('flush',
+                jasmine.any(Function));
+            expect(eventProcessor.cloudWatchReporters.action3.autoflush)
+                .toHaveBeenCalledWith(2000);
+            expect(eventProcessor.cloudWatchReporters.action4).toEqual(
+                jasmine.any(CloudWatchReporter));
+            expect(eventProcessor.cloudWatchReporters.action4.namespace).toBe('namespace');
+            expect(eventProcessor.cloudWatchReporters.action4.metricData).toEqual({
+                MetricName: 'action4-Time',
+                Unit: 'Milliseconds',
+                Dimensions: 'dimensions'
+            });
+            expect(eventProcessor.cloudWatchReporters.action4.on).toHaveBeenCalledWith('flush',
+                jasmine.any(Function));
+            expect(eventProcessor.cloudWatchReporters.action4.autoflush)
+                .toHaveBeenCalledWith(1000);
+        });
+
         describe('reloading actions at some point in the future', function() {
             beforeEach(function() {
-                eventProcessor.config = {
-                    eventHandlers: {
-                        tick: {
-                            actions: ['action1', 'action2']
-                        },
-                        foo: {
-                            actions: [{
-                                name: 'action3'
-                            }]
-                        }
+                eventProcessor.config.eventHandlers = {
+                    tick: {
+                        actions: ['action1', 'action2']
+                    },
+                    foo: {
+                        actions: [{
+                            name: 'action3'
+                        }]
                     }
                 };
                 eventProcessor.loadActions();
             });
-            
+
             it('should require newly added actions', function() {
                 expect(eventProcessor.actions.action1).toContain('my name is mock action one');
                 expect(eventProcessor.actions.action2).toContain('my name is mock action two');
             });
-            
+
             it('should update existing actions', function() {
                 expect(eventProcessor.actions.action3).toContain('my name is mock action three');
                 expect(eventProcessor.actions.action3).not.toBe(loadedActions.action3);
             });
-            
+
             it('should remove unused actions', function() {
                 expect(eventProcessor.actions.action4).not.toBeDefined();
+            });
+        });
+
+        describe('reloading cloudWatch reporters at some point in the future', function() {
+            beforeEach(function() {
+                eventProcessor.config.eventHandlers = {
+                    tick: {
+                        actions: ['action1', 'action2']
+                    },
+                    foo: {
+                        actions: [{ name: 'action3' }, { name: 'action4' }]
+                    }
+                };
+                eventProcessor.config.cloudWatch.action4 = {
+                    enabled: false
+                };
+                CloudWatchReporter.prototype.autoflush.calls.reset();
+                CloudWatchReporter.prototype.flush.calls.reset();
+                eventProcessor.loadActions();
+            });
+
+            it('should create a reporter for newly added actions', function() {
+                expect(eventProcessor.cloudWatchReporters.action1).toEqual(
+                    jasmine.any(CloudWatchReporter));
+                expect(eventProcessor.cloudWatchReporters.action1.namespace).toBe('namespace');
+                expect(eventProcessor.cloudWatchReporters.action1.metricData).toEqual({
+                    MetricName: 'action1-Time',
+                    Unit: 'Milliseconds',
+                    Dimensions: 'dimensions'
+                });
+                expect(eventProcessor.cloudWatchReporters.action1.on).toHaveBeenCalledWith('flush',
+                    jasmine.any(Function));
+                expect(eventProcessor.cloudWatchReporters.action1.autoflush)
+                    .toHaveBeenCalledWith(1000);
+                expect(eventProcessor.cloudWatchReporters.action2).toEqual(
+                    jasmine.any(CloudWatchReporter));
+                expect(eventProcessor.cloudWatchReporters.action2.namespace).toBe('namespace');
+                expect(eventProcessor.cloudWatchReporters.action2.metricData).toEqual({
+                    MetricName: 'action2-Time',
+                    Unit: 'Milliseconds',
+                    Dimensions: 'dimensions'
+                });
+                expect(eventProcessor.cloudWatchReporters.action2.on).toHaveBeenCalledWith('flush',
+                    jasmine.any(Function));
+                expect(eventProcessor.cloudWatchReporters.action2.autoflush)
+                    .toHaveBeenCalledWith(1000);
+            });
+
+            it('should update existing reporters', function() {
+                expect(eventProcessor.cloudWatchReporters.action3.autoflush)
+                    .toHaveBeenCalledWith(2000);
+            });
+
+            it('should remove unused reporters', function() {
+                expect(loadedReporters.action4.autoflush).toHaveBeenCalledWith(0);
+                expect(loadedReporters.action4.flush).toHaveBeenCalled();
+                expect(loadedReporters.action4.removeAllListeners).toHaveBeenCalled();
+                expect(eventProcessor.cloudWatchReporters.action4).not.toBeDefined();
             });
         });
     });

@@ -60,30 +60,26 @@ KclApp.prototype = {
         function checkFile(val) {
             return (isAbsolute(val) && isFile(val)) ? null : 'Not a valid absolute file path';
         }
-        
+
         function checkDir(val) {
             return (isAbsolute(val) && isDirectory(val)) ? null :
                 'Not a valid absolute directory path';
         }
 
-        function checkString(val) {
-            return (typeof val === 'string') ? null : 'Not a string';
+        function checkType(val, type) {
+            return (typeof val === type) ? null : 'Not a ' + type;
         }
 
-        function checkObject(val) {
-            return (typeof val === 'object') ? null : 'Not an object';
-        }
-        
         // Checks that the specified event processor exists.
         function checkProcessor(val) {
             var processorPath = path.resolve(PROJECT_ROOT, 'src/event_processors', val);
             return checkFile(processorPath);
         }
-        
+
         // Checks that the given value is valid configuration for the event processors. Makes sure
         // that any specified actions exist.
         function checkHandlers(val) {
-            var configError = checkObject(val);
+            var configError = checkType(val, 'object');
             if(configError) {
                 return configError;
             }
@@ -106,7 +102,7 @@ KclApp.prototype = {
             }
             return null;
         }
-        
+
         // Gets the validation function for a given schema type
         function getValidationFn(schemaType) {
             switch(schemaType) {
@@ -114,16 +110,14 @@ KclApp.prototype = {
                 return checkFile;
             case 'dir':
                 return checkDir;
-            case 'string':
-                return checkString;
-            case 'object':
-                return checkObject;
             case 'processor':
                 return checkProcessor;
             case 'handlers':
                 return checkHandlers;
             default:
-                throw new Error('Invalid schema type \'' + schemaType + '\'');
+                return function(val) {
+                    return checkType(val, schemaType);
+                };
             }
         }
 
@@ -170,7 +164,13 @@ KclApp.prototype = {
                     region: 'string'
                 }
             },
-            eventHandlers: 'handlers'
+            eventHandlers: 'handlers',
+            cloudWatch: {
+                namespace: 'string',
+                region: 'string',
+                dimensions: 'object',
+                sendInterval: 'number'
+            }
         };
         return validate(config, schema);
     },
@@ -184,7 +184,7 @@ KclApp.prototype = {
         var pid = process.pid;
         fs.writeFileSync(filePath, pid.toString());
     },
-    
+
     /**
     * Removes an existing pid at the given file path.
     *
@@ -193,7 +193,7 @@ KclApp.prototype = {
     removePid: function(filePath) {
         fs.unlinkSync(filePath);
     },
-    
+
     /**
     * Parses command line options to get the path to this application's configuration.
     *
@@ -214,7 +214,7 @@ KclApp.prototype = {
             configPath: configPath
         };
     },
-    
+
     /**
     * Loads configuration from the configPath. If configuration already exists, the application log
     * is refreshed and event processor actions are updated.
@@ -233,28 +233,28 @@ KclApp.prototype = {
         var secretsPath = config.secrets;
         var secrets = require(secretsPath);
         config.secrets = secrets;
-        
+
         // Read the rcAppCreds file
         var appCredsPath = config.appCreds;
         var appCreds = require(appCredsPath);
         config.appCreds = appCreds;
-        
+
         // Handle changes to the config
         if(this.config) {
             // Refresh the log
             var log = logger.getLog();
             log.refresh();
-            
+
             // Reload required actions
             var eventProcessor = this.recordProcessor.processor;
             eventProcessor.config = config;
             eventProcessor.loadActions();
         }
-        
+
         // Update the config
         this.config = config;
     },
-    
+
     /**
     * Parses command line options, manages a pid file, and launches a kcl record processor.
     */
