@@ -15,7 +15,7 @@ describe('fetch_campaigns.js', function() {
     var mockLog;
     var mockCampaigns;
     var mockAnalytics;
-    
+
     beforeEach(function() {
         mockData = { };
         mockOptions = {
@@ -63,9 +63,9 @@ describe('fetch_campaigns.js', function() {
             { id: 'cam-3' }
         ];
         mockAnalytics = [
-            { views: 100 },
-            { views: 200 },
-            { views: 300 }
+            { campaignId: 'cam-3', views: 300 },
+            { campaignId: 'cam-2', views: 200 },
+            { campaignId: 'cam-1', views: 100 }
         ];
         spyOn(requestUtils, 'makeSignedRequest').and.callFake(function(creds, method, options) {
             switch(options.url) {
@@ -80,7 +80,16 @@ describe('fetch_campaigns.js', function() {
         spyOn(JsonProducer.prototype, 'produce');
         spyOn(logger, 'getLog').and.returnValue(mockLog);
     });
-    
+
+    function getMockAnalyticsForId(id) {
+        for(var i=0;i<mockAnalytics.length;i++) {
+            if(mockAnalytics[i].campaignId === id) {
+                return mockAnalytics[i];
+            }
+        }
+        return null;
+    }
+
     it('should request campaigns', function(done) {
         mockCampaignResponse = {
             response: {
@@ -105,7 +114,7 @@ describe('fetch_campaigns.js', function() {
             done.fail(error);
         });
     });
-    
+
     describe('the request for campaigns', function() {
         describe('when it responded with a status code of 200', function() {
             beforeEach(function() {
@@ -117,7 +126,7 @@ describe('fetch_campaigns.js', function() {
                 };
                 JsonProducer.prototype.produce.and.returnValue(Q.resolve());
             });
-            
+
             describe('when analytics are set to be fetched', function() {
                 beforeEach(function() {
                     mockOptions.analytics = true;
@@ -128,7 +137,7 @@ describe('fetch_campaigns.js', function() {
                         body: []
                     };
                 });
-                
+
                 it('should fetch analytics', function(done) {
                     fetchCampaigns(mockData, mockOptions, mockConfig).then(function() {
                         expect(requestUtils.makeSignedRequest).toHaveBeenCalledWith({
@@ -155,15 +164,15 @@ describe('fetch_campaigns.js', function() {
                             body: mockAnalytics
                         };
                     });
-                    
+
                     it('should produce campaigns with analytics into a stream', function(done) {
                         fetchCampaigns(mockData, mockOptions, mockConfig).then(function() {
-                            mockCampaigns.forEach(function(mockCampaign, index) {
+                            mockCampaigns.forEach(function(mockCampaign) {
                                 expect(JsonProducer.prototype.produce).toHaveBeenCalledWith({
                                     type: 'prefix_campaignPulse',
                                     data: {
                                         campaign: mockCampaign,
-                                        analytics: mockAnalytics[index]
+                                        analytics: getMockAnalyticsForId(mockCampaign.id)
                                     }
                                 });
                             });
@@ -171,7 +180,7 @@ describe('fetch_campaigns.js', function() {
                         }).catch(done.fail);
                     });
                 });
-                
+
                 describe('when the request for analytics fails', function() {
                     beforeEach(function() {
                         mockAnalyticsResponse = {
@@ -180,7 +189,7 @@ describe('fetch_campaigns.js', function() {
                             }
                         };
                     });
-                    
+
                     it('should produce campaigns without analytics into a stream', function(done) {
                         fetchCampaigns(mockData, mockOptions, mockConfig).then(function() {
                             mockCampaigns.forEach(function(mockCampaign) {
@@ -194,7 +203,7 @@ describe('fetch_campaigns.js', function() {
                             done();
                         }).catch(done);
                     });
-                    
+
                     it('should log a warning', function(done) {
                         fetchCampaigns(mockData, mockOptions, mockConfig).then(function() {
                             expect(mockLog.warn).toHaveBeenCalled();
@@ -203,12 +212,12 @@ describe('fetch_campaigns.js', function() {
                     });
                 });
             });
-            
+
             describe('when analytics are not set to be fetched', function() {
                 beforeEach(function() {
                     mockOptions.analytics = false;
                 });
-                
+
                 it('should not fetch analytics', function(done) {
                     fetchCampaigns(mockData, mockOptions, mockConfig).then(function() {
                         expect(requestUtils.makeSignedRequest.calls.allArgs().map(function(args) {
@@ -233,7 +242,7 @@ describe('fetch_campaigns.js', function() {
                 });
             });
         });
-        
+
         describe('when it does not respond with a status code of 200', function() {
             beforeEach(function(done) {
                 mockCampaignResponse = {
@@ -246,27 +255,27 @@ describe('fetch_campaigns.js', function() {
                     done.fail(error);
                 });
             });
-            
+
             it('should log a warning', function() {
                 expect(mockLog.warn).toHaveBeenCalled();
             });
         });
     });
-    
+
     describe('producing campaigns into a stream', function() {
         beforeEach(function() {
             mockCampaignResponse = {
                 response: {
                     statusCode: 200
                 },
-                body: ['cam-1', 'cam-2', 'cam-3']
+                body: mockCampaigns
             };
         });
-        
+
         describe('when some fail to be produced', function() {
             beforeEach(function(done) {
                 JsonProducer.prototype.produce.and.callFake(function(object) {
-                    if(object.data.campaign === 'cam-1') {
+                    if(object.data.campaign === mockCampaigns[0]) {
                         return Q.resolve();
                     } else {
                         return Q.reject();
@@ -276,7 +285,7 @@ describe('fetch_campaigns.js', function() {
                     done.fail(error);
                 });
             });
-            
+
             it('should log a warning for them', function() {
                 expect(mockLog.warn.calls.count()).toBe(2);
             });
