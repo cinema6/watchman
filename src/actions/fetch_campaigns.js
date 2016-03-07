@@ -28,24 +28,23 @@ module.exports = function(data, options, config) {
         }).then(function(response) {
             var statusCode = response.response.statusCode;
             var body = response.body;
+            var data = { };
             if(statusCode === 200) {
-                return body.map(function(campaign) {
-                    return {
+                body.forEach(function(campaign) {
+                    data[campaign.id] = {
                         campaign: campaign
                     };
                 });
             } else {
                 log.warn('Error requesting campaigns, code: %1 body: %2', statusCode,
                     JSON.stringify(body));
-                return [];
             }
+            return data;
         });
     }
-    
+
     function getAnalytics(data) {
-        var campaignIds = data.map(function(dataEntry) {
-            return dataEntry.campaign.id;
-        });
+        var campaignIds = Object.keys(data);
         return Q.resolve().then(function() {
             if(fetchAnalytics && campaignIds.length > 0) {
                 return requestUtils.makeSignedRequest(appCreds, 'get', {
@@ -59,29 +58,26 @@ module.exports = function(data, options, config) {
                     var statusCode = response.response.statusCode;
                     var body = response.body;
                     if(statusCode === 200) {
-                        return body.map(function(analytics, index) {
-                            return {
-                                campaign: data[index].campaign,
-                                analytics: analytics
-                            };
+                        body.forEach(function(analytics) {
+                            data[analytics.campaignId].analytics = analytics;
                         });
                     } else {
                         log.warn('Error requesting analytics, code: %1 body: %2', statusCode,
                             JSON.stringify(body));
-                        return data;
                     }
+                    return data;
                 });
             } else {
                 return data;
             }
         });
     }
-    
+
     function produceResults(data) {
-        return Q.allSettled(data.map(function(dataEntry) {
+        return Q.allSettled(Object.keys(data).map(function(id) {
             return watchmanProducer.produce({
                 type: prefix + 'campaignPulse',
-                data: dataEntry
+                data: data[id]
             });
         })).then(function(results) {
             results.forEach(function(result) {
