@@ -1,11 +1,11 @@
 'use strict';
 
 var Q = require('q');
-var endCampaign = require('../../src/actions/end_campaign.js');
 var logger = require('cwrx/lib/logger.js');
 var requestUtils = require('cwrx/lib/requestUtils.js');
+var setStatus = require('../../src/actions/set_status.js');
 
-describe('end_campaign.js', function() {
+describe('set_status.js', function() {
     var mockLog;
     var mockData;
     var mockOptions;
@@ -36,9 +36,13 @@ describe('end_campaign.js', function() {
             secrets: {
                 email: 'email',
                 password: 'password'
+            },
+            appCreds: {
+                key: 'key',
+                secret: 'secret'
             }
         };
-        spyOn(requestUtils, 'qRequest').and.callFake(function(method, options) {
+        spyOn(requestUtils, 'makeSignedRequest').and.callFake(function(creds, method, options) {
             switch(options.url) {
             case 'http://hostname/api/auth/login':
                 return Q.resolve();
@@ -56,9 +60,24 @@ describe('end_campaign.js', function() {
             { campaign: { id: null } }
         ];
         Q.all(mockDatas.map(function(mockData) {
-            return endCampaign(mockData, mockOptions, mockConfig);
+            return setStatus(mockData, mockOptions, mockConfig);
         })).then(function() {
-            expect(requestUtils.qRequest).not.toHaveBeenCalled();
+            expect(requestUtils.makeSignedRequest).not.toHaveBeenCalled();
+            done();
+        }).catch(done.fail);
+    });
+    
+    it('should not attempt anything when not provided a status', function(done) {
+        mockData = {
+            campaign: {
+                id: 'c-123'
+            }
+        };
+        mockOptions = {
+            status: null
+        };
+        setStatus(mockData, mockOptions, mockConfig).then(function() {
+            expect(requestUtils.makeSignedRequest).not.toHaveBeenCalled();
             done();
         }).catch(done.fail);
     });
@@ -70,6 +89,9 @@ describe('end_campaign.js', function() {
                     id: 'c-123'
                 }
             };
+            mockOptions = {
+                status: 'status'
+            };
             mockCampaignResponse = {
                 response: {
                     statusCode: 500
@@ -77,26 +99,15 @@ describe('end_campaign.js', function() {
             };
         });
         
-        it('should authenticate', function(done) {
-            endCampaign(mockData, mockOptions, mockConfig).then(function() {
-                expect(requestUtils.qRequest).toHaveBeenCalledWith('post', {
-                    url: 'http://hostname/api/auth/login',
-                    json: {
-                        email: 'email',
-                        password: 'password'
-                    },
-                    jar: true
-                });
-                done();
-            }).catch(done.fail);
-        });
-        
         it('should edit the status of the campaign', function(done) {
-            endCampaign(mockData, mockOptions, mockConfig).then(function() {
-                expect(requestUtils.qRequest).toHaveBeenCalledWith('put', {
+            setStatus(mockData, mockOptions, mockConfig).then(function() {
+                expect(requestUtils.makeSignedRequest).toHaveBeenCalledWith({
+                    key: 'key',
+                    secret: 'secret'
+                }, 'put', {
                     url: 'http://hostname/api/campaigns/c-123',
                     json: {
-                        status: 'expired'
+                        status: 'status'
                     },
                     jar: true
                 });
@@ -105,7 +116,7 @@ describe('end_campaign.js', function() {
         });
 
         it('should warn if editing the campaign failed', function(done) {
-            endCampaign(mockData, mockOptions, mockConfig).then(function() {
+            setStatus(mockData, mockOptions, mockConfig).then(function() {
                 expect(mockLog.warn).toHaveBeenCalled();
                 done();
             }).catch(done.fail);

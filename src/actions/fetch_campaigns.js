@@ -7,53 +7,94 @@ var requestUtils = require('cwrx/lib/requestUtils.js');
 
 module.exports = function(data, options, config) {
     var apiRoot = config.cwrx.api.root;
-    var authEndpoint = apiRoot + config.cwrx.api.auth.endpoint + '/login';
+    var appCreds = config.appCreds;
+    var analyticsEndpoint = apiRoot + config.cwrx.api.analytics.endpoint;
     var campaignEndpoint = apiRoot + config.cwrx.api.campaigns.endpoint;
+    var fetchAnalytics = options.analytics || false;
     var log = logger.getLog();
     var prefix = (options.prefix) ? options.prefix + '_' : '';
     var producerConfig = config.kinesis.producer;
-    var status = (options.status) ? options.status : 'active';
-    var watchmanProducer = new JsonProducer(producerConfig.stream, producerConfig);    
+    var statuses = (options.statuses) ? options.statuses : ['active'];
+    var watchmanProducer = new JsonProducer(producerConfig.stream, producerConfig);
 
-    return requestUtils.qRequest('post', {
-        url: authEndpoint,
-        json: {
-            email: config.secrets.email,
-            password: config.secrets.password
-        },
-        jar: true
-    }).then(function() {
-        return requestUtils.qRequest('get', {
+    function getCampaigns() {
+        return requestUtils.makeSignedRequest(appCreds, 'get', {
             url: campaignEndpoint,
             json: true,
             jar: true,
             qs: {
-                statuses: status
+                statuses: statuses.join(',')
+            }
+        }).then(function(response) {
+            var statusCode = response.response.statusCode;
+            var body = response.body;
+            if(statusCode === 200) {
+                return body.map(function(campaign) {
+                    return {
+                        campaign: campaign
+                    };
+                });
+            } else {
+                log.warn('Error requesting campaigns, code: %1 body: %2', statusCode,
+                    JSON.stringify(body));
+                return [];
             }
         });
-    }).then(function(response) {
-        var statusCode = response.response.statusCode;
-        var body = response.body;
-        if(statusCode === 200) {
-            return Q.allSettled(body.map(function(campaign) {
-                return watchmanProducer.produce({
-                    type: prefix + 'campaignPulse',
-                    data: {
-                        campaign: campaign
+    }
+    
+    function getAnalytics(data) {
+        var campaignIds = data.map(function(dataEntry) {
+            return dataEntry.campaign.id;
+        });
+        return Q.resolve().then(function() {
+            if(fetchAnalytics && campaignIds.length > 0) {
+                return requestUtils.makeSignedRequest(appCreds, 'get', {
+                    url: analyticsEndpoint + '/campaigns',
+                    json: true,
+                    jar: true,
+                    qs: {
+                        ids: campaignIds.join(',')
+                    }
+                }).then(function(response) {
+                    var statusCode = response.response.statusCode;
+                    var body = response.body;
+                    if(statusCode === 200) {
+                        return body.map(function(analytics, index) {
+                            return {
+                                campaign: data[index].campaign,
+                                analytics: analytics
+                            };
+                        });
+                    } else {
+                        log.warn('Error requesting analytics, code: %1 body: %2', statusCode,
+                            JSON.stringify(body));
+                        return data;
                     }
                 });
-            })).then(function(results) {
-                results.forEach(function(result) {
-                    if (result.state !== 'fulfilled') {
-                        var reason = result.reason;
-                        log.warn('Error producing into %1 stream: %2', producerConfig.stream,
-                            reason);
-                    }
-                });
+            } else {
+                return data;
+            }
+        });
+    }
+    
+    function produceResults(data) {
+        return Q.allSettled(data.map(function(dataEntry) {
+            return watchmanProducer.produce({
+                type: prefix + 'campaignPulse',
+                data: dataEntry
             });
-        } else {
-            log.warn('Error requesting campaigns, code: %1 body: %2', statusCode,
-                JSON.stringify(body));
-        }
-    });
+        })).then(function(results) {
+            results.forEach(function(result) {
+                if (result.state !== 'fulfilled') {
+                    var reason = result.reason;
+                    log.warn('Error producing into %1 stream: %2', producerConfig.stream,
+                        reason);
+                }
+            });
+        });
+    }
+
+    return getCampaigns()
+        .then(getAnalytics)
+        .then(produceResults);
 };

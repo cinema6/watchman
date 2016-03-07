@@ -13,11 +13,12 @@ describe('KclApp.js', function() {
     var mockEventProcessor;
     var mockRecordProcessor;
     var mockLog;
-    
+
     beforeEach(function() {
         config = {
             log: { },
             secrets: '/valid-file-secrets',
+            appCreds: '/valid-file-secrets',
             cwrx: {
                 api: { }
             },
@@ -43,6 +44,12 @@ describe('KclApp.js', function() {
                         }
                     ]
                 }
+            },
+            cloudWatch: {
+                namespace: 'namespace',
+                region: 'region',
+                dimensions: [],
+                sendInterval: 60000
             }
         };
         runSpy = jasmine.createSpy('run()');
@@ -89,35 +96,35 @@ describe('KclApp.js', function() {
         spyOn(process, 'on');
         spyOn(process, 'exit');
     });
-    
+
     describe('the constructor', function() {
         it('should initialize properties', function() {
             expect(app.recordProcessor).toBeNull();
             expect(app.configPath).toBeNull();
         });
     });
-    
+
     describe('checkConfig', function() {
         beforeEach(function() {
             app.checkConfig.and.callThrough();
         });
-        
+
         it('should return null when passed a valid config', function() {
             var configError = app.checkConfig(config, 0);
             expect(configError).toBeNull();
         });
-        
+
         describe('log', function() {
             it('should return an error message if missing', function() {
                 delete config.log;
                 var configError = app.checkConfig(config, 0);
                 expect(configError).toBe('log: Missing value');
             });
-            
-            it('should return an error emssage if not an object', function() {
+
+            it('should return an error emssage if not a object', function() {
                 config.log = 'not object';
                 var configError = app.checkConfig(config, 0);
-                expect(configError).toBe('log: Not an object');
+                expect(configError).toBe('log: Not a object');
             });
         });
 
@@ -127,17 +134,37 @@ describe('KclApp.js', function() {
                 var configError = app.checkConfig(config, 0);
                 expect(configError).toBe('secrets: Missing value');
             });
-            
+
             it('should return an error message if not a file', function() {
                 config.secrets = '/invalid-file';
                 var configError = app.checkConfig(config, 0);
                 expect(configError).toBe('secrets: Not a valid absolute file path');
             });
-            
+
             it('should return an error message if not an absolute path', function() {
                 config.secrets = 'valid-file';
                 var configError = app.checkConfig(config, 0);
                 expect(configError).toBe('secrets: Not a valid absolute file path');
+            });
+        });
+
+        describe('appCreds', function() {
+            it('should return an error message if missing', function() {
+                delete config.appCreds;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('appCreds: Missing value');
+            });
+
+            it('should return an error message if not a file', function() {
+                config.appCreds = '/invalid-file';
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('appCreds: Not a valid absolute file path');
+            });
+
+            it('should return an error message if not an absolute path', function() {
+                config.appCreds = 'valid-file';
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('appCreds: Not a valid absolute file path');
             });
         });
 
@@ -147,11 +174,11 @@ describe('KclApp.js', function() {
                 var configError = app.checkConfig(config, 0);
                 expect(configError).toBe('cwrx: api: Missing value');
             });
-            
+
             it('should return an error emssage if not an object', function() {
                 config.cwrx.api = 'not object';
                 var configError = app.checkConfig(config, 0);
-                expect(configError).toBe('cwrx: api: Not an object');
+                expect(configError).toBe('cwrx: api: Not a object');
             });
         });
 
@@ -161,14 +188,14 @@ describe('KclApp.js', function() {
                 var configError = app.checkConfig(config, 0);
                 expect(configError).toBe('pidPath: Missing value');
             });
-            
+
             it('should return an error message if not a directory', function() {
                 config.pidPath = '/invalid-dir';
                 var configError = app.checkConfig(config, 0);
                 expect(configError).toBe(
                     'pidPath: Not a valid absolute directory path');
             });
-            
+
             it('should return an error message if not an absolute path', function() {
                 config.pidPath = 'valid-dir';
                 var configError = app.checkConfig(config, 0);
@@ -176,7 +203,7 @@ describe('KclApp.js', function() {
                     'pidPath: Not a valid absolute directory path');
             });
         });
-        
+
         describe('kinesis.consumers', function() {
             it('should return an error message if missing', function() {
                 delete config.kinesis.consumer;
@@ -184,7 +211,7 @@ describe('KclApp.js', function() {
                 expect(configError).toBe('kinesis: consumer: Missing value');
             });
         });
-        
+
         describe('kinesis.consumer.processor', function() {
             it('should return an error message if it contains a consumer without a processor',
             function() {
@@ -197,7 +224,7 @@ describe('KclApp.js', function() {
                     'kinesis: consumer: processor: Not a valid absolute file path');
             });
         });
-        
+
         describe('kinesis.consumer.appName', function() {
             it('should return an error message if it contains a consumer without an appName',
             function() {
@@ -208,7 +235,7 @@ describe('KclApp.js', function() {
                 configError = app.checkConfig(config, 0);
                 expect(configError).toBe('kinesis: consumer: appName: Not a string');
             });
-            
+
         });
 
         describe('kinesis.producer.stream', function() {
@@ -217,28 +244,28 @@ describe('KclApp.js', function() {
                 var configError = app.checkConfig(config, 0);
                 expect(configError).toBe('kinesis: producer: stream: Missing value');
             });
-            
+
             it('should return an error message if not a string', function() {
                 config.kinesis.producer.stream = 123;
                 var configError = app.checkConfig(config, 0);
                 expect(configError).toBe('kinesis: producer: stream: Not a string');
             });
         });
-        
+
         describe('kinesis.producer.region', function() {
             it('should return an error message if missing', function() {
                 delete config.kinesis.producer.region;
                 var configError = app.checkConfig(config, 0);
                 expect(configError).toBe('kinesis: producer: region: Missing value');
             });
-            
+
             it('should return an error message if not a string', function() {
                 config.kinesis.producer.region = 123;
                 var configError = app.checkConfig(config, 0);
                 expect(configError).toBe('kinesis: producer: region: Not a string');
             });
         });
-        
+
         describe('eventHandlers', function() {
             it('should return an error message if missing or not an object', function() {
                 delete config.eventHandlers;
@@ -246,7 +273,7 @@ describe('KclApp.js', function() {
                 expect(configError).toBe('eventHandlers: Missing value');
                 config.eventHandlers = 'not object';
                 configError = app.checkConfig(config, 0);
-                expect(configError).toBe('eventHandlers: Not an object');
+                expect(configError).toBe('eventHandlers: Not a object');
             });
 
             it('should return an error if event hashes are not objects containing actions',
@@ -261,14 +288,70 @@ describe('KclApp.js', function() {
                 configError = app.checkConfig(config, 0);
                 expect(configError).toBe('eventHandlers: foo: Must contain actions');
             });
-            
+
             it('should return an error if there are invalid actions', function() {
                 config.eventHandlers.pulse.actions.push('invalid_action');
                 var configError = app.checkConfig(config, 0);
                 expect(configError).toBe(
                     'eventHandlers: pulse: actions: 1: Invalid action');
             });
-        });        
+        });
+
+        describe('cloudWatch.namespace', function() {
+            it('should return an error message if missing', function() {
+                delete config.cloudWatch.namespace;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('cloudWatch: namespace: Missing value');
+            });
+
+            it('should return an error message if not a string', function() {
+                config.cloudWatch.namespace = 123;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('cloudWatch: namespace: Not a string');
+            });
+        });
+
+        describe('cloudWatch.region', function() {
+            it('should return an error message if missing', function() {
+                delete config.cloudWatch.region;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('cloudWatch: region: Missing value');
+            });
+
+            it('should return an error message if not a string', function() {
+                config.cloudWatch.region = 123;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('cloudWatch: region: Not a string');
+            });
+        });
+
+        describe('cloudWatch.dimensions', function() {
+            it('should return an error message if missing', function() {
+                delete config.cloudWatch.dimensions;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('cloudWatch: dimensions: Missing value');
+            });
+
+            it('should return an error message if not an object', function() {
+                config.cloudWatch.dimensions = 123;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('cloudWatch: dimensions: Not a object');
+            });
+        });
+
+        describe('cloudWatch.sendInterval', function() {
+            it('should return an error message if missing', function() {
+                delete config.cloudWatch.sendInterval;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('cloudWatch: sendInterval: Missing value');
+            });
+
+            it('should return an error message if not a number', function() {
+                config.cloudWatch.sendInterval = 'string';
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('cloudWatch: sendInterval: Not a number');
+            });
+        });
     });
 
     describe('writePid', function() {
@@ -281,23 +364,23 @@ describe('KclApp.js', function() {
             expect(fs.writeFileSync).toHaveBeenCalledWith('path', process.pid.toString());
         });
     });
-    
+
     describe('removePid', function() {
         beforeEach(function() {
             app.removePid.and.callThrough();
             app.removePid('path');
         });
-        
+
         it('should delete the pid file', function() {
             expect(fs.unlinkSync).toHaveBeenCalledWith('path');
         });
     });
-    
+
     describe('parseCmdLine', function() {
         beforeEach(function() {
             app.parseCmdLine.and.callThrough();
         });
-        
+
         it('should parse command line options and set the config path', function() {
             process.argv = ['', '', '-c', 'mockConfigPath'];
             var options = app.parseCmdLine();
@@ -305,7 +388,7 @@ describe('KclApp.js', function() {
                 configPath: 'mockConfigPath'
             });
         });
-        
+
         it('should throw an error if given an invalid config', function(done) {
             process.argv = ['', '', '-c', ''];
             try {
@@ -317,7 +400,7 @@ describe('KclApp.js', function() {
             }
         });
     });
-    
+
     describe('run', function() {
         beforeEach(function() {
             app.parseCmdLine.and.returnValue({
@@ -327,7 +410,7 @@ describe('KclApp.js', function() {
                 app.config = config;
             });
         });
-        
+
         it('should parse command line arguments', function() {
             app.run();
             expect(app.parseCmdLine).toHaveBeenCalledWith();
@@ -338,34 +421,34 @@ describe('KclApp.js', function() {
             app.run();
             expect(app.loadConfig).toHaveBeenCalledWith();
         });
-        
+
         it('should create the log', function() {
             app.run();
             expect(logger.createLog).toHaveBeenCalledWith({ });
         });
-        
+
         it('should create a new event processor', function() {
             app.run();
             expect(mockEventProcessor).toHaveBeenCalledWith(config);
         });
-        
+
         it('should create a new record processor', function() {
             app.run();
             expect(mockRecordProcessor).toHaveBeenCalledWith(jasmine.any(mockEventProcessor));
             expect(app.recordProcessor).toEqual(jasmine.any(mockRecordProcessor));
         });
-        
+
         it('should write a pid file', function() {
             app.run();
             expect(app.writePid).toHaveBeenCalledWith('/valid-dir/appName.pid');
         });
-        
+
         it('should run the kcl app', function() {
             app.run();
             expect(mockKcl).toHaveBeenCalledWith(jasmine.any(mockRecordProcessor));
             expect(runSpy).toHaveBeenCalledWith();
         });
-        
+
         it('should log an error if the app fails to start', function() {
             runSpy.and.callFake(function() {
                 throw new Error('epic fail');
@@ -374,7 +457,7 @@ describe('KclApp.js', function() {
             expect(mockLog.error).toHaveBeenCalled();
             expect(process.exit).toHaveBeenCalledWith(1);
         });
-        
+
         it('should remove the pid file on exit', function() {
             app.run();
             expect(process.on).toHaveBeenCalledWith('exit', jasmine.any(Function));
@@ -384,26 +467,26 @@ describe('KclApp.js', function() {
             handler();
             expect(app.removePid).toHaveBeenCalledWith('/valid-dir/appName.pid');
         });
-        
+
         describe('the SIGHUP handler', function() {
             var handler;
-            
+
             beforeEach(function() {
                 app.run();
                 handler = process.on.calls.all().filter(function(call) {
                     return call.args[0] === 'SIGHUP';
                 })[0].args[1];
             });
-            
+
             it('should be added', function() {
                 expect(process.on).toHaveBeenCalledWith('SIGHUP', jasmine.any(Function));
             });
-            
+
             it('try to reload the config', function() {
                 handler();
                 expect(app.loadConfig).toHaveBeenCalledWith();
             });
-            
+
             it('should log an error if reloading the config fails', function() {
                 app.loadConfig.and.callFake(function() {
                     throw new Error('epic fail');
@@ -413,14 +496,14 @@ describe('KclApp.js', function() {
             });
         });
     });
-    
+
     describe('the loadConfig method', function() {
         beforeEach(function() {
             app.loadConfig.and.callThrough();
             app.configPath = 'mockConfig';
             fs.readFileSync.and.returnValue(JSON.stringify(config));
         });
-        
+
         it('should throw an error if attempting to load an invalid config', function(done) {
             app.checkConfig.and.returnValue('epic fail');
             try {
@@ -431,15 +514,16 @@ describe('KclApp.js', function() {
                 done();
             }
         });
-        
-        it('should set the config property with added secrets', function() {
+
+        it('should set the config property with added secrets and appCreds', function() {
             expect(app.config).toBeNull();
             app.loadConfig();
             expect(fs.readFileSync).toHaveBeenCalledWith('mockConfig', 'utf8');
             config.secrets = 'so secret';
+            config.appCreds = 'so secret';
             expect(app.config).toEqual(config);
         });
-        
+
         describe('reloading the config', function() {
             beforeEach(function() {
                 app.config = 'not null';
@@ -452,13 +536,14 @@ describe('KclApp.js', function() {
                 };
                 app.loadConfig();
             });
-            
+
             it('should refresh the log', function() {
                 expect(mockLog.refresh).toHaveBeenCalledWith();
             });
-            
+
             it('should update the config of the event processor', function() {
                 config.secrets = 'so secret';
+                config.appCreds = 'so secret';
                 expect(app.recordProcessor.processor.config).toEqual(config);
                 expect(app.recordProcessor.processor.loadActions).toHaveBeenCalledWith();
             });
