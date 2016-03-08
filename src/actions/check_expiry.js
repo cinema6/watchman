@@ -18,7 +18,7 @@ module.exports = function(data, options, config) {
             return false;
         }
     }
-    
+
     function campaignReachedBudget() {
         if(data.analytics && data.analytics.summary && data.analytics.summary.totalSpend &&
                 data.campaign && data.campaign.pricing && data.campaign.pricing.budget) {

@@ -10,18 +10,18 @@ describe('WatchmanEventProcessor.js', function() {
         spyOn(EventProcessor.prototype, 'loadActions');
         watchmanEventProcessor = new WatchmanEventProcessor('config');
     });
-    
+
     it('should be an EventProcessor', function() {
         expect(watchmanEventProcessor).toEqual(jasmine.any(EventProcessor));
     });
-    
+
     describe('the constructor', function() {
         it('should call the super constructor', function() {
             expect(watchmanEventProcessor.config).toBe('config');
             expect(watchmanEventProcessor.name).toBe('watchman');
         });
     });
-    
+
     describe('the recordToEvent method', function() {
         it('should correctly map messages', function() {
             var input = [

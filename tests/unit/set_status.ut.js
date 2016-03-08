@@ -11,7 +11,7 @@ describe('set_status.js', function() {
     var mockOptions;
     var mockConfig;
     var mockCampaignResponse;
-    
+
     beforeEach(function() {
         mockLog = {
             trace: jasmine.createSpy('trace()'),
@@ -52,7 +52,7 @@ describe('set_status.js', function() {
         });
         spyOn(logger, 'getLog').and.returnValue(mockLog);
     });
-    
+
     it('should not attempt anything when not provided a campaign', function(done) {
         var mockDatas = [
             { },
@@ -66,7 +66,7 @@ describe('set_status.js', function() {
             done();
         }).catch(done.fail);
     });
-    
+
     it('should not attempt anything when not provided a status', function(done) {
         mockData = {
             campaign: {
@@ -81,7 +81,7 @@ describe('set_status.js', function() {
             done();
         }).catch(done.fail);
     });
-    
+
     describe('when provided a campaign', function() {
         beforeEach(function() {
             mockData = {
@@ -98,7 +98,7 @@ describe('set_status.js', function() {
                 }
             };
         });
-        
+
         it('should edit the status of the campaign', function(done) {
             setStatus(mockData, mockOptions, mockConfig).then(function() {
                 expect(requestUtils.makeSignedRequest).toHaveBeenCalledWith({

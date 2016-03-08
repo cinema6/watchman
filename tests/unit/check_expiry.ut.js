@@ -7,7 +7,7 @@ var checkExpiry = require('../../src/actions/check_expiry.js');
 describe('check_expiry.js', function() {
     var mockOptions;
     var mockConfig;
-    
+
     beforeEach(function() {
         mockOptions = { };
         mockConfig = {
@@ -39,7 +39,7 @@ describe('check_expiry.js', function() {
                 done.fail(error);
             });
         });
-        
+
         it('should not produce if the end date has not yet arrived', function(done) {
             var mockData = {
                 campaign: {
@@ -59,7 +59,7 @@ describe('check_expiry.js', function() {
                 done.fail(error);
             });
         });
-        
+
         it('should produce if the end date has passed', function(done) {
             var mockData = {
                 campaign: {
@@ -84,7 +84,7 @@ describe('check_expiry.js', function() {
                 done.fail(error);
             });
         });
-        
+
         it('should not produce if the status is already expired', function(done) {
             var mockData = {
                 campaign: {
@@ -125,7 +125,7 @@ describe('check_expiry.js', function() {
                 done.fail(error);
             });
         });
-        
+
         it('should not produce if there is no budget on the campaign', function(done) {
             var mockDatas = [
                 { analytics: { summary: { totalSpend: 'spend' } } },
@@ -143,7 +143,7 @@ describe('check_expiry.js', function() {
                 done.fail(error);
             });
         });
-        
+
         it('should not produce if the budget has not yet been reached', function(done) {
             var mockData = {
                 campaign: {
@@ -164,7 +164,7 @@ describe('check_expiry.js', function() {
                 done.fail(error);
             });
         });
-        
+
         it('should produce if the budget has been reached', function(done) {
             var mockData = {
                 campaign: {
@@ -190,7 +190,7 @@ describe('check_expiry.js', function() {
                 done.fail(error);
             });
         });
-        
+
         it('should not produce if the status is already outOfBudget', function(done) {
             var mockData = {
                 campaign: {

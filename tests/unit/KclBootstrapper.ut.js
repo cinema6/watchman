@@ -20,7 +20,7 @@ describe('KclBootstrapper.js', function() {
         spyOn(process, 'exit');
         spyOn(process, 'on');
     });
-    
+
     describe('run', function() {
         beforeEach(function() {
             bootstrapper.parseCmdLine.and.returnValue({
@@ -31,12 +31,12 @@ describe('KclBootstrapper.js', function() {
             });
             childProcess.spawn.and.returnValue(mockChild);
         });
-        
+
         it('should parse command line options', function() {
             bootstrapper.run();
             expect(bootstrapper.parseCmdLine).toHaveBeenCalledWith();
         });
-        
+
         it('should set the gid and uid of the process', function() {
             bootstrapper.run();
             expect(process.setgid).toHaveBeenCalledWith('group');
@@ -53,7 +53,7 @@ describe('KclBootstrapper.js', function() {
             expect(childArgs[2]).toBe('com.amazonaws.services.kinesis.multilang.MultiLangDaemon');
             expect(childArgs[3]).toBe('mld.properties');
         });
-        
+
         it('should exit the bootstrapper when the MultiLangDaemon closes', function() {
             bootstrapper.run();
             expect(mockChild.on).toHaveBeenCalledWith('exit', jasmine.any(Function));
@@ -61,7 +61,7 @@ describe('KclBootstrapper.js', function() {
             handler();
             expect(process.exit).toHaveBeenCalledWith(1);
         });
-        
+
         it('exit the MultiLangDaemon when the bootstrapper closes', function() {
             bootstrapper.run();
             var listeners = ['SIGINT', 'SIGTERM'];
@@ -74,12 +74,12 @@ describe('KclBootstrapper.js', function() {
             });
         });
     });
-    
+
     describe('parseCmdLine', function() {
         beforeEach(function() {
             bootstrapper.parseCmdLine.and.callThrough();
         });
-        
+
         it('should parse command line options', function() {
             process.argv = ['', '', '-j', 'java', '-p', 'properties', '-u', 'sixxy', '-g', 'sixxy'];
             var options = bootstrapper.parseCmdLine();
@@ -90,7 +90,7 @@ describe('KclBootstrapper.js', function() {
                 group: 'sixxy'
             });
         });
-        
+
         it('should throw an error for invalid java path', function(done) {
             process.argv = ['', '', '-j', '', '-p', 'properties', '-u', 'sixxy', '-g', 'sixxy'];
             try {
@@ -101,7 +101,7 @@ describe('KclBootstrapper.js', function() {
                 done();
             }
         });
-        
+
         it('should throw an error for invalid properties path', function(done) {
             process.argv = ['', '', '-j', 'java', '-p', '', '-u', 'sixxy', '-g', 'sixxy'];
             try {
@@ -112,7 +112,7 @@ describe('KclBootstrapper.js', function() {
                 done();
             }
         });
-        
+
         it('should throw an error for invalid user', function(done) {
             process.argv = ['', '', '-j', 'java', '-p', 'properties', '-u', '', '-g', 'sixxy'];
             try {
@@ -123,7 +123,7 @@ describe('KclBootstrapper.js', function() {
                 done();
             }
         });
-        
+
         it('should throw an error for invalid group', function(done) {
             process.argv = ['', '', '-j', 'java', '-p', 'properties', '-u', 'sixxy', '-g', ''];
             try {
