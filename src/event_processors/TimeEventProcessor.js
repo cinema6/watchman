@@ -5,7 +5,7 @@ var EventProcessor = require('./EventProcessor.js');
 /**
 * An EventProcessor used to process time messages.
 *
-* @class TimeRecordProcessor
+* @class TimeEventProcessor
 * @constructor
 */
 function TimeEventProcessor(config) {

@@ -50,6 +50,16 @@ describe('KclApp.js', function() {
                 region: 'region',
                 dimensions: [],
                 sendInterval: 60000
+            },
+            emails: {
+                sender: 'sender',
+                dashboardLink: 'dashboard',
+                manageLink: 'manage',
+                reviewLink: 'review',
+                activationTarget: 'activation',
+                supportAddress: 'support',
+                passwordResetPages: { },
+                forgotTargets: { }
             }
         };
         runSpy = jasmine.createSpy('run()');
@@ -352,6 +362,118 @@ describe('KclApp.js', function() {
                 expect(configError).toBe('cloudWatch: sendInterval: Not a number');
             });
         });
+
+        describe('emails.sender', function() {
+            it('should return an error message if missing', function() {
+                delete config.emails.sender;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('emails: sender: Missing value');
+            });
+
+            it('should return an error message if not a string', function() {
+                config.emails.sender = 123;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('emails: sender: Not a string');
+            });
+        });
+
+        describe('emails.dashboardLink', function() {
+            it('should return an error message if missing', function() {
+                delete config.emails.dashboardLink;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('emails: dashboardLink: Missing value');
+            });
+
+            it('should return an error message if not a string', function() {
+                config.emails.dashboardLink = 123;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('emails: dashboardLink: Not a string');
+            });
+        });
+
+        describe('emails.manageLink', function() {
+            it('should return an error message if missing', function() {
+                delete config.emails.manageLink;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('emails: manageLink: Missing value');
+            });
+
+            it('should return an error message if not a string', function() {
+                config.emails.manageLink = 123;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('emails: manageLink: Not a string');
+            });
+        });
+
+        describe('emails.reviewLink', function() {
+            it('should return an error message if missing', function() {
+                delete config.emails.reviewLink;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('emails: reviewLink: Missing value');
+            });
+
+            it('should return an error message if not a string', function() {
+                config.emails.reviewLink = 123;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('emails: reviewLink: Not a string');
+            });
+        });
+
+        describe('emails.activationTarget', function() {
+            it('should return an error message if missing', function() {
+                delete config.emails.activationTarget;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('emails: activationTarget: Missing value');
+            });
+
+            it('should return an error message if not a string', function() {
+                config.emails.activationTarget = 123;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('emails: activationTarget: Not a string');
+            });
+        });
+
+        describe('emails.supportAddress', function() {
+            it('should return an error message if missing', function() {
+                delete config.emails.supportAddress;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('emails: supportAddress: Missing value');
+            });
+
+            it('should return an error message if not a string', function() {
+                config.emails.supportAddress = 123;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('emails: supportAddress: Not a string');
+            });
+        });
+
+        describe('emails.passwordResetPages', function() {
+            it('should return an error message if missing', function() {
+                delete config.emails.passwordResetPages;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('emails: passwordResetPages: Missing value');
+            });
+
+            it('should return an error message if not an object', function() {
+                config.emails.passwordResetPages = 123;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('emails: passwordResetPages: Not a object');
+            });
+        });
+
+        describe('emails.forgotTargets', function() {
+            it('should return an error message if missing', function() {
+                delete config.emails.forgotTargets;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('emails: forgotTargets: Missing value');
+            });
+
+            it('should return an error message if not an object', function() {
+                config.emails.forgotTargets = 123;
+                var configError = app.checkConfig(config, 0);
+                expect(configError).toBe('emails: forgotTargets: Not a object');
+            });
+        });
     });
 
     describe('parseCmdLine', function() {
@@ -484,7 +606,9 @@ describe('KclApp.js', function() {
             expect(app.config).toBeNull();
             app.loadConfig();
             expect(fs.readFileSync).toHaveBeenCalledWith('mockConfig', 'utf8');
-            config.secrets = 'so secret';
+            config.state = {
+                secrets: 'so secret'
+            };
             config.appCreds = 'so secret';
             expect(app.config).toEqual(config);
         });
@@ -507,7 +631,9 @@ describe('KclApp.js', function() {
             });
 
             it('should update the config of the event processor', function() {
-                config.secrets = 'so secret';
+                config.state = {
+                    secrets: 'so secret'
+                };
                 config.appCreds = 'so secret';
                 expect(app.recordProcessor.processor.config).toEqual(config);
                 expect(app.recordProcessor.processor.loadActions).toHaveBeenCalledWith();

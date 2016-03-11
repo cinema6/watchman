@@ -34,7 +34,7 @@ describe('timeStream', function() {
     var producer;
 
     beforeAll(function(done) {
-        jasmine.DEFAULT_TIMEOUT_INTERVAL = 10000;
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000;
         producer = new JsonProducer(TIME_STREAM, { region: 'us-east-1' });
         var pgconn = {
             user: 'cwrx',
@@ -50,7 +50,7 @@ describe('timeStream', function() {
                     endDate: new Date(2000, 11, 17)
                 },
                 status: 'active',
-                user: 'not-e2e-user',
+                user: 'e2e-user',
                 org: 'o-selfie'
             },
             {
@@ -60,7 +60,7 @@ describe('timeStream', function() {
                     endDate: new Date(3000, 11, 17)
                 },
                 status: 'active',
-                user: 'not-e2e-user',
+                user: 'e2e-user',
                 org: 'o-selfie'
             }
         ];
@@ -157,6 +157,17 @@ describe('timeStream', function() {
                 }
             }
         ];
+        // The password is a hash of "password"
+        var mockUsers = [
+            {
+                id: 'e2e-user',
+                status: 'active',
+                email : 'c6e2etester@gmail.com',
+                password : '$2a$10$XomlyDak6mGSgrC/g1L7FO.4kMRkj4UturtKSzy6mFeL8QWOBmIWq',
+                org: 'e2e-org',
+                permissions: {}
+            }
+        ];
         var mockApp = {
             id: 'app-e2e-watchman',
             key: APP_CREDS.key,
@@ -164,7 +175,8 @@ describe('timeStream', function() {
             secret: APP_CREDS.secret,
             permissions: {
                 campaigns: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
-                cards: { read: 'all', create: 'all', edit: 'all', delete: 'all' }
+                cards: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
+                users: { read: 'all', create: 'all', edit: 'all', delete: 'all' }
             },
             entitlements: {
                 'directEditCampaigns': true
@@ -203,11 +215,10 @@ describe('timeStream', function() {
                 pgInsert(),
                 testUtils.resetCollection('cards', mockCards),
                 testUtils.resetCollection('campaigns', mockCampaigns),
+                testUtils.resetCollection('users', mockUsers),
                 testUtils.mongoUpsert('applications', { key: 'watchman-app' }, mockApp)
             ]);
-        }).then(done).catch(function(error) {
-            done.fail(error);
-        });
+        }).then(done, done.fail);
     });
 
     afterAll(function(done) {
@@ -216,60 +227,71 @@ describe('timeStream', function() {
         });
     });
 
-    it('should expire active, paused, or outOfBudget campaigns upon reaching their end date',
-            function(done) {
-        function waitForEnded() {
-            return testUtils.mongoFind('campaigns', { id: 'e2e-cam-1' }).then(function(campaigns) {
-                if(campaigns[0].status !== 'expired') {
-                    return Q.Promise(function(resolve, reject) {
-                        setTimeout(function() {
-                            waitForEnded().then(resolve, reject);
-                        }, WAIT_TIME);
+    function waitForTrue(promise) {
+        return Q.resolve().then(promise).then(function(value) {
+            if(!value) {
+                return Q.Promise(function(resolve, reject) {
+                    setTimeout(function() {
+                        waitForTrue(promise).then(resolve, reject);
+                    }, WAIT_TIME);
+                });
+            }
+        });
+    }
+
+    describe('the time event prompting campaigns to be fetched', function() {
+        beforeAll(function(done) {
+            producer.produce({ type: 'hourly' }).then(done, done.fail);
+        });
+
+        describe('when an active, paused, or outOfBudget campaign has reached its end date',
+                function() {
+            it('should change the status to expired', function(done) {
+                function waitForStatus() {
+                    return waitForTrue(function() {
+                        return testUtils.mongoFind('campaigns', { id: 'e2e-cam-1' })
+                            .then(function(campaigns) {
+                                return (campaigns[0].status === 'expired');
+                            });
                     });
                 }
+
+                return waitForStatus().then(function() {
+                    var ids = ['e2e-cam-1', 'e2e-cam-2', 'e2e-cam-3', 'e2e-cam-4', 'e2e-cam-7'];
+                    return testUtils.mongoFind('campaigns', { id: { $in: ids } }, { id: 1 });
+                }).then(function(campaigns) {
+                    expect(campaigns[0].status).toBe('expired');
+                    expect(campaigns[1].status).toBe('expired');
+                    expect(campaigns[2].status).toBe('active');
+                    expect(campaigns[3].status).toBe('draft');
+                    expect(campaigns[4].status).toBe('expired');
+                    done();
+                }).catch(done.fail);
             });
-        }
+        });
 
-        producer.produce({ type: 'hourly' }).then(function() {
-            return waitForEnded();
-        }).then(function() {
-            var ids = ['e2e-cam-1', 'e2e-cam-2', 'e2e-cam-3', 'e2e-cam-4', 'e2e-cam-7'];
-            return testUtils.mongoFind('campaigns', { id: { $in: ids } }, { id: 1 });
-        }).then(function(campaigns) {
-            expect(campaigns[0].status).toBe('expired');
-            expect(campaigns[1].status).toBe('expired');
-            expect(campaigns[2].status).toBe('active');
-            expect(campaigns[3].status).toBe('draft');
-            expect(campaigns[4].status).toBe('expired');
-            done();
-        }).catch(done.fail);
-    });
-
-    it('should change the status of active or paused campaigns when reaching their budget',
-            function(done) {
-        function waitForEnded() {
-            return testUtils.mongoFind('campaigns', { id: 'e2e-cam-5' }).then(function(campaigns) {
-                if(campaigns[0].status !== 'outOfBudget') {
-                    return Q.Promise(function(resolve, reject) {
-                        setTimeout(function() {
-                            waitForEnded().then(resolve, reject);
-                        }, WAIT_TIME);
+        describe('when an active or paused campaign has reached its budget', function() {
+            it('should change the status to outOfBudget', function(done) {
+                function waitForStatus() {
+                    return waitForTrue(function() {
+                        return testUtils.mongoFind('campaigns', { id: 'e2e-cam-5' })
+                            .then(function(campaigns) {
+                                return (campaigns[0].status === 'outOfBudget');
+                            });
                     });
                 }
-            });
-        }
 
-        producer.produce({ type: 'hourly' }).then(function() {
-            return waitForEnded();
-        }).then(function() {
-            var ids = ['e2e-cam-3', 'e2e-cam-4', 'e2e-cam-5', 'e2e-cam-6'];
-            return testUtils.mongoFind('campaigns', { id: { $in: ids } }, { id: 1 });
-        }).then(function(campaigns) {
-            expect(campaigns[0].status).toBe('active');
-            expect(campaigns[1].status).toBe('draft');
-            expect(campaigns[2].status).toBe('outOfBudget');
-            expect(campaigns[3].status).toBe('outOfBudget');
-            done();
-        }).catch(done.fail);
+                return waitForStatus().then(function() {
+                    var ids = ['e2e-cam-3', 'e2e-cam-4', 'e2e-cam-5', 'e2e-cam-6'];
+                    return testUtils.mongoFind('campaigns', { id: { $in: ids } }, { id: 1 });
+                }).then(function(campaigns) {
+                    expect(campaigns[0].status).toBe('active');
+                    expect(campaigns[1].status).toBe('draft');
+                    expect(campaigns[2].status).toBe('outOfBudget');
+                    expect(campaigns[3].status).toBe('outOfBudget');
+                    done();
+                }).catch(done.fail);
+            });
+        });
     });
 });

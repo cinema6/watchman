@@ -116,6 +116,110 @@ describe('EventProcessor.js', function() {
             }).catch(done.fail);
         });
 
+        describe('filtering actions based on the ifData hash', function() {
+            beforeEach(function() {
+                eventProcessor.actions = {
+                    'good_action': mockGoodAction,
+                    'bad_action': mockBadAction
+                };
+            });
+
+            it('should not filter actions without an ifData', function(done) {
+                eventProcessor.handleEvent({
+                    name: 'tick',
+                    data: 'data'
+                }, {
+                    actions: [
+                        'good_action',
+                        'bad_action'
+                    ]
+                }).then(function() {
+                    expect(mockGoodAction).toHaveBeenCalled();
+                    expect(mockBadAction).toHaveBeenCalled();
+                }).then(done, done.fail);
+            });
+
+            it('should filter actions that do not match some of the ifData', function(done) {
+                eventProcessor.handleEvent({
+                    name: 'tick',
+                    data: {
+                        foo: 'foo@bar 123'
+                    }
+                }, {
+                    actions: [
+                        {
+                            name: 'good_action',
+                            ifData: {
+                                foo: '^foo@.* \\d{3}$'
+                            }
+                        },
+                        {
+                            name: 'bad_action',
+                            ifData: {
+                                foo: '^foo@.* \\d{4}$'
+                            }
+                        }
+                    ]
+                }).then(function() {
+                    expect(mockGoodAction).toHaveBeenCalled();
+                    expect(mockBadAction).not.toHaveBeenCalled();
+                }).then(done, done.fail);
+            });
+
+            it('should not filter actions that match the ifData', function(done) {
+                eventProcessor.handleEvent({
+                    name: 'tick',
+                    data: {
+                        foo: 'foo@bar 123'
+                    }
+                }, {
+                    actions: [
+                        {
+                            name: 'good_action',
+                            ifData: {
+                                foo: '^foo@.* \\d{3}$'
+                            }
+                        },
+                        {
+                            name: 'bad_action',
+                            ifData: {
+                                foo: '^foo@.* \\d{3}$'
+                            }
+                        }
+                    ]
+                }).then(function() {
+                    expect(mockGoodAction).toHaveBeenCalled();
+                    expect(mockBadAction).toHaveBeenCalled();
+                }).then(done, done.fail);
+            });
+
+            it('should filter actions who do not have the properties required by ifData',
+                    function(done) {
+                eventProcessor.handleEvent({
+                    name: 'tick',
+                    data: { }
+                }, {
+                    actions: [
+                        {
+                            name: 'good_action',
+                            ifData: {
+                                foo: '.*'
+                            }
+                        },
+                        {
+                            name: 'bad_action',
+                            ifData: {
+                                foo: '.*'
+                            }
+                        }
+                    ]
+                }).then(function() {
+                    expect(mockGoodAction).not.toHaveBeenCalled();
+                    expect(mockBadAction).not.toHaveBeenCalled();
+                }).then(done, done.fail);
+            });
+        });
+
         it('should perform the configured list of actions', function(done) {
             eventProcessor.actions = {
                 'good_action': mockGoodAction,

@@ -60,7 +60,7 @@ describe('check_expiry.js', function() {
             });
         });
 
-        it('should produce if the end date has passed', function(done) {
+        it('should produce if the end date has passed for a current campaign', function(done) {
             var mockData = {
                 campaign: {
                     cards: [
@@ -72,17 +72,15 @@ describe('check_expiry.js', function() {
                     ]
                 }
             };
-            checkExpiry(mockData, mockOptions, mockConfig).then(function() {
+            return checkExpiry(mockData, mockOptions, mockConfig).then(function() {
                 expect(JsonProducer.prototype.produce).toHaveBeenCalledWith({
                     type: 'campaignExpired',
                     data: {
-                        campaign: mockData.campaign
+                        campaign: mockData.campaign,
+                        date: jasmine.any(Date)
                     }
                 });
-                done();
-            }).catch(function(error) {
-                done.fail(error);
-            });
+            }).then(done, done.fail);
         });
 
         it('should not produce if the status is already expired', function(done) {
@@ -165,7 +163,7 @@ describe('check_expiry.js', function() {
             });
         });
 
-        it('should produce if the budget has been reached', function(done) {
+        it('should produce if the budget has been reached for a current campaign', function(done) {
             var mockData = {
                 campaign: {
                     pricing: {
@@ -178,17 +176,15 @@ describe('check_expiry.js', function() {
                     }
                 }
             };
-            checkExpiry(mockData, mockOptions, mockConfig).then(function() {
+            return checkExpiry(mockData, mockOptions, mockConfig).then(function() {
                 expect(JsonProducer.prototype.produce).toHaveBeenCalledWith({
                     type: 'campaignReachedBudget',
                     data: {
-                        campaign: mockData.campaign
+                        campaign: mockData.campaign,
+                        date: jasmine.any(Date)
                     }
                 });
-                done();
-            }).catch(function(error) {
-                done.fail(error);
-            });
+            }).then(done, done.fail);
         });
 
         it('should not produce if the status is already outOfBudget', function(done) {

@@ -108,8 +108,7 @@ describe('set_status.js', function() {
                     url: 'http://hostname/api/campaigns/c-123',
                     json: {
                         status: 'status'
-                    },
-                    jar: true
+                    }
                 });
                 done();
             }).catch(done.fail);

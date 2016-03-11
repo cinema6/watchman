@@ -4,7 +4,8 @@ module.exports = {
         options: {
             mongoHost: '33.33.33.10',
             timeStream: 'devTimeStream',
-            watchmanStream: 'devWatchmanStream'
+            watchmanStream: 'devWatchmanStream',
+            cwrxStream: 'devCwrxStream'
         }
     }
 };
