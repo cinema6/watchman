@@ -32,7 +32,7 @@ function pgQuery(conn, statement) {
 
 describe('timeStream', function() {
     var producer;
-    
+
     beforeAll(function(done) {
         jasmine.DEFAULT_TIMEOUT_INTERVAL = 10000;
         producer = new JsonProducer(TIME_STREAM, { region: 'us-east-1' });
@@ -180,7 +180,7 @@ describe('timeStream', function() {
 
         var today = ((new Date()).toISOString()).substr(0, 10);
         var pgdataCampaignSummaryHourly = [
-            'INSERT INTO rpt.campaign_summary_hourly_all VALUES',
+            'INSERT INTO rpt.campaign_summary_hourly VALUES',
             '(\'' + today + ' 01:00:00+00\',\'e2e-cam-1\',\'completedView\',0,0),',
             '(\'' + today + ' 01:00:00+00\',\'e2e-cam-2\',\'completedView\',100,100),',
             '(\'' + today + ' 01:00:00+00\',\'e2e-cam-3\',\'completedView\',200,200),',
@@ -189,15 +189,15 @@ describe('timeStream', function() {
             '(\'' + today + ' 01:00:00+00\',\'e2e-cam-6\',\'completedView\',500,500),',
             '(\'' + today + ' 01:00:00+00\',\'e2e-cam-7\',\'completedView\',600,600);'
         ];
-        
+
         function pgTruncate() {
-            return pgQuery(pgconn, 'TRUNCATE TABLE rpt.campaign_summary_hourly_all');
+            return pgQuery(pgconn, 'TRUNCATE TABLE rpt.campaign_summary_hourly');
         }
-        
+
         function pgInsert() {
             return pgQuery(pgconn, pgdataCampaignSummaryHourly.join(' '));
         }
-        
+
         pgTruncate().then(function() {
             return Q.all([
                 pgInsert(),
@@ -244,7 +244,7 @@ describe('timeStream', function() {
             done();
         }).catch(done.fail);
     });
-    
+
     it('should change the status of active or paused campaigns when reaching their budget',
             function(done) {
         function waitForEnded() {
