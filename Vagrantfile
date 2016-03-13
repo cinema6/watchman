@@ -36,26 +36,17 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     chef.json = {
         :watchman => {
             :awsAuth => JSON.parse(File.read("#{ENV['HOME']}/.aws.json")),
-            :secrets => {
-                :email => "testuser",
-                :password => "password"
-            },
             :rsyslog => {
-                :token => "fac240ab-aa03-4430-8966-a474b92773d3",
                 :hostname => ENV["USER"],
-                :monitor => true
-            },
-            :deploy => {
-                :apps => ["devTimeStreamApplication", "devWatchmanStreamApplication"]
-            },
-            :devTimeStreamApplication => {
-                :mld => {
-                    :stream => "devTimeStream"
-                }
-            },
-            :devWatchmanStreamApplication => {
-                :mld => {
-                    :stream => "devWatchmanStream"
+                :monitor => true,
+                :watchman => {
+                    :token => "fac240ab-aa03-4430-8966-a474b92773d3"
+                },
+                :devTimeStreamApplication => {
+                    :token => "64ae1c2d-3425-4337-841f-df86e3362ebb"
+                },
+                :devWatchmanStreamApplication => {
+                    :token => "e488a8de-462d-4f59-ad68-f7cf2f268c3d"
                 }
             },
             :app => {
