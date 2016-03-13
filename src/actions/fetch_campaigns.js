@@ -36,8 +36,8 @@ module.exports = function(data, options, config) {
                     };
                 });
             } else {
-                log.warn('Error requesting campaigns, code: %1 body: %2', statusCode,
-                    JSON.stringify(body));
+                log.warn('Error requesting campaigns with statuses %1, code: %2 body: %3',
+                    statuses, statusCode, JSON.stringify(body));
             }
             return data;
         });
@@ -62,8 +62,8 @@ module.exports = function(data, options, config) {
                             data[analytics.campaignId].analytics = analytics;
                         });
                     } else {
-                        log.warn('Error requesting analytics, code: %1 body: %2', statusCode,
-                            JSON.stringify(body));
+                        log.warn('Error requesting analytics for campaigns %1, code: %2 body: %3',
+                            campaignIds, statusCode, JSON.stringify(body));
                     }
                     return data;
                 });
