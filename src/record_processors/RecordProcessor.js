@@ -163,6 +163,9 @@ RecordProcessor.prototype = {
                     log.warn('[%1] Failed to checkpoint on shutdown in shard %2: %3', self.name,
                         self.shardId, error);
                 });
+            } else if(reason === 'ZOMBIE') {
+                log.error('[%1] Worker is no longer responding, exiting', self.name);
+                process.exit(1);
             }
         }).then(function() {
             completeCallback();

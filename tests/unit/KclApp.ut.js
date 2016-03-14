@@ -87,6 +87,7 @@ describe('KclApp.js', function() {
         spyOn(fs, 'writeFileSync');
         spyOn(fs, 'unlinkSync');
         spyOn(fs, 'readFileSync');
+        spyOn(fs, 'existsSync');
         spyOn(app, 'parseCmdLine');
         spyOn(app, 'checkConfig');
         spyOn(app, 'writePid');
@@ -95,6 +96,7 @@ describe('KclApp.js', function() {
         spyOn(logger, 'createLog').and.returnValue(mockLog);
         spyOn(process, 'on');
         spyOn(process, 'exit');
+        spyOn(process, 'kill');
     });
 
     describe('the constructor', function() {
@@ -357,11 +359,19 @@ describe('KclApp.js', function() {
     describe('writePid', function() {
         beforeEach(function() {
             app.writePid.and.callThrough();
-            app.writePid('path');
         });
 
         it('should write the pid to a file', function() {
+            app.writePid('path');
             expect(fs.writeFileSync).toHaveBeenCalledWith('path', process.pid.toString());
+        });
+
+        it('should kill the current process if it exists', function() {
+            fs.existsSync.and.returnValue(true);
+            fs.readFileSync.and.returnValue('123');
+            app.writePid('path');
+            expect(fs.readFileSync).toHaveBeenCalledWith('path', { encoding: 'utf-8' });
+            expect(process.kill).toHaveBeenCalledWith(123);
         });
     });
 
