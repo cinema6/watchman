@@ -83,7 +83,7 @@ EventProcessor.prototype = {
                 }
             }).catch(function(error) {
                 log.warn('[%1 event processor] Error performing action %2: %3', self.name,
-                    actionName, JSON.stringify(error));
+                    actionName, util.inspect(error));
             });
         }));
     },
