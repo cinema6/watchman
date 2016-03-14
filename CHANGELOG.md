@@ -6,6 +6,7 @@
   * [FEATURE]: Allow fetch_campaigns to request campaigns in chunks of specified size
   * Log more detailed warnings when a request fails
   * Log the successful completion of actions at the trace level
+* *[/v0.0.1-rc2]*
 
 * *[v0.0.1-rc1]*
   * Initial release of Watchman
