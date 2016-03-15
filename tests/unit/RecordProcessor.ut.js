@@ -29,6 +29,7 @@ describe('RecordProcessor.js', function() {
         recordProcessor = new RecordProcessor(mockProcessor);
         spyOn(recordProcessor, 'checkpoint').and.callThrough();
         spyOn(logger, 'getLog').and.returnValue(mockLog);
+        spyOn(process, 'exit');
     });
 
     describe('the constructor', function() {
@@ -37,7 +38,7 @@ describe('RecordProcessor.js', function() {
             expect(recordProcessor.processor).toEqual(mockProcessor);
             expect(recordProcessor.shardId).toBeNull();
         });
-        
+
         it('should throw an error if not given an event processor', function() {
             var error = null;
             try {
@@ -48,7 +49,7 @@ describe('RecordProcessor.js', function() {
             expect(error).not.toBeNull();
         });
     });
-    
+
     describe('the processRecords method', function() {
         it('should not attempt to process non-existant records', function() {
             recordProcessor.processRecords(null, callback);
@@ -60,13 +61,13 @@ describe('RecordProcessor.js', function() {
             expect(mockProcessor.process).not.toHaveBeenCalled();
             expect(callback).toHaveBeenCalled();
             callback.calls.reset();
-            
+
             recordProcessor.processRecords({ records: [] }, callback);
             expect(mockProcessor.process).not.toHaveBeenCalled();
             expect(callback).toHaveBeenCalled();
             callback.calls.reset();
         });
-        
+
         describe('when receiving a batch of valid records', function() {
             beforeEach(function(done) {
                 var records = [
@@ -83,7 +84,7 @@ describe('RecordProcessor.js', function() {
                 mockProcessor.process.and.returnValue(Q.resolve());
                 process.nextTick(done);
             });
-            
+
             it('should process them as json', function() {
                 var expectedJson = [
                     { fish: 'trout', message: 'i <3 streams' },
@@ -95,13 +96,13 @@ describe('RecordProcessor.js', function() {
                 });
                 expect(callback).toHaveBeenCalled();
             });
-            
+
             it('should perform a checkpoint', function() {
                 expect(recordProcessor.checkpoint).toHaveBeenCalledWith('checkpointer', '3');
                 expect(callback).toHaveBeenCalled();
             });
         });
-        
+
         describe('when receiving a batch containing some invalid records', function() {
             beforeEach(function(done) {
                 var records = [
@@ -116,25 +117,25 @@ describe('RecordProcessor.js', function() {
                 mockProcessor.process.and.returnValue(Q.resolve());
                 process.nextTick(done);
             });
-            
+
             it('should process only the valid json', function() {
                 var expected = { fish: 'trout', message: 'i <3 streams' };
                 expect(mockProcessor.process).toHaveBeenCalledWith(expected);
                 expect(mockProcessor.process.calls.count()).toBe(1);
                 expect(callback).toHaveBeenCalled();
             });
-            
+
             it('should still checkpoint after the batch', function() {
                 expect(recordProcessor.checkpoint).toHaveBeenCalledWith('checkpointer', '3');
                 expect(callback).toHaveBeenCalled();
             });
-            
+
             it('should log a warning for each invalid record', function() {
                 expect(mockLog.warn.calls.count()).toBe(2);
                 expect(callback).toHaveBeenCalled();
             });
         });
-        
+
         it('should log a warning if checkpointing fails', function(done) {
             var records = [
                 { data: 'eyJmaXNoIjoidHJvdXQiLCJtZXNzYWdlIjoiaSA8MyBzdHJlYW1zIn0=',
@@ -153,7 +154,7 @@ describe('RecordProcessor.js', function() {
                 done();
             });
         });
-        
+
         it('should log an error on unexpected failure', function(done) {
             var records = [
                 { data: 'eyJmaXNoIjoidHJvdXQiLCJtZXNzYWdlIjoiaSA8MyBzdHJlYW1zIn0=',
@@ -175,7 +176,7 @@ describe('RecordProcessor.js', function() {
             });
         });
     });
-    
+
     describe('the shutdown method', function() {
         describe('when the reason is TERMINATE', function() {
             it('should perform a checkpoint', function(done) {
@@ -188,7 +189,7 @@ describe('RecordProcessor.js', function() {
                     done();
                 });
             });
-            
+
             it('should log a warning if the checkpoint fails', function(done) {
                 recordProcessor.checkpoint.and.returnValue(Q.reject());
                 recordProcessor.shutdown({ reason: 'TERMINATE', checkpointer: 'checkpointer' },
@@ -201,7 +202,7 @@ describe('RecordProcessor.js', function() {
                 });
             });
         });
-        
+
         describe('when the reason is ZOMBIE', function() {
             it('should not perform a checkpoint', function(done) {
                 recordProcessor.shutdown({ reason: 'ZOMBIE', checkpointer: 'checkpointer' },
@@ -212,8 +213,18 @@ describe('RecordProcessor.js', function() {
                     done();
                 });
             });
+
+            it('should log an error and exit the process', function(done) {
+                recordProcessor.shutdown({ reason: 'ZOMBIE', checkpointer: 'checkpointer' },
+                    callback);
+                process.nextTick(function() {
+                    expect(mockLog.error).toHaveBeenCalled();
+                    expect(process.exit).toHaveBeenCalled();
+                    done();
+                });
+            });
         });
-        
+
         it('should log an error on unexpected failure', function(done) {
             recordProcessor.checkpoint.and.returnValue(Q.reject());
             recordProcessor.shutdown({ reason: 'TERMINATE', checkpointer: 'checkpointer' },
@@ -228,7 +239,7 @@ describe('RecordProcessor.js', function() {
             });
         });
     });
-    
+
     describe('the checkpoint method', function() {
         it('should resolve with the checkpoint sequence number', function(done) {
             mockCheckpointer.checkpoint.and.callFake(function(num, cb) {
@@ -241,7 +252,7 @@ describe('RecordProcessor.js', function() {
                 done();
             }).catch(done.fail);
         });
-        
+
         it('should reject if an error occurs', function(done) {
             mockCheckpointer.checkpoint.and.callFake(function(num, cb) {
                 cb('epic fail', null);
@@ -252,7 +263,7 @@ describe('RecordProcessor.js', function() {
                 done();
             });
         });
-        
+
         it('should work if not given a sequence number', function(done) {
             mockCheckpointer.checkpoint.and.callFake(function(num, cb) {
                 cb(null, 'checkpoint-num');

@@ -10,7 +10,7 @@ module.exports = {
         command: function() {
             var apps = ['devTimeStreamApplication', 'devWatchmanStreamApplication'];
             var cmd = apps.map(function(app) {
-                return 'sudo rsync --recursive --exclude=node_modules/*grunt* /vagrant/' +
+                return 'sudo rsync --recursive --exclude=node_modules/* /vagrant/' +
                     ' /opt/sixxy/install/' + app + '/current;sudo service ' + app + ' restart';
             }).join(';');
             return SSH_CMD + ' "' + cmd + '"';

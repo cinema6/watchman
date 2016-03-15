@@ -76,14 +76,14 @@ EventProcessor.prototype = {
             var cloudWatchReporter = self.cloudWatchReporters[actionName];
             var start = Date.now();
             return actionModule(event.data, actionOptions, self.config).then(function() {
+                log.trace('[%1 event processor] Successfully performed action %2',
+                    self.name, actionNames[index]);
                 if(cloudWatchReporter) {
-                    log.info('[%1 event processor] Successfully performed action %2',
-                        self.name, actionNames[index]);
                     cloudWatchReporter.push(Date.now() - start);
                 }
             }).catch(function(error) {
                 log.warn('[%1 event processor] Error performing action %2: %3', self.name,
-                    actionName, JSON.stringify(error));
+                    actionName, util.inspect(error));
             });
         }));
     },

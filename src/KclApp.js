@@ -176,13 +176,26 @@ KclApp.prototype = {
     },
 
     /**
-    * Writes this scripts' process id to a given file path.
+    * Writes this scripts' process id to a given file path. If a pid file already exists, attempt
+    * to exit the process it points to.
     *
     * @param {String} filePath Absolute path to which to write the pid.
     */
     writePid: function(filePath) {
-        var pid = process.pid;
-        fs.writeFileSync(filePath, pid.toString());
+        var log = logger.getLog();
+        if(fs.existsSync(filePath)) {
+            var oldPid = parseInt(fs.readFileSync(filePath, {
+                encoding: 'utf-8'
+            }));
+            try {
+                log.info('Pidfile exists, attempting to kill process %1', oldPid);
+                process.kill(oldPid);
+            } catch(error) {
+                log.info('Error killing process %1: %2', oldPid, error);
+            }
+        }
+        var newPid = process.pid;
+        fs.writeFileSync(filePath, newPid.toString());
     },
 
     /**
