@@ -176,38 +176,6 @@ KclApp.prototype = {
     },
 
     /**
-    * Writes this scripts' process id to a given file path. If a pid file already exists, attempt
-    * to exit the process it points to.
-    *
-    * @param {String} filePath Absolute path to which to write the pid.
-    */
-    writePid: function(filePath) {
-        var log = logger.getLog();
-        if(fs.existsSync(filePath)) {
-            var oldPid = parseInt(fs.readFileSync(filePath, {
-                encoding: 'utf-8'
-            }));
-            try {
-                log.info('Pidfile exists, attempting to kill process %1', oldPid);
-                process.kill(oldPid);
-            } catch(error) {
-                log.info('Error killing process %1: %2', oldPid, error);
-            }
-        }
-        var newPid = process.pid;
-        fs.writeFileSync(filePath, newPid.toString());
-    },
-
-    /**
-    * Removes an existing pid at the given file path.
-    *
-    * @param {String} filePath Absolute path to a pid to be removed.
-    */
-    removePid: function(filePath) {
-        fs.unlinkSync(filePath);
-    },
-
-    /**
     * Parses command line options to get the path to this application's configuration.
     *
     * @return {Object} An options object containing the parsed entities.
@@ -281,14 +249,12 @@ KclApp.prototype = {
         var config = self.config;
         var log = logger.createLog(config.log);
         var consumerConfig = config.kinesis.consumer;
-        var pidFile = path.resolve(config.pidPath, consumerConfig.appName + '.pid');
 
         try {
             var AppEventProcessor = require('./event_processors/' + consumerConfig.processor);
             var eventProcessor = new AppEventProcessor(config);
-            self.recordProcessor = new RecordProcessor(eventProcessor);
+            self.recordProcessor = new RecordProcessor(eventProcessor, config.pidPath);
             log.info('[%1] Starting application', consumerConfig.appName);
-            self.writePid(pidFile);
             kcl(self.recordProcessor).run();
         } catch(error) {
             log.error('[%1] Error running application: %2', consumerConfig.appName, error);
@@ -297,7 +263,6 @@ KclApp.prototype = {
 
         process.on('exit', function() {
             log.info('[%1] Exiting application', consumerConfig.appName);
-            self.removePid(pidFile);
         });
         process.on('SIGHUP', function() {
             log.info('[%1] Reloading configuration', consumerConfig.appName);
