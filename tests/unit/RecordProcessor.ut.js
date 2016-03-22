@@ -2,6 +2,7 @@
 
 var RecordProcessor = require('../../src/record_processors/RecordProcessor.js');
 var Q = require('q');
+var fs =  require('fs');
 var logger = require('cwrx/lib/logger.js');
 
 describe('RecordProcessor.js', function() {
@@ -26,15 +27,22 @@ describe('RecordProcessor.js', function() {
         mockCheckpointer = {
             checkpoint: jasmine.createSpy('checkpoint()')
         };
-        recordProcessor = new RecordProcessor(mockProcessor);
+        recordProcessor = new RecordProcessor(mockProcessor, '/pid/path');
+        spyOn(fs, 'existsSync');
+        spyOn(fs, 'unlinkSync');
+        spyOn(fs, 'writeFileSync');
+        spyOn(fs, 'readFileSync');
         spyOn(recordProcessor, 'checkpoint').and.callThrough();
         spyOn(logger, 'getLog').and.returnValue(mockLog);
         spyOn(process, 'exit');
+        spyOn(process, 'kill');
+        spyOn(process, 'on');
     });
 
     describe('the constructor', function() {
         it('initialize its properties', function() {
             expect(recordProcessor.name).toBe('name record processor');
+            expect(recordProcessor.pidPath).toBe('/pid/path');
             expect(recordProcessor.processor).toEqual(mockProcessor);
             expect(recordProcessor.shardId).toBeNull();
         });
@@ -47,6 +55,50 @@ describe('RecordProcessor.js', function() {
                 error = err;
             }
             expect(error).not.toBeNull();
+        });
+    });
+
+    describe('the initialize method', function() {
+        var initialize;
+
+        beforeAll(function() {
+            initialize = function() {
+                recordProcessor.initialize({
+                    shardId: 'shard-000'
+                }, callback);
+            };
+        });
+
+        afterEach(function() {
+            expect(callback).toHaveBeenCalledWith();
+        });
+
+        it('should set the shardId', function() {
+            initialize();
+            expect(recordProcessor.shardId).toBe('shard-000');
+        });
+
+        describe('pid handling', function() {
+            it('should kill the process of an existing pid', function() {
+                fs.existsSync.and.returnValue(true);
+                fs.readFileSync.and.returnValue(123);
+                initialize();
+                expect(process.kill).toHaveBeenCalledWith(123);
+            });
+
+            it('should write a pid', function() {
+                initialize();
+                expect(fs.writeFileSync).toHaveBeenCalledWith('/pid/path/name-shard-000.pid',
+                    jasmine.any(String));
+            });
+
+            it('should remove the pid on exit', function() {
+                initialize();
+                expect(process.on).toHaveBeenCalledWith('exit', jasmine.any(Function));
+                var handler = process.on.calls.mostRecent().args[1];
+                handler();
+                expect(fs.unlinkSync).toHaveBeenCalledWith('/pid/path/name-shard-000.pid');
+            });
         });
     });
 

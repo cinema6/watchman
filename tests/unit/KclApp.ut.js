@@ -90,8 +90,6 @@ describe('KclApp.js', function() {
         spyOn(fs, 'existsSync');
         spyOn(app, 'parseCmdLine');
         spyOn(app, 'checkConfig');
-        spyOn(app, 'writePid');
-        spyOn(app, 'removePid');
         spyOn(app, 'loadConfig');
         spyOn(logger, 'createLog').and.returnValue(mockLog);
         spyOn(process, 'on');
@@ -356,36 +354,6 @@ describe('KclApp.js', function() {
         });
     });
 
-    describe('writePid', function() {
-        beforeEach(function() {
-            app.writePid.and.callThrough();
-        });
-
-        it('should write the pid to a file', function() {
-            app.writePid('path');
-            expect(fs.writeFileSync).toHaveBeenCalledWith('path', process.pid.toString());
-        });
-
-        it('should kill the current process if it exists', function() {
-            fs.existsSync.and.returnValue(true);
-            fs.readFileSync.and.returnValue('123');
-            app.writePid('path');
-            expect(fs.readFileSync).toHaveBeenCalledWith('path', { encoding: 'utf-8' });
-            expect(process.kill).toHaveBeenCalledWith(123);
-        });
-    });
-
-    describe('removePid', function() {
-        beforeEach(function() {
-            app.removePid.and.callThrough();
-            app.removePid('path');
-        });
-
-        it('should delete the pid file', function() {
-            expect(fs.unlinkSync).toHaveBeenCalledWith('path');
-        });
-    });
-
     describe('parseCmdLine', function() {
         beforeEach(function() {
             app.parseCmdLine.and.callThrough();
@@ -443,14 +411,11 @@ describe('KclApp.js', function() {
         });
 
         it('should create a new record processor', function() {
+            config.pidPath = '/pid/path';
             app.run();
-            expect(mockRecordProcessor).toHaveBeenCalledWith(jasmine.any(mockEventProcessor));
+            expect(mockRecordProcessor).toHaveBeenCalledWith(jasmine.any(mockEventProcessor),
+                '/pid/path');
             expect(app.recordProcessor).toEqual(jasmine.any(mockRecordProcessor));
-        });
-
-        it('should write a pid file', function() {
-            app.run();
-            expect(app.writePid).toHaveBeenCalledWith('/valid-dir/appName.pid');
         });
 
         it('should run the kcl app', function() {
@@ -466,16 +431,6 @@ describe('KclApp.js', function() {
             app.run();
             expect(mockLog.error).toHaveBeenCalled();
             expect(process.exit).toHaveBeenCalledWith(1);
-        });
-
-        it('should remove the pid file on exit', function() {
-            app.run();
-            expect(process.on).toHaveBeenCalledWith('exit', jasmine.any(Function));
-            var handler = process.on.calls.all().filter(function(call) {
-                return call.args[0] === 'exit';
-            })[0].args[1];
-            handler();
-            expect(app.removePid).toHaveBeenCalledWith('/valid-dir/appName.pid');
         });
 
         describe('the SIGHUP handler', function() {

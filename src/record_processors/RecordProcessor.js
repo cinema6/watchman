@@ -1,7 +1,9 @@
 'use strict';
 
 var Q = require('q');
+var fs = require('fs');
 var logger = require('cwrx/lib/logger.js');
+var path = require('path');
 
 /**
 * The record processor must provide three functions:
@@ -31,11 +33,12 @@ var logger = require('cwrx/lib/logger.js');
 * @param {EventProcessor} eventProcessor An event processor used to process decoded json records.
 * @constructor
 */
-function RecordProcessor(eventProcessor) {
+function RecordProcessor(eventProcessor, pidPath) {
     if(!eventProcessor) {
         throw new Error('Must provide an event processor');
     }
     this.name = eventProcessor.name + ' record processor';
+    this.pidPath = pidPath;
     this.processor = eventProcessor;
     this.shardId = null;
 }
@@ -53,6 +56,26 @@ RecordProcessor.prototype = {
         var log = logger.getLog();
         this.shardId = initializeInput.shardId;
         log.info('[%1] Initializing with shard %2', this.name, this.shardId);
+
+        // Handle pid files
+        var pidFile = path.resolve(this.pidPath,
+            this.processor.name + '-' + this.shardId + '.pid');
+        if(fs.existsSync(pidFile)) {
+            var oldPid = parseInt(fs.readFileSync(pidFile, {
+                encoding: 'utf-8'
+            }));
+            try {
+                log.info('Pidfile exists, attempting to kill process %1', oldPid);
+                process.kill(oldPid);
+            } catch(error) {
+                log.info('Error killing process %1: %2', oldPid, error);
+            }
+        }
+        var pid = process.pid;
+        fs.writeFileSync(pidFile, pid.toString());
+        process.on('exit', function() {
+            fs.unlinkSync(pidFile);
+        });
         completeCallback();
     },
 

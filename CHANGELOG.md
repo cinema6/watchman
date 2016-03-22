@@ -1,5 +1,10 @@
 # Watchman
 
+## v0.0.2 (March 22, 2016)
+* *[v0.0.2-rc1]*
+  * Fix for an issue where multiple instances of a given KCL application would not be able to start
+* *[/v0.0.2-rc1]*
+
 ## v0.0.1 (March 7, 2016)
 * *[v0.0.1-rc2]*
   * [FIX]: Fix for an issue that could cause watchman to silently fail if a java worker process was lost
