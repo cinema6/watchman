@@ -231,13 +231,14 @@ describe('RecordProcessor.js', function() {
 
     describe('the shutdown method', function() {
         describe('when the reason is TERMINATE', function() {
-            it('should perform a checkpoint', function(done) {
+            it('should perform a checkpoint and exit the process', function(done) {
                 recordProcessor.checkpoint.and.returnValue(Q.resolve());
                 recordProcessor.shutdown({ reason: 'TERMINATE', checkpointer: 'checkpointer' },
                     callback);
                 process.nextTick(function() {
                     expect(recordProcessor.checkpoint).toHaveBeenCalledWith('checkpointer');
                     expect(callback).toHaveBeenCalled();
+                    expect(process.exit).toHaveBeenCalledWith(0);
                     done();
                 });
             });
@@ -256,28 +257,19 @@ describe('RecordProcessor.js', function() {
         });
 
         describe('when the reason is ZOMBIE', function() {
-            it('should not perform a checkpoint', function(done) {
+            it('should not perform a checkpoint and exit the process', function(done) {
                 recordProcessor.shutdown({ reason: 'ZOMBIE', checkpointer: 'checkpointer' },
                     callback);
                 process.nextTick(function() {
                     expect(recordProcessor.checkpoint).not.toHaveBeenCalled();
                     expect(callback).toHaveBeenCalled();
-                    done();
-                });
-            });
-
-            it('should log an error and exit the process', function(done) {
-                recordProcessor.shutdown({ reason: 'ZOMBIE', checkpointer: 'checkpointer' },
-                    callback);
-                process.nextTick(function() {
-                    expect(mockLog.error).toHaveBeenCalled();
-                    expect(process.exit).toHaveBeenCalled();
+                    expect(process.exit).toHaveBeenCalledWith(0);
                     done();
                 });
             });
         });
 
-        it('should log an error on unexpected failure', function(done) {
+        it('should log an error on unexpected failure and exit the process', function(done) {
             recordProcessor.checkpoint.and.returnValue(Q.reject());
             recordProcessor.shutdown({ reason: 'TERMINATE', checkpointer: 'checkpointer' },
                 callback);
@@ -287,6 +279,7 @@ describe('RecordProcessor.js', function() {
             process.nextTick(function() {
                 expect(mockLog.error).toHaveBeenCalled();
                 expect(callback).toHaveBeenCalled();
+                expect(process.exit).toHaveBeenCalledWith(0);
                 done();
             });
         });
