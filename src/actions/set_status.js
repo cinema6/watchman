@@ -18,8 +18,7 @@ module.exports = function(data, options, config) {
                 url: campaignEndpoint + '/' + campaignId,
                 json: {
                     status: status
-                },
-                jar: true
+                }
             }).then(function(response) {
                 var statusCode = response.response.statusCode;
                 var body = response.body;

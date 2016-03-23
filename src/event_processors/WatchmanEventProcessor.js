@@ -5,7 +5,7 @@ var EventProcessor = require('./EventProcessor.js');
 /**
 * An EventProcessor used to process watchman messages.
 *
-* @class WatchmanRecordProcessor
+* @class WatchmanEventProcessor
 * @constructor
 */
 function WatchmanEventProcessor(config) {

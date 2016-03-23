@@ -47,6 +47,9 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
                 },
                 :devWatchmanStreamApplication => {
                     :token => "e488a8de-462d-4f59-ad68-f7cf2f268c3d"
+                },
+                :devCwrxStreamApplication => {
+                    :token => "86527b56-b848-4c65-b274-33e09cf2a9eb"
                 }
             },
             :app => {

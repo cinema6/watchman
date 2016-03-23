@@ -7,7 +7,7 @@ var checkExpiry = require('../../src/actions/check_expiry.js');
 describe('check_expiry.js', function() {
     var mockOptions;
     var mockConfig;
-    
+
     beforeEach(function() {
         mockOptions = { };
         mockConfig = {
@@ -39,7 +39,7 @@ describe('check_expiry.js', function() {
                 done.fail(error);
             });
         });
-        
+
         it('should not produce if the end date has not yet arrived', function(done) {
             var mockData = {
                 campaign: {
@@ -59,8 +59,8 @@ describe('check_expiry.js', function() {
                 done.fail(error);
             });
         });
-        
-        it('should produce if the end date has passed', function(done) {
+
+        it('should produce if the end date has passed for a current campaign', function(done) {
             var mockData = {
                 campaign: {
                     cards: [
@@ -72,19 +72,17 @@ describe('check_expiry.js', function() {
                     ]
                 }
             };
-            checkExpiry(mockData, mockOptions, mockConfig).then(function() {
+            return checkExpiry(mockData, mockOptions, mockConfig).then(function() {
                 expect(JsonProducer.prototype.produce).toHaveBeenCalledWith({
                     type: 'campaignExpired',
                     data: {
-                        campaign: mockData.campaign
+                        campaign: mockData.campaign,
+                        date: jasmine.any(Date)
                     }
                 });
-                done();
-            }).catch(function(error) {
-                done.fail(error);
-            });
+            }).then(done, done.fail);
         });
-        
+
         it('should not produce if the status is already expired', function(done) {
             var mockData = {
                 campaign: {
@@ -125,7 +123,7 @@ describe('check_expiry.js', function() {
                 done.fail(error);
             });
         });
-        
+
         it('should not produce if there is no budget on the campaign', function(done) {
             var mockDatas = [
                 { analytics: { summary: { totalSpend: 'spend' } } },
@@ -143,7 +141,7 @@ describe('check_expiry.js', function() {
                 done.fail(error);
             });
         });
-        
+
         it('should not produce if the budget has not yet been reached', function(done) {
             var mockData = {
                 campaign: {
@@ -164,8 +162,8 @@ describe('check_expiry.js', function() {
                 done.fail(error);
             });
         });
-        
-        it('should produce if the budget has been reached', function(done) {
+
+        it('should produce if the budget has been reached for a current campaign', function(done) {
             var mockData = {
                 campaign: {
                     pricing: {
@@ -178,19 +176,17 @@ describe('check_expiry.js', function() {
                     }
                 }
             };
-            checkExpiry(mockData, mockOptions, mockConfig).then(function() {
+            return checkExpiry(mockData, mockOptions, mockConfig).then(function() {
                 expect(JsonProducer.prototype.produce).toHaveBeenCalledWith({
                     type: 'campaignReachedBudget',
                     data: {
-                        campaign: mockData.campaign
+                        campaign: mockData.campaign,
+                        date: jasmine.any(Date)
                     }
                 });
-                done();
-            }).catch(function(error) {
-                done.fail(error);
-            });
+            }).then(done, done.fail);
         });
-        
+
         it('should not produce if the status is already outOfBudget', function(done) {
             var mockData = {
                 campaign: {

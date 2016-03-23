@@ -10,18 +10,18 @@ describe('TimeEventProcessor.js', function() {
         spyOn(EventProcessor.prototype, 'loadActions');
         timeEventProcessor = new TimeEventProcessor('config');
     });
-    
+
     it('should be an EventProcessor', function() {
         expect(timeEventProcessor).toEqual(jasmine.any(EventProcessor));
     });
-    
+
     describe('the constructor', function() {
         it('should call the super constructor', function() {
             expect(timeEventProcessor.config).toBe('config');
             expect(timeEventProcessor.name).toBe('time');
         });
     });
-    
+
     describe('the recordToEvent method', function() {
         it('should correctly map messages', function() {
             var input = [

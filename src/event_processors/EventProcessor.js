@@ -58,6 +58,21 @@ EventProcessor.prototype = {
         var log = logger.getLog();
         var self = this;
 
+        // Only consider actions with event data matching regular expressions in the ifData hash
+        actions = actions.filter(function(action) {
+            var ifData = action.ifData || { };
+            var dataKeys = Object.keys(ifData);
+            for(var i=0;i<dataKeys.length;i++) {
+                var key = dataKeys[i];
+                var regex = new RegExp(ifData[key]);
+                var dataProp = event.data[key];
+                if(!dataProp || !regex.test(dataProp)) {
+                    return false;
+                }
+            }
+            return true;
+        });
+
         // Resolve if there are no actions in the eventConfig
         if(actions.length === 0) {
             return Q.resolve();

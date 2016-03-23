@@ -170,6 +170,16 @@ KclApp.prototype = {
                 region: 'string',
                 dimensions: 'object',
                 sendInterval: 'number'
+            },
+            emails: {
+                sender: 'string',
+                dashboardLink: 'string',
+                manageLink: 'string',
+                reviewLink: 'string',
+                activationTarget: 'string',
+                supportAddress: 'string',
+                passwordResetPages: 'object',
+                forgotTargets: 'object'
             }
         };
         return validate(config, schema);
@@ -213,7 +223,9 @@ KclApp.prototype = {
         // Read the secrets file
         var secretsPath = config.secrets;
         var secrets = require(secretsPath);
-        config.secrets = secrets;
+        config.state = {
+            secrets: secrets
+        };
 
         // Read the rcAppCreds file
         var appCredsPath = config.appCreds;

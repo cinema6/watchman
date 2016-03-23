@@ -6,13 +6,13 @@ var path = require('path');
 
 module.exports = function(grunt) {
     var cloudFormation;
-    
+
     function initCloudFormation(auth, region) {
         AWS.config.loadFromPath(auth);
         AWS.config.update({ region: region });
         cloudFormation = new AWS.CloudFormation();
     }
-    
+
     function getStackOutputs(stack) {
         return Q.Promise(function(resolve, reject) {
             cloudFormation.describeStacks({
@@ -26,7 +26,7 @@ module.exports = function(grunt) {
             });
         });
     }
-    
+
     grunt.registerMultiTask('test', 'runs tests', function() {
         var done = this.async();
         var options = this.options();
@@ -46,9 +46,10 @@ module.exports = function(grunt) {
             var region = grunt.option('region') || 'us-east-1';
             var timeStream = options.timeStream;
             var watchmanStream = options.watchmanStream;
-            
+            var cwrxStream = options.cwrxStream;
+
             initCloudFormation(auth, region);
-            
+
             Q.resolve().then(function() {
                 if(cloudStack) {
                     return getStackOutputs(cloudStack).then(function(outputs) {
@@ -62,6 +63,9 @@ module.exports = function(grunt) {
                                 break;
                             case 'watchmanStream':
                                 watchmanStream = output.OutputValue;
+                                break;
+                            case 'cwrxStream':
+                                cwrxStream = output.OutputValue;
                                 break;
                             }
                         });
@@ -88,6 +92,7 @@ module.exports = function(grunt) {
                 process.env.mongo = JSON.stringify(mongoCfg);
                 process.env.timeStream = timeStream;
                 process.env.watchmanStream = watchmanStream;
+                process.env.cwrxStream = cwrxStream;
                 grunt.task.run('jasmine_nodejs:e2e');
                 done();
             }).catch(function(error) {

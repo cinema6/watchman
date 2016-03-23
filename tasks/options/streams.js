@@ -1,8 +1,12 @@
 module.exports = {
     options: {
         waitTime: 5000,
-        streams: ['devTimeStream', 'devWatchmanStream'],
-        tables: ['devTimeStreamApplication', 'devWatchmanStreamApplication']
+        streams: ['devTimeStream', 'devWatchmanStream', 'devCwrxStream'],
+        tables: [
+            'devTimeStreamApplication',
+            'devWatchmanStreamApplication',
+            'devCwrxStreamApplication'
+        ]
     },
     create: { },
     destroy: { }

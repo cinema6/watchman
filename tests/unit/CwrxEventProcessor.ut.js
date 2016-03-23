@@ -1,24 +1,24 @@
 'use strict';
 
 var EventProcessor = require('../../src/event_processors/EventProcessor.js');
-var WatchmanEventProcessor = require('../../src/event_processors/WatchmanEventProcessor.js');
+var CwrxEventProcessor = require('../../src/event_processors/CwrxEventProcessor.js');
 
-describe('WatchmanEventProcessor.js', function() {
-    var watchmanEventProcessor;
+describe('CwrxEventProcessor.js', function() {
+    var cwrxEventProcessor;
 
     beforeEach(function() {
         spyOn(EventProcessor.prototype, 'loadActions');
-        watchmanEventProcessor = new WatchmanEventProcessor('config');
+        cwrxEventProcessor = new CwrxEventProcessor('config');
     });
 
     it('should be an EventProcessor', function() {
-        expect(watchmanEventProcessor).toEqual(jasmine.any(EventProcessor));
+        expect(cwrxEventProcessor).toEqual(jasmine.any(EventProcessor));
     });
 
     describe('the constructor', function() {
         it('should call the super constructor', function() {
-            expect(watchmanEventProcessor.config).toBe('config');
-            expect(watchmanEventProcessor.name).toBe('watchman');
+            expect(cwrxEventProcessor.config).toBe('config');
+            expect(cwrxEventProcessor.name).toBe('cwrx');
         });
     });
 
@@ -37,7 +37,7 @@ describe('WatchmanEventProcessor.js', function() {
                 null
             ];
             input.forEach(function(message, index) {
-                expect(watchmanEventProcessor.recordToEvent(message)).toEqual(expected[index]);
+                expect(cwrxEventProcessor.recordToEvent(message)).toEqual(expected[index]);
             });
         });
     });
