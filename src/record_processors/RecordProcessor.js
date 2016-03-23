@@ -187,14 +187,16 @@ RecordProcessor.prototype = {
                         self.shardId, error);
                 });
             } else if(reason === 'ZOMBIE') {
-                log.error('[%1] Worker is no longer responding, exiting', self.name);
-                process.exit(1);
+                log.info('[%1] Worker for shard %2 is no longer present, exiting', self.name,
+                    self.shardId);
             }
         }).then(function() {
             completeCallback();
+            process.exit(0);
         }).catch(function(error) {
             log.error('[%1] Error in shard %2: %3', self.name, self.shardId, error);
             completeCallback();
+            process.exit(0);
         });
     },
 

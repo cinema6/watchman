@@ -2,6 +2,7 @@
 
 ## v0.0.2 (March 22, 2016)
 * *[v0.0.2-rc1]*
+  * Improved shutdown behavior for when a worker becomes a zombie or terminates
   * Fix for an issue where multiple instances of a given KCL application would not be able to start
 * *[/v0.0.2-rc1]*
 
