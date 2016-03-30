@@ -3,3 +3,6 @@ node_modules
 docs
 .vagrant
 reports
+
+*.lock
+.rcAppCreds.json

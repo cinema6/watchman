@@ -103,7 +103,13 @@ var __private__ = {
             }
             return 'New update request from ' + submitter + ' for campaign "' + campName + '"';
         case 'activateAccount':
-            return 'Welcome to Reelcontent Video Ads!';
+            switch (data.target) {
+            case 'bob':
+                return 'Welcome to Reelcontent Marketing!';
+            default:
+                return 'Welcome to Reelcontent Video Ads!';
+            }
+            return;
         case 'accountWasActivated':
             return 'Your Account is Now Active';
         case 'passwordChanged':
@@ -185,18 +191,32 @@ var __private__ = {
             };
             break;
         case 'activateAccount':
-            var target = emailConfig.activationTarget;
+            var target = emailConfig.activationTargets[data.target || 'selfie'];
             var link = target + ((target.indexOf('?') === -1) ? '?' : '&') +
                 'id=' + data.user.id + '&token=' + data.token;
-            template = 'activateAccount.html';
+            template = (function() {
+                switch (data.target) {
+                case 'bob':
+                    return 'activateAccount--bob.html';
+                default:
+                    return 'activateAccount.html';
+                }
+            }());
             templateData = {
                 activationLink: link
             };
             break;
         case 'accountWasActivated':
-            template = 'accountWasActivated.html';
+            template = (function() {
+                switch (data.target) {
+                case 'bob':
+                    return 'accountWasActivated--bob.html';
+                default:
+                    return 'accountWasActivated.html';
+                }
+            }());
             templateData = {
-                dashboardLink: emailConfig.dashboardLink
+                dashboardLink: emailConfig.dashboardLinks[data.target || 'selfie']
             };
             break;
         case 'passwordChanged':

@@ -49,10 +49,16 @@
                     },
                     "emails": {
                         "sender": "no-reply@reelcontent.com",
-                        "dashboardLink": "http://localhost:9000/#/apps/selfie/campaigns",
+                        "dashboardLinks": {
+                            "selfie": "http://localhost:9000/#/apps/selfie/campaigns",
+                            "bob": "http://localhost:9000/#/bob/products"
+                        },
                         "manageLink": "http://localhost:9000/#/apps/selfie/campaigns/manage/:campId/manage",
                         "reviewLink": "http://localhost:9000/#/apps/selfie/campaigns/manage/:campId/admin",
-                        "activationTarget": "http://localhost:9000/#/confirm?selfie=selfie",
+                        "activationTargets": {
+                            "selfie": "http://localhost:9000/#/confirm?selfie=selfie",
+                            "bob": "http://localhost:9000/#/bob/confirm"
+                        },
                         "supportAddress": "c6e2etester@gmail.com",
                         "passwordResetPages": {
                             "portal": "http://localhost:9000/#/password/forgot",

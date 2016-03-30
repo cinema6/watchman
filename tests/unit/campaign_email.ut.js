@@ -315,8 +315,39 @@ describe('campaign_email.js', function() {
             });
         });
 
-        it('should get the subject for activateAccount emails', function() {
-            expect(getSubject('activateAccount')).toBe('Welcome to Reelcontent Video Ads!');
+        describe('if the type is "activateAccount"', function() {
+            var type, data;
+
+            beforeEach(function() {
+                type = 'activateAccount';
+                data = {};
+            });
+
+            describe('and the data has no target', function() {
+                it('should be a subject for selfie', function() {
+                    expect(getSubject(type, data)).toBe('Welcome to Reelcontent Video Ads!');
+                });
+            });
+
+            describe('and the target is selfie', function() {
+                beforeEach(function() {
+                    data.target = 'selfie';
+                });
+
+                it('should be a subject for selfie', function() {
+                    expect(getSubject(type, data)).toBe('Welcome to Reelcontent Video Ads!');
+                });
+            });
+
+            describe('and the target is bob', function() {
+                beforeEach(function() {
+                    data.target = 'bob';
+                });
+
+                it('should be a subject for bob', function() {
+                    expect(getSubject(type, data)).toBe('Welcome to Reelcontent Marketing!');
+                });
+            });
         });
 
         it('should get the subject for accountWasActivated emails', function() {
@@ -542,12 +573,18 @@ describe('campaign_email.js', function() {
         });
 
         describe('compiling an activateAccount email', function() {
-            it('should handle the possibility of a url without query params', function(done) {
-                emailConfig.activationTarget = 'http://link.com';
+            beforeEach(function() {
+                emailConfig.activationTargets = {
+                    selfie: 'http://link.com',
+                    bob: 'http://bob-link.com'
+                };
                 data.user = {
                     id: 'u-123'
                 };
                 data.token = 'token';
+            });
+
+            it('should handle the possibility of a url without query params', function(done) {
                 getHtml('activateAccount', data, emailConfig).then(function() {
                     expect(email.__private__.loadTemplate).toHaveBeenCalledWith(
                         'activateAccount.html');
@@ -561,11 +598,8 @@ describe('campaign_email.js', function() {
             });
 
             it('should handle the possibility of a url with query params', function(done) {
-                emailConfig.activationTarget = 'http://link.com?query=param';
-                data.user = {
-                    id: 'u-123'
-                };
-                data.token = 'token';
+                emailConfig.activationTargets.selfie = 'http://link.com?query=param';
+
                 getHtml('activateAccount', data, emailConfig).then(function() {
                     expect(email.__private__.loadTemplate).toHaveBeenCalledWith(
                         'activateAccount.html');
@@ -577,19 +611,109 @@ describe('campaign_email.js', function() {
                     done();
                 }).catch(done.fail);
             });
+
+            describe('if the target is selfie', function() {
+                beforeEach(function() {
+                    data.target = 'selfie';
+                });
+
+                it('should use the selfie template and data', function(done) {
+                    getHtml('activateAccount', data, emailConfig).then(function() {
+                        expect(email.__private__.loadTemplate).toHaveBeenCalledWith(
+                            'activateAccount.html');
+                        expect(handlebars.compile).toHaveBeenCalledWith('template');
+                        expect(compileSpy).toHaveBeenCalledWith({
+                            activationLink: 'http://link.com?id=u-123&token=token'
+                        });
+                        expect();
+                        done();
+                    }).catch(done.fail);
+                });
+            });
+
+            describe('if the target is bob', function() {
+                beforeEach(function() {
+                    data.target = 'bob';
+                });
+
+                it('should use the bob template and data', function(done) {
+                    getHtml('activateAccount', data, emailConfig).then(function() {
+                        expect(email.__private__.loadTemplate).toHaveBeenCalledWith(
+                            'activateAccount--bob.html');
+                        expect(handlebars.compile).toHaveBeenCalledWith('template');
+                        expect(compileSpy).toHaveBeenCalledWith({
+                            activationLink: 'http://bob-link.com?id=u-123&token=token'
+                        });
+                        expect();
+                        done();
+                    }).catch(done.fail);
+                });
+            });
         });
 
-        it('should be able to compile an accountWasActivated email', function(done) {
-            getHtml('accountWasActivated', data, emailConfig).then(function() {
-                expect(email.__private__.loadTemplate).toHaveBeenCalledWith(
-                    'accountWasActivated.html');
-                expect(handlebars.compile).toHaveBeenCalledWith('template');
-                expect(compileSpy).toHaveBeenCalledWith({
-                    dashboardLink: 'dashboard link'
+        describe('if the type is "accountWasActivated"', function() {
+            var type;
+
+            beforeEach(function() {
+                type = 'accountWasActivated';
+                emailConfig.dashboardLinks = {
+                    selfie: 'dashboard link',
+                    bob: 'bob dashboard link'
+                };
+            });
+
+            describe('without a target', function() {
+                it('should use the selfie template and data', function(done) {
+                    getHtml('accountWasActivated', data, emailConfig).then(function() {
+                        expect(email.__private__.loadTemplate).toHaveBeenCalledWith(
+                            'accountWasActivated.html');
+                        expect(handlebars.compile).toHaveBeenCalledWith('template');
+                        expect(compileSpy).toHaveBeenCalledWith({
+                            dashboardLink: 'dashboard link'
+                        });
+                        expect();
+                        done();
+                    }).catch(done.fail);
                 });
-                expect();
-                done();
-            }).catch(done.fail);
+            });
+
+            describe('with a selfie target', function() {
+                beforeEach(function() {
+                    data.target = 'selfie';
+                });
+
+                it('should use the selfie template and data', function(done) {
+                    getHtml('accountWasActivated', data, emailConfig).then(function() {
+                        expect(email.__private__.loadTemplate).toHaveBeenCalledWith(
+                            'accountWasActivated.html');
+                        expect(handlebars.compile).toHaveBeenCalledWith('template');
+                        expect(compileSpy).toHaveBeenCalledWith({
+                            dashboardLink: 'dashboard link'
+                        });
+                        expect();
+                        done();
+                    }).catch(done.fail);
+                });
+            });
+
+            describe('with a bob target', function() {
+                beforeEach(function() {
+                    data.target = 'bob';
+                });
+
+                it('should use the bob template and data', function(done) {
+                    getHtml('accountWasActivated', data, emailConfig).then(function() {
+                        expect(email.__private__.loadTemplate).toHaveBeenCalledWith(
+                            'accountWasActivated--bob.html');
+                        expect(handlebars.compile).toHaveBeenCalledWith('template');
+                        expect(compileSpy).toHaveBeenCalledWith({
+                            dashboardLink: 'bob dashboard link'
+                        });
+                        expect();
+                        done();
+                    }).catch(done.fail);
+                });
+            });
         });
 
         it('should be able to compile a passwordChanged email', function(done) {
