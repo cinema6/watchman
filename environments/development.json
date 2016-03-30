@@ -1,0 +1,297 @@
+{
+    "name": "development",
+    "chef_type": "environment",
+    "json_class": "Chef::Environment",
+    "description": "Watchman Development Environment",
+    "default_attributes": {
+        "watchman" : {
+            "deploy": {
+                "apps": ["devTimeStreamApplication", "devWatchmanStreamApplication", "devCwrxStreamApplication"]
+            },
+            "app": {
+                "config": {
+                    "log": {
+                        "logLevel": "trace",
+                        "logDir": "/opt/sixxy/logs",
+                        "logName": "watchman.log",
+                        "media": [ { "type": "file" } ]
+                    },
+                    "secrets": "/opt/sixxy/.watchman.secrets.json",
+                    "appCreds": "/opt/sixxy/.rcAppCreds.json",
+                    "cwrx": {
+                        "api": {
+                            "root": "http://33.33.33.10",
+                            "auth": {
+                                "endpoint": "/api/auth"
+                            },
+                            "campaigns": {
+                                "endpoint": "/api/campaigns"
+                            },
+                            "analytics": {
+                                "endpoint": "/api/analytics"
+                            },
+                            "users": {
+                                "endpoint": "/api/account/users"
+                            }
+                        }
+                    },
+                    "pidPath": "/opt/sixxy/run",
+                    "cloudWatch": {
+                        "namespace": "C6/Watchman",
+                        "region": "us-east-1",
+                        "dimensions": [
+                            {
+                                "Name": "Environment",
+                                "Value": "Development"
+                            }
+                        ],
+                        "sendInterval": 60000
+                    },
+                    "emails": {
+                        "sender": "no-reply@reelcontent.com",
+                        "dashboardLink": "http://localhost:9000/#/apps/selfie/campaigns",
+                        "manageLink": "http://localhost:9000/#/apps/selfie/campaigns/manage/:campId/manage",
+                        "reviewLink": "http://localhost:9000/#/apps/selfie/campaigns/manage/:campId/admin",
+                        "activationTarget": "http://localhost:9000/#/confirm?selfie=selfie",
+                        "supportAddress": "c6e2etester@gmail.com",
+                        "passwordResetPages": {
+                            "portal": "http://localhost:9000/#/password/forgot",
+                            "selfie": "http://localhost:9000/#/pass/forgot?selfie=true"
+                        },
+                        "forgotTargets": {
+                            "portal": "http://localhost:9000/#/password/reset",
+                            "selfie": "http://localhost:9000/#/pass/reset?selfie=true"
+                        }
+                    }
+                }
+            },
+            "devTimeStreamApplication": {
+                "config": {
+                    "kinesis": {
+                        "consumer": {
+                            "processor": "TimeEventProcessor.js",
+                            "appName": "devTimeStreamApplication"
+                        },
+                        "producer": {
+                            "stream": "devWatchmanStream",
+                            "region": "us-east-1"
+                        }
+                    },
+                    "eventHandlers": {
+                        "hourly": {
+                            "actions": [
+                                {
+                                    "name": "fetch_campaigns",
+                                    "options": {
+                                        "statuses": ["active", "paused", "outOfBudget"],
+                                        "prefix": "hourly",
+                                        "analytics": true,
+                                        "number": 50
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                "mld": {
+                    "stream": "devTimeStream"
+                }
+            },
+            "devWatchmanStreamApplication": {
+                "config": {
+                    "kinesis": {
+                        "consumer": {
+                            "processor": "WatchmanEventProcessor.js",
+                            "appName": "devWatchmanStreamApplication"
+                        },
+                        "producer": {
+                            "stream": "devWatchmanStream",
+                            "region": "us-east-1"
+                        }
+                    },
+                    "eventHandlers": {
+                        "hourly_campaignPulse": {
+                            "actions": ["check_expiry"]
+                        },
+                        "campaignExpired": {
+                            "actions": [
+                                {
+                                    "name": "set_status",
+                                    "options": {
+                                        "status": "expired"
+                                    }
+                                }
+                            ]
+                        },
+                        "campaignReachedBudget": {
+                            "actions": [
+                                {
+                                    "name": "set_status",
+                                    "options": {
+                                        "status": "outOfBudget"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                "mld": {
+                    "stream": "devWatchmanStream"
+                }
+            },
+            "devCwrxStreamApplication": {
+                "config": {
+                    "kinesis": {
+                        "consumer": {
+                            "processor": "CwrxEventProcessor.js",
+                            "appName": "devCwrxStreamApplication"
+                        },
+                        "producer": {
+                            "stream": "devWatchmanStream",
+                            "region": "us-east-1"
+                        }
+                    },
+                    "eventHandlers": {
+                        "campaignStateChange": {
+                            "actions": [
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "campaignExpired"
+                                    },
+                                    "ifData": {
+                                        "previousState": "active|paused",
+                                        "currentState": "expired"
+                                    }
+                                },
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "campaignReachedBudget"
+                                    },
+                                    "ifData": {
+                                        "currentState": "outOfBudget"
+                                    }
+                                }
+                            ]
+                        },
+                        "campaignApproved": {
+                            "actions": [
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "campaignApproved"
+                                    }
+                                }
+                            ]
+                        },
+                        "campaignUpdateApproved": {
+                            "actions": [
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "campaignUpdateApproved"
+                                    }
+                                }
+                            ]
+                        },
+                        "campaignRejected": {
+                            "actions": [
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "campaignRejected"
+                                    }
+                                }
+                            ]
+                        },
+                        "campaignUpdateRejected": {
+                            "actions": [
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "campaignUpdateRejected"
+                                    }
+                                }
+                            ]
+                        },
+                        "newUpdateRequest": {
+                            "actions": [
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "toSupport": true,
+                                        "type": "newUpdateRequest"
+                                    }
+                                }
+                            ]
+                        },
+                        "accountCreated": {
+                            "actions": [
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "activateAccount"
+                                    }
+                                }
+                            ]
+                        },
+                        "accountActivated": {
+                            "actions": [
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "accountWasActivated"
+                                    }
+                                }
+                            ]
+                        },
+                        "passwordChanged": {
+                            "actions": [
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "passwordChanged"
+                                    }
+                                }
+                            ]
+                        },
+                        "emailChanged": {
+                            "actions": [
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "emailChanged"
+                                    }
+                                }
+                            ]
+                        },
+                        "failedLogins": {
+                            "actions": [
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "failedLogins"
+                                    }
+                                }
+                            ]
+                        },
+                        "forgotPassword": {
+                            "actions": [
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "forgotPassword"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                "mld": {
+                    "stream": "devCwrxStream"
+                }
+            }
+        }
+    }
+}
