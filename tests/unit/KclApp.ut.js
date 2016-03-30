@@ -53,10 +53,10 @@ describe('KclApp.js', function() {
             },
             emails: {
                 sender: 'sender',
-                dashboardLink: 'dashboard',
+                dashboardLinks: { },
                 manageLink: 'manage',
                 reviewLink: 'review',
-                activationTarget: 'activation',
+                activationTargets: { },
                 supportAddress: 'support',
                 passwordResetPages: { },
                 forgotTargets: { }
@@ -377,17 +377,17 @@ describe('KclApp.js', function() {
             });
         });
 
-        describe('emails.dashboardLink', function() {
+        describe('emails.dashboardLinks', function() {
             it('should return an error message if missing', function() {
-                delete config.emails.dashboardLink;
+                delete config.emails.dashboardLinks;
                 var configError = app.checkConfig(config, 0);
-                expect(configError).toBe('emails: dashboardLink: Missing value');
+                expect(configError).toBe('emails: dashboardLinks: Missing value');
             });
 
-            it('should return an error message if not a string', function() {
-                config.emails.dashboardLink = 123;
+            it('should return an error message if not an object', function() {
+                config.emails.dashboardLinks = 123;
                 var configError = app.checkConfig(config, 0);
-                expect(configError).toBe('emails: dashboardLink: Not a string');
+                expect(configError).toBe('emails: dashboardLinks: Not a object');
             });
         });
 
@@ -419,17 +419,17 @@ describe('KclApp.js', function() {
             });
         });
 
-        describe('emails.activationTarget', function() {
+        describe('emails.activationTargets', function() {
             it('should return an error message if missing', function() {
-                delete config.emails.activationTarget;
+                delete config.emails.activationTargets;
                 var configError = app.checkConfig(config, 0);
-                expect(configError).toBe('emails: activationTarget: Missing value');
+                expect(configError).toBe('emails: activationTargets: Missing value');
             });
 
-            it('should return an error message if not a string', function() {
-                config.emails.activationTarget = 123;
+            it('should return an error message if not an object', function() {
+                config.emails.activationTargets = 123;
                 var configError = app.checkConfig(config, 0);
-                expect(configError).toBe('emails: activationTarget: Not a string');
+                expect(configError).toBe('emails: activationTargets: Not a object');
             });
         });
 

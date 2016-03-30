@@ -173,10 +173,10 @@ KclApp.prototype = {
             },
             emails: {
                 sender: 'string',
-                dashboardLink: 'string',
+                dashboardLinks: 'object',
                 manageLink: 'string',
                 reviewLink: 'string',
-                activationTarget: 'string',
+                activationTargets: 'object',
                 supportAddress: 'string',
                 passwordResetPages: 'object',
                 forgotTargets: 'object'
