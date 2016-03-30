@@ -29,10 +29,11 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.vm.provision "chef_solo" do |chef|
     chef.data_bags_path = "#{ENV['CHEF_REPO']}/data_bags"
     chef.encrypted_data_bag_secret_key_path = "#{ENV['HOME']}/.chef/c6data.pem"
-    chef.roles_path = "../cookbooks/watchman/roles"
-    chef.environments_path = "../cookbooks/watchman/environments"
-    chef.add_role "test"
+    chef.environments_path = "./environments"
     chef.environment = "development"
+    chef.run_list = [
+        'recipe[watchman]'
+    ]
     chef.json = {
         :watchman => {
             :awsAuth => JSON.parse(File.read("#{ENV['HOME']}/.aws.json")),
