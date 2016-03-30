@@ -2,6 +2,7 @@
 
 * *[v0.1.0-rc1]*
   * [FEATURE]: Added campaign_email action to send out emails about campaign events
+  * Add support for slideshow bob account creations emails
 
 ## v0.0.2 (March 22, 2016)
 * *[v0.0.2-rc1]*
