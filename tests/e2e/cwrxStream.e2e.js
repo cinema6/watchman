@@ -304,6 +304,29 @@ describe('cwrxStream', function() {
         }).catch(done.fail);
     });
 
+    it('should send an activation email when a new bob account has been created', function(done) {
+        producer.produce({
+            type: 'accountCreated',
+            data: {
+                token: 'secret-token',
+                user: mockUser,
+                target: 'bob'
+            }
+        }).then(function() {
+            mailman.once('Welcome to Reelcontent Marketing!',
+                    function(msg) {
+                expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                var regex = /https?:\/\/.+id.+u-123.+token.+secret-token/;
+                expect(msg.text).toMatch(regex);
+                expect(msg.html).toMatch(regex);
+                expect((new Date() - msg.date)).toBeLessThan(30000);
+                expect(msg.text).toContain('Welcome to Reelcontent Marketing!');
+                done();
+            });
+        }).catch(done.fail);
+    });
+
     it('should send an email notifying the user that their account has been activated',
             function(done) {
         producer.produce({
@@ -319,6 +342,29 @@ describe('cwrxStream', function() {
                 var regex = /account\s*is\s*now\s*active/;
                 expect(msg.text).toMatch(regex);
                 expect(msg.html).toMatch(regex);
+                expect((new Date() - msg.date)).toBeLessThan(30000);
+                done();
+            });
+        }).catch(done.fail);
+    });
+
+    it('should send an email notifying the user that their bob account has been activated',
+            function(done) {
+        producer.produce({
+            type: 'accountActivated',
+            data: {
+                user: mockUser,
+                target: 'bob'
+            }
+        }).then(function() {
+            mailman.once('Your Account is Now Active',
+                    function(msg) {
+                expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                var regex = /account\s*is\s*now\s*active/;
+                expect(msg.text).toMatch(regex);
+                expect(msg.html).toMatch(regex);
+                expect(msg.text).toContain('ADD MY FIRST PRODUCT');
                 expect((new Date() - msg.date)).toBeLessThan(30000);
                 done();
             });
