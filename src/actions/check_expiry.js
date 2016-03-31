@@ -1,6 +1,6 @@
 'use strict';
 
-var JsonProducer = require('../producers/JsonProducer.js');
+var JsonProducer = require('rc-kinesis').JsonProducer;
 var Q = require('q');
 var enums = require('cwrx/lib/enums.js');
 var logger = require('cwrx/lib/logger.js');

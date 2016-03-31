@@ -1,7 +1,7 @@
 
 'use strict';
 
-var JsonProducer = require('../../src/producers/JsonProducer.js');
+var JsonProducer = require('rc-kinesis').JsonProducer;
 var Q = require('q');
 var testUtils = require('cwrx/test/e2e/testUtils.js');
 
