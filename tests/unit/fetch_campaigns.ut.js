@@ -1,6 +1,6 @@
 'use strict';
 
-var JsonProducer = require('../../src/producers/JsonProducer.js');
+var JsonProducer = require('rc-kinesis').JsonProducer;
 var Q = require('q');
 var fetchCampaigns = require('../../src/actions/fetch_campaigns.js');
 var logger = require('cwrx/lib/logger.js');
