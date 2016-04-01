@@ -136,6 +136,7 @@ function action(data, options, config) {
                 return __private__.getCampaigns(appCreds, campaignEndpoint, {
                     limit: fetchNumber,
                     skip: skipNumber,
+                    sort: 'id,1',
                     statuses: statuses.join(',')
                 }).then(function(campData) {
                     if(fetchAnalytics) {
