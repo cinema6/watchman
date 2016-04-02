@@ -6,6 +6,7 @@ var Q = require('q');
 var testUtils = require('cwrx/test/e2e/testUtils.js');
 
 var APP_CREDS = JSON.parse(process.env.appCreds);
+var AWS_CREDS = JSON.parse(process.env.awsCreds);
 var TIME_STREAM = process.env.timeStream;
 var WAIT_TIME = 1000;
 
@@ -35,7 +36,14 @@ describe('timeStream', function() {
 
     beforeAll(function(done) {
         jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000;
-        producer = new JsonProducer(TIME_STREAM, { region: 'us-east-1' });
+        var awsConfig = {
+            region: 'us-east-1',
+        };
+        if(AWS_CREDS) {
+            awsConfig.accessKeyId = AWS_CREDS.accessKeyId;
+            awsConfig.secretAccessKey = AWS_CREDS.secretAccessKey;
+        }
+        producer = new JsonProducer(TIME_STREAM, awsConfig);
         var pgconn = {
             user: 'cwrx',
             password: 'password',

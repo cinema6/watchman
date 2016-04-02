@@ -4,6 +4,7 @@ var JsonProducer = require('rc-kinesis').JsonProducer;
 var Q = require('q');
 var testUtils = require('cwrx/test/e2e/testUtils.js');
 
+var AWS_CREDS = JSON.parse(process.env.awsCreds);
 var CWRX_STREAM = process.env.cwrxStream;
 
 describe('cwrxStream', function() {
@@ -26,7 +27,14 @@ describe('cwrxStream', function() {
 
     beforeEach(function() {
         jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000;
-        producer = new JsonProducer(CWRX_STREAM, { region: 'us-east-1' });
+        var awsConfig = {
+            region: 'us-east-1',
+        };
+        if(AWS_CREDS) {
+            awsConfig.accessKeyId = AWS_CREDS.accessKeyId;
+            awsConfig.secretAccessKey = AWS_CREDS.secretAccessKey;
+        }
+        producer = new JsonProducer(CWRX_STREAM, awsConfig);
         mockCampaign = {
             id: 'c-123',
             name: 'Cooltastic Campaign'
