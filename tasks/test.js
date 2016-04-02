@@ -2,6 +2,7 @@
 
 var AWS = require('aws-sdk');
 var Q = require('q');
+var fs = require('fs');
 var path = require('path');
 
 module.exports = function(grunt) {
@@ -89,6 +90,14 @@ module.exports = function(grunt) {
                     pass: 'password'
                 };
                 process.env.appCreds = JSON.stringify(appCreds);
+                try {
+                    var credsPath = path.join(process.env.HOME,'.aws.json');
+                    process.env.awsCreds = fs.readFileSync(credsPath, {
+                        encoding: 'utf-8'
+                    });
+                } catch (error) {
+                    process.env.awsCreds = null;
+                }
                 process.env.mongo = JSON.stringify(mongoCfg);
                 process.env.timeStream = timeStream;
                 process.env.watchmanStream = watchmanStream;
