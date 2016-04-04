@@ -34,7 +34,7 @@ module.exports = function(data, options, config) {
 
     return Q.resolve().then(function() {
         if(campaignEnded() && campaign.status !== enums.Status.Expired) {
-            log.trace('Campaign %1 ended at %2', campaign.id,
+            log.info('Campaign %1 (%2) ended at %3', campaign.name, campaign.id,
                 campaign.cards[0].campaign.endDate);
             return watchmanProducer.produce({
                 type: 'campaignExpired',
@@ -44,7 +44,7 @@ module.exports = function(data, options, config) {
                 }
             });
         } else if(campaignReachedBudget() && campaign.status !== enums.Status.OutOfBudget) {
-            log.trace('Campaign %1 reached budget of %2', campaign.id,
+            log.info('Campaign %1 (%2) reached budget of %3', campaign.name, campaign.id,
                 campaign.pricing.budget);
             return watchmanProducer.produce({
                 type: 'campaignReachedBudget',

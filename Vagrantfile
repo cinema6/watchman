@@ -27,6 +27,8 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
   # Provision with chef solo
   config.vm.provision "chef_solo" do |chef|
+    watchmanUser = ENV["WATCHMAN_USER"] || ENV["USER"] || "anon"
+
     chef.data_bags_path = "#{ENV['CHEF_REPO']}/data_bags"
     chef.encrypted_data_bag_secret_key_path = "#{ENV['HOME']}/.chef/c6data.pem"
     chef.environments_path = "./environments"
@@ -38,29 +40,45 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
         :watchman => {
             :awsAuth => JSON.parse(File.read("#{ENV['HOME']}/.aws.json")),
             :rsyslog => {
-                :hostname => ENV["USER"],
-                :monitor => true,
-                :watchman => {
-                    :token => "fac240ab-aa03-4430-8966-a474b92773d3"
+                :hostname => watchmanUser
+            },
+            :devTimeStreamApplication => {
+                :config => {
+                    :kinesis => {
+                        :producer => {
+                            :stream => "devWatchmanStream-" + watchmanUser
+                        }
+                    }
                 },
-                :devTimeStreamApplication => {
-                    :token => "64ae1c2d-3425-4337-841f-df86e3362ebb"
-                },
-                :devWatchmanStreamApplication => {
-                    :token => "e488a8de-462d-4f59-ad68-f7cf2f268c3d"
-                },
-                :devCwrxStreamApplication => {
-                    :token => "86527b56-b848-4c65-b274-33e09cf2a9eb"
+                :mld => {
+                    :stream => "devTimeStream-" + watchmanUser,
+                    :table => "devTimeStreamApplication-" + watchmanUser
                 }
             },
-            :app => {
-                :cwrx => {
-                    :auth => {
-                        :endpoint => ":3200/api/auth"
-                    },
-                    :campaigns => {
-                        :endpoint => ":3900/api/campaigns"
+            :devWatchmanStreamApplication => {
+                :config => {
+                    :kinesis => {
+                        :producer => {
+                            :stream => "devWatchmanStream-" + watchmanUser
+                        }
                     }
+                },
+                :mld => {
+                    :stream => "devWatchmanStream-" + watchmanUser,
+                    :table => "devWatchmanStreamApplication-" + watchmanUser
+                }
+            },
+            :devCwrxStreamApplication => {
+                :config => {
+                    :kinesis => {
+                        :producer => {
+                            :stream => "devWatchmanStream-" + watchmanUser
+                        }
+                    }
+                },
+                :mld => {
+                    :stream => "devCwrxStream-" + watchmanUser,
+                    :table => "devCwrxStreamApplication-" + watchmanUser
                 }
             }
         }

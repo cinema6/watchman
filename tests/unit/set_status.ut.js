@@ -114,9 +114,9 @@ describe('set_status.js', function() {
             }).catch(done.fail);
         });
 
-        it('should warn if editing the campaign failed', function(done) {
+        it('should error if editing the campaign failed', function(done) {
             setStatus(mockData, mockOptions, mockConfig).then(function() {
-                expect(mockLog.warn).toHaveBeenCalled();
+                expect(mockLog.error).toHaveBeenCalled();
                 done();
             }).catch(done.fail);
         });

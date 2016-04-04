@@ -1,9 +1,14 @@
 # Watchman
 
+## v0.1.0 (April 4, 2016)
 * *[v0.1.0-rc1]*
+  * [FIX]: Fix for an issue where some campaigns may fail to be fetched
+  * [DEV]: Support simultaneous development and testing on streams
+  * Improved failure messages for some actions
   * Use rc-kinesis in place of JsonProducer
   * [FEATURE]: Added campaign_email action to send out emails about campaign events
   * Add support for slideshow bob account creations emails
+* *[/v0.1.0-rc1]*
 
 ## v0.0.2 (March 22, 2016)
 * *[v0.0.2-rc1]*

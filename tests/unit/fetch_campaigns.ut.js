@@ -460,18 +460,21 @@ describe('fetch_campaigns.js', function() {
                     mockConfig.appCreds, 'http://hostname/api/campaigns', {
                         limit: 2,
                         skip: 0,
+                        sort: 'id,1',
                         statuses: 'status1,status2'
                     });
                 expect(fetchCampaigns.__private__.getCampaigns).toHaveBeenCalledWith(
                     mockConfig.appCreds, 'http://hostname/api/campaigns', {
                         limit: 2,
                         skip: 2,
+                        sort: 'id,1',
                         statuses: 'status1,status2'
                     });
                 expect(fetchCampaigns.__private__.getCampaigns).toHaveBeenCalledWith(
                     mockConfig.appCreds, 'http://hostname/api/campaigns', {
                         limit: 2,
                         skip: 4,
+                        sort: 'id,1',
                         statuses: 'status1,status2'
                     });
                 expect(fetchCampaigns.__private__.getCampaigns.calls.count()).toBe(3);
