@@ -21,7 +21,8 @@
     "nodemailer": "^2.3.0",
     "nodemailer-ses-transport": "^1.3.0",
     "q": "^1.4.1",
-    "rc-kinesis": "^1.0.0"
+    "rc-kinesis": "^1.0.0",
+    "readable-stream": "^2.0.6"
   },
   "devDependencies": {
     "grunt": "^0.4.5",
@@ -33,6 +34,7 @@
     "grunt-jasmine-nodejs": "^1.4.3",
     "load-grunt-config": "^0.19.1",
     "pg.js": "^4.1.1",
-    "proxyquire": "^1.7.3"
+    "proxyquire": "^1.7.3",
+    "rc-uuid": "^2.0.1"
   }
 }
