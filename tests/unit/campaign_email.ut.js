@@ -317,7 +317,7 @@ describe('campaign_email.js', function() {
 
         it('should get the subject for paymentMade emails', function() {
             expect(getSubject('paymentMade')).toBe(
-                'Receipt for your payment to Reelcontent');
+                'Your payment has been approved');
         });
 
         describe('if the type is "activateAccount"', function() {

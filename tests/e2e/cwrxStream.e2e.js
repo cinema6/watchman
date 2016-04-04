@@ -321,7 +321,7 @@ describe('cwrxStream', function() {
                     balance: 9001.12
                 }
             }).then(function() {
-                mailman.once('Receipt for your payment to Reelcontent', function(msg) {
+                mailman.once('Your payment has been approved', function(msg) {
                     expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                     msgRegexes.concat([
@@ -350,7 +350,7 @@ describe('cwrxStream', function() {
                     balance: 9001.12
                 }
             }).then(function() {
-                mailman.once('Receipt for your payment to Reelcontent', function(msg) {
+                mailman.once('Your payment has been approved', function(msg) {
                     expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                     msgRegexes.concat([

@@ -103,7 +103,7 @@ var __private__ = {
             }
             return 'New update request from ' + submitter + ' for campaign "' + campName + '"';
         case 'paymentMade':
-            return 'Receipt for your payment to Reelcontent';
+            return 'Your payment has been approved';
         case 'activateAccount':
             switch (data.target) {
             case 'bob':
