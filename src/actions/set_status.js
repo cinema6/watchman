@@ -23,12 +23,12 @@ module.exports = function(data, options, config) {
                 var statusCode = response.response.statusCode;
                 var body = response.body;
                 if(statusCode === 200) {
-                    log.info('Changed status of campaign %1 from %2 to %3', campaignId,
-                        data.campaign.status, status);
+                    log.info('Changed status of campaign %1 (%2) from %3 to %4',
+                        data.campaign.name, campaignId, data.campaign.status, status);
                 } else {
-                    log.error('Error updating status of campaign %1 from  %2 to %3,' +
-                        ' code: %4 body: %5', campaignId, data.campaign.status, status, statusCode,
-                        JSON.stringify(body));
+                    log.error('Error updating status of campaign %1 (%2) from  %3 to %4,' +
+                        ' code: %5 body: %6', data.campaign.name, campaignId, data.campaign.status,
+                        status, statusCode, JSON.stringify(body));
                 }
             });
         }
