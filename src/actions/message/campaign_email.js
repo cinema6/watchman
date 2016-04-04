@@ -102,7 +102,7 @@ var __private__ = {
                 submitter = data.application.key;
             }
             return 'New update request from ' + submitter + ' for campaign "' + campName + '"';
-        case 'paymentMade': //TODO: rename?
+        case 'paymentMade':
             return 'Receipt for your payment to Reelcontent';
         case 'activateAccount':
             switch (data.target) {

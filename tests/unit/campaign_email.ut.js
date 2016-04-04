@@ -585,7 +585,7 @@ describe('campaign_email.js', function() {
                     createdAt: '2016-04-04T19:06:11.821Z',
                     method: {
                         type: 'creditCard',
-                        cardType: 'visa',
+                        cardType: 'Visa',
                         cardholderName: 'Johnny Testmonkey',
                         last4: '1234'
                     }
@@ -608,7 +608,7 @@ describe('campaign_email.js', function() {
                         isCreditCard: true,
                         method: {
                             type: 'creditCard',
-                            cardType: 'visa',
+                            cardType: 'Visa',
                             cardholderName: 'Johnny Testmonkey',
                             last4: '1234'
                         },

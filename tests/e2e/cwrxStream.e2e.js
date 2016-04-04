@@ -26,7 +26,7 @@ describe('cwrxStream', function() {
     });
 
     beforeEach(function() {
-        jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000;
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 60000;
         var awsConfig = {
             region: 'us-east-1',
         };
@@ -289,6 +289,82 @@ describe('cwrxStream', function() {
                 done();
             });
         }).catch(done.fail);
+    });
+    
+    describe('when handling a paymentMade event', function() {
+        var mockPayment, msgRegexes;
+        beforeEach(function() {
+            mockPayment = {
+                amount: 123.45,
+                createdAt: '2016-04-04T19:06:11.821Z',
+                method: {
+                    type: 'creditCard',
+                    cardType: 'Visa',
+                    cardholderName: 'Johnny Testmonkey',
+                    last4: '1234'
+                }
+            };
+            
+            msgRegexes = [
+                /Amount:\s*\$123.45/,
+                /Processed:\s*Monday,\s*April\s*04,\s*2016/,
+                /Your\s*balance\s*after\s*deposit:\s*\$9001.12/
+            ];
+        });
+
+        it('should send a receipt email for payments made with a credit card', function(done) {
+            producer.produce({
+                type: 'paymentMade',
+                data: {
+                    payment: mockPayment,
+                    user: mockUser,
+                    balance: 9001.12
+                }
+            }).then(function() {
+                mailman.once('Receipt for your payment to Reelcontent', function(msg) {
+                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                    msgRegexes.concat([
+                        /Payment\s*Method:\s*Credit\s*Card/,
+                        /Cardholder\s*Name:\s*Johnny\s*Testmonkey/,
+                        /Card\s*Type:\s*Visa/,
+                        /Last\s*4\s*Digits:\s*1234/
+                    ]).forEach(function(regex) {
+                        expect(regex.test(msg.text)).toBeTruthy('Expected text to match ' + regex);
+                        expect(regex.test(msg.html)).toBeTruthy('Expected html to match ' + regex);
+                    });
+                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    done();
+                });
+            }).catch(done.fail);
+        });
+
+        it('should send a receipt email for payments made with a paypal account', function(done) {
+            mockPayment.method = { type: 'paypal', email: 'johnny@testmonkey.com' };
+
+            producer.produce({
+                type: 'paymentMade',
+                data: {
+                    payment: mockPayment,
+                    user: mockUser,
+                    balance: 9001.12
+                }
+            }).then(function() {
+                mailman.once('Receipt for your payment to Reelcontent', function(msg) {
+                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                    msgRegexes.concat([
+                        /Payment\s*Method:\s*PayPal/,
+                        /Email:\s*johnny@testmonkey\.com/
+                    ]).forEach(function(regex) {
+                        expect(regex.test(msg.text)).toBeTruthy('Expected text to match ' + regex);
+                        expect(regex.test(msg.html)).toBeTruthy('Expected html to match ' + regex);
+                    });
+                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    done();
+                });
+            }).catch(done.fail);
+        });
     });
 
     it('should send an activation email when a new user account has been created', function(done) {
