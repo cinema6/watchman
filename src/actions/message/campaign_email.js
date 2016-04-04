@@ -195,8 +195,12 @@ var __private__ = {
         case 'paymentMade':
             template = 'paymentReceipt.html';
             templateData = {
-                amount: '$' + data.payment.amount.toFixed(2),
-                //TODO: probs some more stuff
+                contact         : emailConfig.supportAddress,
+                amount          : '$' + data.payment.amount.toFixed(2),
+                isCreditCard    : data.payment.method.type === 'creditCard',
+                method          : data.payment.method,
+                date            : new Date(data.payment.createdAt).toLocaleDateString(),
+                balance         : '$' + data.balance.toFixed(2),
             };
             break;
         case 'activateAccount':
