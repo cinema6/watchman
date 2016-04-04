@@ -102,6 +102,8 @@ var __private__ = {
                 submitter = data.application.key;
             }
             return 'New update request from ' + submitter + ' for campaign "' + campName + '"';
+        case 'paymentMade': //TODO: rename?
+            return 'Receipt for your payment to Reelcontent';
         case 'activateAccount':
             switch (data.target) {
             case 'bob':
@@ -188,6 +190,13 @@ var __private__ = {
                     (data.application && data.application.key),
                 campName: data.campaign.name,
                 reviewLink: emailConfig.reviewLink.replace(':campId', data.campaign.id)
+            };
+            break;
+        case 'paymentMade':
+            template = 'paymentReceipt.html';
+            templateData = {
+                amount: '$' + data.payment.amount.toFixed(2),
+                //TODO: probs some more stuff
             };
             break;
         case 'activateAccount':

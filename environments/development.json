@@ -238,6 +238,16 @@
                                 }
                             ]
                         },
+                        "paymentMade": {
+                            "actions": [
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "paymentMade"
+                                    }
+                                }
+                            ]
+                        },
                         "accountCreated": {
                             "actions": [
                                 {

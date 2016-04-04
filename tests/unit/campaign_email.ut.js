@@ -315,6 +315,11 @@ describe('campaign_email.js', function() {
             });
         });
 
+        it('should get the subject for paymentMade emails', function() {
+            expect(getSubject('paymentMade')).toBe(
+                'Receipt for your payment to Reelcontent');
+        });
+
         describe('if the type is "activateAccount"', function() {
             var type, data;
 
@@ -570,6 +575,27 @@ describe('campaign_email.js', function() {
                     done();
                 }).catch(done.fail);
             });
+        });
+
+        it('should be able to compile a paymentMade email', function(done) {
+            data.payment = {
+                id: 'pay1',
+                amount: 666.66
+            };
+            data.user = {
+                id: 'u-1',
+                email: 'foo@test.com'
+            };
+            getHtml('paymentMade', data, emailConfig).then(function() {
+                expect(email.__private__.loadTemplate).toHaveBeenCalledWith(
+                    'paymentReceipt.html');
+                expect(handlebars.compile).toHaveBeenCalledWith('template');
+                expect(compileSpy).toHaveBeenCalledWith({
+                    amount: '$666.66'
+                });
+                expect();
+                done();
+            }).catch(done.fail);
         });
 
         describe('compiling an activateAccount email', function() {
