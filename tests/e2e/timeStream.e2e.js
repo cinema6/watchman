@@ -10,27 +10,6 @@ var AWS_CREDS = JSON.parse(process.env.awsCreds);
 var TIME_STREAM = process.env.timeStream;
 var WAIT_TIME = 1000;
 
-function pgQuery(conn, statement) {
-    var pg = require('pg.js');
-    return Q.Promise(function(resolve, reject) {
-        pg.connect(conn, function(err, client, done) {
-            if(err) {
-                reject(err);
-            } else {
-                client.query(statement, function(err, res) {
-                    if(err) {
-                        done();
-                        reject(err);
-                    } else {
-                        done();
-                        resolve(res);
-                    }
-                });
-            }
-        });
-    });
-}
-
 describe('timeStream', function() {
     var producer;
 
@@ -44,12 +23,6 @@ describe('timeStream', function() {
             awsConfig.secretAccessKey = AWS_CREDS.secretAccessKey;
         }
         producer = new JsonProducer(TIME_STREAM, awsConfig);
-        var pgconn = {
-            user: 'cwrx',
-            password: 'password',
-            database: 'campfire_cwrx',
-            host: process.env.mongo ? JSON.parse(process.env.mongo).host : '33.33.33.100'
-        };
         var mockCards = [
             {
                 id: 'e2e-rc-1',
@@ -199,23 +172,24 @@ describe('timeStream', function() {
         };
 
         var today = ((new Date()).toISOString()).substr(0, 10);
-        var pgdataCampaignSummaryHourly = [
-            'INSERT INTO rpt.campaign_summary_hourly VALUES',
-            '(\'' + today + ' 01:00:00+00\',\'e2e-cam-1\',\'completedView\',0,0),',
-            '(\'' + today + ' 01:00:00+00\',\'e2e-cam-2\',\'completedView\',100,100),',
-            '(\'' + today + ' 01:00:00+00\',\'e2e-cam-3\',\'completedView\',200,200),',
-            '(\'' + today + ' 01:00:00+00\',\'e2e-cam-4\',\'completedView\',300,300),',
-            '(\'' + today + ' 01:00:00+00\',\'e2e-cam-5\',\'completedView\',400,400),',
-            '(\'' + today + ' 01:00:00+00\',\'e2e-cam-6\',\'completedView\',500,500),',
-            '(\'' + today + ' 01:00:00+00\',\'e2e-cam-7\',\'completedView\',600,600);'
+        var pgdataBillingTransactions = [
+            'INSERT INTO fct.billing_transactions (rec_ts,transaction_ts,transaction_id,',
+            '   org_id,campaign_id,sign,units,amount) VALUES',
+            '(now(),\'' + today + ' 00:00:00+00\',\'t-1\',\'o1\',\'e2e-cam-1\',-1,0,0),',
+            '(now(),\'' + today + ' 00:00:00+00\',\'t-1\',\'o1\',\'e2e-cam-2\',-1,100,100),',
+            '(now(),\'' + today + ' 00:00:00+00\',\'t-1\',\'o1\',\'e2e-cam-3\',-1,200,200),',
+            '(now(),\'' + today + ' 00:00:00+00\',\'t-1\',\'o1\',\'e2e-cam-4\',-1,300,300),',
+            '(now(),\'' + today + ' 00:00:00+00\',\'t-1\',\'o1\',\'e2e-cam-5\',-1,400,400),',
+            '(now(),\'' + today + ' 01:00:00+00\',\'t-2\',\'o1\',\'e2e-cam-6\',-1,500,500),',
+            '(now(),\'' + today + ' 00:00:00+00\',\'t-3\',\'o2\',\'e2e-cam-7\',-1,600,600);'
         ];
 
         function pgTruncate() {
-            return pgQuery(pgconn, 'TRUNCATE TABLE rpt.campaign_summary_hourly');
+            return testUtils.pgQuery('TRUNCATE TABLE fct.billing_transactions');
         }
 
         function pgInsert() {
-            return pgQuery(pgconn, pgdataCampaignSummaryHourly.join(' '));
+            return testUtils.pgQuery(pgdataBillingTransactions.join(' '));
         }
 
         pgTruncate().then(function() {
