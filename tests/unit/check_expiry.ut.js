@@ -2,11 +2,12 @@
 
 var JsonProducer = require('rc-kinesis').JsonProducer;
 var Q = require('q');
-var checkExpiry = require('../../src/actions/check_expiry.js');
+var checkExpiryFactory = require('../../src/actions/check_expiry.js');
 
 describe('check_expiry.js', function() {
     var mockOptions;
     var mockConfig;
+    var checkExpiry;
 
     beforeEach(function() {
         mockOptions = { };
@@ -18,6 +19,8 @@ describe('check_expiry.js', function() {
             }
         };
         spyOn(JsonProducer.prototype, 'produce');
+
+        checkExpiry = checkExpiryFactory(mockConfig);
     });
 
     describe('checking for an ended campaign', function() {
@@ -31,7 +34,7 @@ describe('check_expiry.js', function() {
                 { campaign: { cards: [ { campaign: { endDate: null } } ] } }
             ];
             Q.all(mockDatas.map(function(mockData) {
-                return checkExpiry(mockData, mockOptions, mockConfig);
+                return checkExpiry({ data: mockData, options: mockOptions });
             })).then(function() {
                 expect(JsonProducer.prototype.produce).not.toHaveBeenCalled();
                 done();
@@ -52,7 +55,7 @@ describe('check_expiry.js', function() {
                     ]
                 }
             };
-            checkExpiry(mockData, mockOptions, mockConfig).then(function() {
+            checkExpiry({ data: mockData, options: mockOptions }).then(function() {
                 expect(JsonProducer.prototype.produce).not.toHaveBeenCalled();
                 done();
             }).catch(function(error) {
@@ -72,7 +75,7 @@ describe('check_expiry.js', function() {
                     ]
                 }
             };
-            return checkExpiry(mockData, mockOptions, mockConfig).then(function() {
+            return checkExpiry({ data: mockData, options: mockOptions }).then(function() {
                 expect(JsonProducer.prototype.produce).toHaveBeenCalledWith({
                     type: 'campaignExpired',
                     data: {
@@ -96,7 +99,7 @@ describe('check_expiry.js', function() {
                     ]
                 }
             };
-            checkExpiry(mockData, mockOptions, mockConfig).then(function() {
+            checkExpiry({ data: mockData, options: mockOptions }).then(function() {
                 expect(JsonProducer.prototype.produce).not.toHaveBeenCalled();
                 done();
             }).catch(function(error) {
@@ -115,7 +118,7 @@ describe('check_expiry.js', function() {
                     campaign: { pricing: { budget: 'budget' } } }
             ];
             Q.all(mockDatas.map(function(mockData) {
-                return checkExpiry(mockData, mockOptions, mockConfig);
+                return checkExpiry({ data: mockData, options: mockOptions });
             })).then(function() {
                 expect(JsonProducer.prototype.produce).not.toHaveBeenCalled();
                 done();
@@ -133,7 +136,7 @@ describe('check_expiry.js', function() {
                     analytics: { summary: { totalSpend: 'spend' } } }
             ];
             Q.all(mockDatas.map(function(mockData) {
-                return checkExpiry(mockData, mockOptions, mockConfig);
+                return checkExpiry({ data: mockData, options: mockOptions });
             })).then(function() {
                 expect(JsonProducer.prototype.produce).not.toHaveBeenCalled();
                 done();
@@ -155,7 +158,7 @@ describe('check_expiry.js', function() {
                     }
                 }
             };
-            checkExpiry(mockData, mockOptions, mockConfig).then(function() {
+            checkExpiry({ data: mockData, options: mockOptions }).then(function() {
                 expect(JsonProducer.prototype.produce).not.toHaveBeenCalled();
                 done();
             }).catch(function(error) {
@@ -176,7 +179,7 @@ describe('check_expiry.js', function() {
                     }
                 }
             };
-            return checkExpiry(mockData, mockOptions, mockConfig).then(function() {
+            return checkExpiry({ data: mockData, options: mockOptions }).then(function() {
                 expect(JsonProducer.prototype.produce).toHaveBeenCalledWith({
                     type: 'campaignReachedBudget',
                     data: {
@@ -201,7 +204,7 @@ describe('check_expiry.js', function() {
                     }
                 }
             };
-            checkExpiry(mockData, mockOptions, mockConfig).then(function() {
+            checkExpiry({ data: mockData, options: mockOptions }).then(function() {
                 expect(JsonProducer.prototype.produce).not.toHaveBeenCalled();
                 done();
             }).catch(function(error) {

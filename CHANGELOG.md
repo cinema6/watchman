@@ -2,6 +2,7 @@
 
 * *[v0.2.0-rc1]*
   * [FEATURE]: Added functionality to campaign_email action to send receipt emails for `paymentMade` event
+  * [DEV]: Refactor the action API
 
 ## v0.1.0 (April 4, 2016)
 * *[v0.1.0-rc1]*

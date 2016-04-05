@@ -1,12 +1,15 @@
 'use strict';
 
+/* jshint maxlen:false */
+
 var JsonProducer = require('rc-kinesis').JsonProducer;
 var Q = require('q');
-var fetchCampaigns = require('../../src/actions/fetch_campaigns.js');
+var fetchCampaignsFactory = require('../../src/actions/fetch_campaigns.js');
 var logger = require('cwrx/lib/logger.js');
 var requestUtils = require('cwrx/lib/requestUtils.js');
 
 describe('fetch_campaigns.js', function() {
+    var fetchCampaigns;
     var mockAnalyticsResponse;
     var mockCampaignResponse;
     var mockData;
@@ -78,11 +81,14 @@ describe('fetch_campaigns.js', function() {
         });
         spyOn(JsonProducer.prototype, 'produce');
         spyOn(logger, 'getLog').and.returnValue(mockLog);
-        spyOn(fetchCampaigns.__private__, 'getRequest');
-        spyOn(fetchCampaigns.__private__, 'getNumCampaigns');
-        spyOn(fetchCampaigns.__private__, 'getCampaigns');
-        spyOn(fetchCampaigns.__private__, 'getAnalytics');
-        spyOn(fetchCampaigns.__private__, 'produceResults');
+
+        fetchCampaigns = fetchCampaignsFactory(mockConfig);
+
+        spyOn(fetchCampaignsFactory.__private__, 'getRequest');
+        spyOn(fetchCampaignsFactory.__private__, 'getNumCampaigns');
+        spyOn(fetchCampaignsFactory.__private__, 'getCampaigns');
+        spyOn(fetchCampaignsFactory.__private__, 'getAnalytics');
+        spyOn(fetchCampaignsFactory.__private__, 'produceResults');
     });
 
     function getMockAnalyticsForId(id) {
@@ -98,7 +104,7 @@ describe('fetch_campaigns.js', function() {
         var getRequest;
 
         beforeEach(function() {
-            getRequest = fetchCampaigns.__private__.getRequest;
+            getRequest = fetchCampaignsFactory.__private__.getRequest;
             getRequest.and.callThrough();
         });
 
@@ -152,7 +158,7 @@ describe('fetch_campaigns.js', function() {
         var getCampaigns;
 
         beforeEach(function() {
-            getCampaigns = fetchCampaigns.__private__.getCampaigns;
+            getCampaigns = fetchCampaignsFactory.__private__.getCampaigns;
             getCampaigns.and.callThrough();
         });
 
@@ -163,9 +169,9 @@ describe('fetch_campaigns.js', function() {
                 },
                 body: mockCampaigns
             };
-            fetchCampaigns.__private__.getRequest.and.returnValue(Q.resolve(mockResponse));
+            fetchCampaignsFactory.__private__.getRequest.and.returnValue(Q.resolve(mockResponse));
             getCampaigns('creds', 'endpoint', 'query').then(function() {
-                expect(fetchCampaigns.__private__.getRequest).toHaveBeenCalledWith('creds',
+                expect(fetchCampaignsFactory.__private__.getRequest).toHaveBeenCalledWith('creds',
                     'endpoint', 'query');
                 done();
             }).catch(done.fail);
@@ -178,7 +184,7 @@ describe('fetch_campaigns.js', function() {
                 },
                 body: mockCampaigns
             };
-            fetchCampaigns.__private__.getRequest.and.returnValue(Q.resolve(mockResponse));
+            fetchCampaignsFactory.__private__.getRequest.and.returnValue(Q.resolve(mockResponse));
             getCampaigns('creds', 'endpoint', 'query').then(function(campData) {
                 expect(campData).toEqual({
                     'cam-1': {
@@ -196,7 +202,7 @@ describe('fetch_campaigns.js', function() {
         });
 
         it('should reject if the get request fails', function(done) {
-            fetchCampaigns.__private__.getRequest.and.returnValue(Q.reject('epic fail'));
+            fetchCampaignsFactory.__private__.getRequest.and.returnValue(Q.reject('epic fail'));
             getCampaigns('creds', 'endpoint', 'query').then(done.fail).catch(function(error) {
                 expect(error).toBe('epic fail');
                 done();
@@ -209,7 +215,7 @@ describe('fetch_campaigns.js', function() {
         var getAnalytics;
 
         beforeEach(function() {
-            getAnalytics = fetchCampaigns.__private__.getAnalytics;
+            getAnalytics = fetchCampaignsFactory.__private__.getAnalytics;
             getAnalytics.and.callThrough();
         });
 
@@ -236,9 +242,9 @@ describe('fetch_campaigns.js', function() {
             mockAnalyticsResponse = {
                 body: []
             };
-            fetchCampaigns.__private__.getRequest.and.returnValue(Q.resolve(mockAnalyticsResponse));
+            fetchCampaignsFactory.__private__.getRequest.and.returnValue(Q.resolve(mockAnalyticsResponse));
             getAnalytics(campData, 'creds', 'endpoint').then(function() {
-                expect(fetchCampaigns.__private__.getRequest).toHaveBeenCalledWith('creds',
+                expect(fetchCampaignsFactory.__private__.getRequest).toHaveBeenCalledWith('creds',
                     'endpoint', { ids: 'cam-1,cam-2,cam-3' });
                 done();
             }).catch(done.fail);
@@ -259,7 +265,7 @@ describe('fetch_campaigns.js', function() {
             mockAnalyticsResponse = {
                 body: mockAnalytics
             };
-            fetchCampaigns.__private__.getRequest.and.returnValue(Q.resolve(mockAnalyticsResponse));
+            fetchCampaignsFactory.__private__.getRequest.and.returnValue(Q.resolve(mockAnalyticsResponse));
             getAnalytics(campData, 'creds', 'endpoint').then(function(newData) {
                 expect(newData).toEqual({
                     'cam-1': {
@@ -291,7 +297,7 @@ describe('fetch_campaigns.js', function() {
                     campaign: mockCampaigns[2]
                 }
             };
-            fetchCampaigns.__private__.getRequest.and.returnValue(Q.reject('epic fail'));
+            fetchCampaignsFactory.__private__.getRequest.and.returnValue(Q.reject('epic fail'));
             getAnalytics(campData, 'creds', 'endpoint').then(done.fail).catch(function(error) {
                 expect(error).toBe('epic fail');
                 done();
@@ -304,7 +310,7 @@ describe('fetch_campaigns.js', function() {
         var mockProducer;
 
         beforeEach(function() {
-            produceResults = fetchCampaigns.__private__.produceResults;
+            produceResults = fetchCampaignsFactory.__private__.produceResults;
             produceResults.and.callThrough();
             mockProducer = new JsonProducer();
         });
@@ -384,7 +390,7 @@ describe('fetch_campaigns.js', function() {
         var getNumCampaigns;
 
         beforeEach(function() {
-            getNumCampaigns = fetchCampaigns.__private__.getNumCampaigns;
+            getNumCampaigns = fetchCampaignsFactory.__private__.getNumCampaigns;
             getNumCampaigns.and.callThrough();
         });
 
@@ -396,9 +402,9 @@ describe('fetch_campaigns.js', function() {
                     }
                 }
             };
-            fetchCampaigns.__private__.getRequest.and.returnValue(Q.resolve(mockResponse));
+            fetchCampaignsFactory.__private__.getRequest.and.returnValue(Q.resolve(mockResponse));
             getNumCampaigns('creds', 'endpoint', ['status1', 'status2']).then(function() {
-                expect(fetchCampaigns.__private__.getRequest).toHaveBeenCalledWith('creds',
+                expect(fetchCampaignsFactory.__private__.getRequest).toHaveBeenCalledWith('creds',
                     'endpoint', {
                         limit: 1,
                         statuses: 'status1,status2',
@@ -417,7 +423,7 @@ describe('fetch_campaigns.js', function() {
                     }
                 }
             };
-            fetchCampaigns.__private__.getRequest.and.returnValue(Q.resolve(mockResponse));
+            fetchCampaignsFactory.__private__.getRequest.and.returnValue(Q.resolve(mockResponse));
             getNumCampaigns('creds', 'endpoint', ['status1', 'status2']).then(function(num) {
                 expect(num).toBe(100);
                 done();
@@ -432,7 +438,7 @@ describe('fetch_campaigns.js', function() {
                     }
                 }
             };
-            fetchCampaigns.__private__.getRequest.and.returnValue(Q.resolve(mockResponse));
+            fetchCampaignsFactory.__private__.getRequest.and.returnValue(Q.resolve(mockResponse));
             getNumCampaigns('creds', 'endpoint', ['status1', 'status2']).then(done.fail)
                 .catch(function(error) {
                     expect(error).toContain('invalid');
@@ -443,9 +449,9 @@ describe('fetch_campaigns.js', function() {
 
     describe('the action', function() {
         it('should get the number of campaigns with the given statuses', function(done) {
-            fetchCampaigns.__private__.getNumCampaigns.and.returnValue(Q.resolve(0));
-            fetchCampaigns(mockData, mockOptions, mockConfig).then(function() {
-                expect(fetchCampaigns.__private__.getNumCampaigns).toHaveBeenCalledWith(
+            fetchCampaignsFactory.__private__.getNumCampaigns.and.returnValue(Q.resolve(0));
+            fetchCampaigns({ data: mockData, options: mockOptions }).then(function() {
+                expect(fetchCampaignsFactory.__private__.getNumCampaigns).toHaveBeenCalledWith(
                     mockConfig.appCreds, 'http://hostname/api/campaigns', ['status1','status2']);
                 done();
             }).catch(done.fail);
@@ -453,88 +459,88 @@ describe('fetch_campaigns.js', function() {
 
         it('should make requests to get campaigns and limit the number of campaigns it fetches',
                 function(done) {
-            fetchCampaigns.__private__.getNumCampaigns.and.returnValue(Q.resolve(5));
-            fetchCampaigns.__private__.getCampaigns.and.returnValue(Q.resolve('campData'));
-            fetchCampaigns(mockData, mockOptions, mockConfig).then(function() {
-                expect(fetchCampaigns.__private__.getCampaigns).toHaveBeenCalledWith(
+            fetchCampaignsFactory.__private__.getNumCampaigns.and.returnValue(Q.resolve(5));
+            fetchCampaignsFactory.__private__.getCampaigns.and.returnValue(Q.resolve('campData'));
+            fetchCampaigns({ data: mockData, options: mockOptions }).then(function() {
+                expect(fetchCampaignsFactory.__private__.getCampaigns).toHaveBeenCalledWith(
                     mockConfig.appCreds, 'http://hostname/api/campaigns', {
                         limit: 2,
                         skip: 0,
                         sort: 'id,1',
                         statuses: 'status1,status2'
                     });
-                expect(fetchCampaigns.__private__.getCampaigns).toHaveBeenCalledWith(
+                expect(fetchCampaignsFactory.__private__.getCampaigns).toHaveBeenCalledWith(
                     mockConfig.appCreds, 'http://hostname/api/campaigns', {
                         limit: 2,
                         skip: 2,
                         sort: 'id,1',
                         statuses: 'status1,status2'
                     });
-                expect(fetchCampaigns.__private__.getCampaigns).toHaveBeenCalledWith(
+                expect(fetchCampaignsFactory.__private__.getCampaigns).toHaveBeenCalledWith(
                     mockConfig.appCreds, 'http://hostname/api/campaigns', {
                         limit: 2,
                         skip: 4,
                         sort: 'id,1',
                         statuses: 'status1,status2'
                     });
-                expect(fetchCampaigns.__private__.getCampaigns.calls.count()).toBe(3);
+                expect(fetchCampaignsFactory.__private__.getCampaigns.calls.count()).toBe(3);
                 done();
             }).catch(done.fail);
         });
 
         it('should make requests to get analytics for each campaign request', function(done) {
-            fetchCampaigns.__private__.getNumCampaigns.and.returnValue(Q.resolve(5));
-            fetchCampaigns.__private__.getCampaigns.and.returnValue(Q.resolve('campData'));
-            fetchCampaigns.__private__.getAnalytics.and.returnValue(Q.resolve('populatedCampData'));
+            fetchCampaignsFactory.__private__.getNumCampaigns.and.returnValue(Q.resolve(5));
+            fetchCampaignsFactory.__private__.getCampaigns.and.returnValue(Q.resolve('campData'));
+            fetchCampaignsFactory.__private__.getAnalytics.and.returnValue(Q.resolve('populatedCampData'));
             mockOptions.analytics = true;
-            fetchCampaigns(mockData, mockOptions, mockConfig).then(function() {
-                expect(fetchCampaigns.__private__.getAnalytics).toHaveBeenCalledWith('campData',
+            fetchCampaigns({ data: mockData, options: mockOptions }).then(function() {
+                expect(fetchCampaignsFactory.__private__.getAnalytics).toHaveBeenCalledWith('campData',
                     mockConfig.appCreds, 'http://hostname/api/analytics/campaigns');
-                expect(fetchCampaigns.__private__.getAnalytics.calls.count()).toBe(3);
+                expect(fetchCampaignsFactory.__private__.getAnalytics.calls.count()).toBe(3);
                 done();
             }).catch(done.fail);
         });
 
         it('should produce the results of each group of fetched campaigns', function(done) {
-            fetchCampaigns.__private__.getNumCampaigns.and.returnValue(Q.resolve(5));
-            fetchCampaigns.__private__.getCampaigns.and.returnValue(Q.resolve('campData'));
-            fetchCampaigns.__private__.getAnalytics.and.returnValue(Q.resolve('populatedCampData'));
+            fetchCampaignsFactory.__private__.getNumCampaigns.and.returnValue(Q.resolve(5));
+            fetchCampaignsFactory.__private__.getCampaigns.and.returnValue(Q.resolve('campData'));
+            fetchCampaignsFactory.__private__.getAnalytics.and.returnValue(Q.resolve('populatedCampData'));
             mockOptions.analytics = true;
-            fetchCampaigns(mockData, mockOptions, mockConfig).then(function() {
-                expect(fetchCampaigns.__private__.produceResults).toHaveBeenCalledWith(
+            fetchCampaigns({ data: mockData, options: mockOptions }).then(function() {
+                expect(fetchCampaignsFactory.__private__.produceResults).toHaveBeenCalledWith(
                     jasmine.any(JsonProducer), 'populatedCampData', 'prefix');
-                expect(fetchCampaigns.__private__.produceResults.calls.count()).toBe(3);
+                expect(fetchCampaignsFactory.__private__.produceResults.calls.count()).toBe(3);
                 done();
             }).catch(done.fail);
         });
 
         it('should still send some requests if one fails', function(done) {
-            fetchCampaigns.__private__.getNumCampaigns.and.returnValue(Q.resolve(5));
-            fetchCampaigns.__private__.getCampaigns.and.callFake(function(creds, endpoint, query) {
+            fetchCampaignsFactory.__private__.getNumCampaigns.and.returnValue(Q.resolve(5));
+            fetchCampaignsFactory.__private__.getCampaigns.and.callFake(function(creds, endpoint, query) {
                 if(query.skip === 0) {
                     return Q.resolve('campData');
                 } else {
                     return Q.reject();
                 }
             });
-            fetchCampaigns(mockData, mockOptions, mockConfig).then(function() {
-                expect(fetchCampaigns.__private__.produceResults).toHaveBeenCalledWith(
+            fetchCampaigns({ data: mockData, options: mockOptions }).then(function() {
+                expect(fetchCampaignsFactory.__private__.produceResults).toHaveBeenCalledWith(
                     jasmine.any(JsonProducer), 'campData', 'prefix');
-                expect(fetchCampaigns.__private__.produceResults.calls.count()).toBe(1);
+                expect(fetchCampaignsFactory.__private__.produceResults.calls.count()).toBe(1);
                 done();
             }).catch(done.fail);
         });
 
         it('should log a warning if some of the requests failed', function(done) {
-            fetchCampaigns.__private__.getNumCampaigns.and.returnValue(Q.resolve(5));
-            fetchCampaigns.__private__.getCampaigns.and.callFake(function(creds, endpoint, query) {
+            fetchCampaignsFactory.__private__.getNumCampaigns.and.returnValue(Q.resolve(5));
+            fetchCampaignsFactory.__private__.getCampaigns.and.callFake(function(creds, endpoint, query) {
                 if(query.skip === 0) {
                     return Q.resolve('campData');
                 } else {
                     return Q.reject();
                 }
             });
-            fetchCampaigns(mockData, mockOptions, mockConfig).then(function() {
+            fetchCampaigns({ data: mockData, options: mockOptions }).then(function() {
                 expect(mockLog.warn.calls.count()).toBe(2);
                 done();
             }).catch(done.fail);

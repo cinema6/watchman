@@ -3,9 +3,10 @@
 var Q = require('q');
 var logger = require('cwrx/lib/logger.js');
 var requestUtils = require('cwrx/lib/requestUtils.js');
-var setStatus = require('../../src/actions/set_status.js');
+var setStatusFactory = require('../../src/actions/set_status.js');
 
 describe('set_status.js', function() {
+    var setStatus;
     var mockLog;
     var mockData;
     var mockOptions;
@@ -42,6 +43,9 @@ describe('set_status.js', function() {
                 secret: 'secret'
             }
         };
+
+        setStatus = setStatusFactory(mockConfig);
+
         spyOn(requestUtils, 'makeSignedRequest').and.callFake(function(creds, method, options) {
             switch(options.url) {
             case 'http://hostname/api/auth/login':
@@ -60,7 +64,7 @@ describe('set_status.js', function() {
             { campaign: { id: null } }
         ];
         Q.all(mockDatas.map(function(mockData) {
-            return setStatus(mockData, mockOptions, mockConfig);
+            return setStatus({ data: mockData, options: mockOptions });
         })).then(function() {
             expect(requestUtils.makeSignedRequest).not.toHaveBeenCalled();
             done();
@@ -76,7 +80,7 @@ describe('set_status.js', function() {
         mockOptions = {
             status: null
         };
-        setStatus(mockData, mockOptions, mockConfig).then(function() {
+        setStatus({ data: mockData, options: mockOptions }).then(function() {
             expect(requestUtils.makeSignedRequest).not.toHaveBeenCalled();
             done();
         }).catch(done.fail);
@@ -100,7 +104,7 @@ describe('set_status.js', function() {
         });
 
         it('should edit the status of the campaign', function(done) {
-            setStatus(mockData, mockOptions, mockConfig).then(function() {
+            setStatus({ data: mockData, options: mockOptions }).then(function() {
                 expect(requestUtils.makeSignedRequest).toHaveBeenCalledWith({
                     key: 'key',
                     secret: 'secret'
@@ -115,7 +119,7 @@ describe('set_status.js', function() {
         });
 
         it('should error if editing the campaign failed', function(done) {
-            setStatus(mockData, mockOptions, mockConfig).then(function() {
+            setStatus({ data: mockData, options: mockOptions }).then(function() {
                 expect(mockLog.error).toHaveBeenCalled();
                 done();
             }).catch(done.fail);
