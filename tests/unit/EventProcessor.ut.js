@@ -237,9 +237,8 @@ describe('EventProcessor.js', function() {
                     'bad_action'
                 ]
             }).then(function() {
-                expect(mockGoodAction).toHaveBeenCalledWith('data', 'options',
-                    eventProcessor.config);
-                expect(mockBadAction).toHaveBeenCalledWith('data', null, eventProcessor.config);
+                expect(mockGoodAction).toHaveBeenCalledWith('data', 'options');
+                expect(mockBadAction).toHaveBeenCalledWith('data', null);
                 done();
             }).catch(done.fail);
         });
@@ -302,6 +301,7 @@ describe('EventProcessor.js', function() {
     describe('the loadActions method', function() {
         var loadedActions;
         var loadedReporters;
+        var action1Factory, action2Factory, action3Factory, action4Factory;
 
         beforeEach(function() {
             eventProcessor.loadActions.and.callThrough();
@@ -322,6 +322,12 @@ describe('EventProcessor.js', function() {
                 }
             };
             eventProcessor.loadActions();
+
+            action1Factory = require('../helpers/action1');
+            action2Factory = require('../helpers/action2');
+            action3Factory = require('../helpers/action3');
+            action4Factory = require('../helpers/action4');
+
             loadedActions = { };
             loadedReporters = { };
             Object.keys(eventProcessor.actions).forEach(function(action) {
@@ -330,6 +336,11 @@ describe('EventProcessor.js', function() {
             Object.keys(eventProcessor.cloudWatchReporters).forEach(function(action) {
                 loadedReporters[action] = eventProcessor.cloudWatchReporters[action];
             });
+        });
+
+        it('should call the factory function for each action', function() {
+            expect(action3Factory).toHaveBeenCalledWith(eventProcessor.config);
+            expect(action4Factory).toHaveBeenCalledWith(eventProcessor.config);
         });
 
         it('should be able to load actions', function() {
@@ -377,6 +388,16 @@ describe('EventProcessor.js', function() {
                     }
                 };
                 eventProcessor.loadActions();
+
+                action1Factory = require('../helpers/action1');
+                action2Factory = require('../helpers/action2');
+                action3Factory = require('../helpers/action3');
+                action4Factory = require('../helpers/action4');
+            });
+
+            it('should call the factory function for each action', function() {
+                expect(action1Factory).toHaveBeenCalledWith(eventProcessor.config);
+                expect(action2Factory).toHaveBeenCalledWith(eventProcessor.config);
             });
 
             it('should require newly added actions', function() {

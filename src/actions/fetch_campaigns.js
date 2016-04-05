@@ -113,53 +113,55 @@ var __private__ = {
     }
 };
 
-function action(data, options, config) {
-    var apiRoot = config.cwrx.api.root;
-    var appCreds = config.appCreds;
-    var analyticsEndpoint = apiRoot + config.cwrx.api.analytics.endpoint + '/campaigns';
-    var campaignEndpoint = apiRoot + config.cwrx.api.campaigns.endpoint;
-    var fetchAnalytics = options.analytics || false;
-    var fetchNumber = options.number || DEFAULT_FETCH_NUMBER;
-    var log = logger.getLog();
-    var prefix = options.prefix;
-    var producerConfig = config.kinesis.producer;
-    var statuses = (options.statuses) ? options.statuses : ['active'];
-    var watchmanProducer = new JsonProducer(producerConfig.stream, producerConfig);
+function factory(config) {
+    return function action(data, options) {
+        var apiRoot = config.cwrx.api.root;
+        var appCreds = config.appCreds;
+        var analyticsEndpoint = apiRoot + config.cwrx.api.analytics.endpoint + '/campaigns';
+        var campaignEndpoint = apiRoot + config.cwrx.api.campaigns.endpoint;
+        var fetchAnalytics = options.analytics || false;
+        var fetchNumber = options.number || DEFAULT_FETCH_NUMBER;
+        var log = logger.getLog();
+        var prefix = options.prefix;
+        var producerConfig = config.kinesis.producer;
+        var statuses = (options.statuses) ? options.statuses : ['active'];
+        var watchmanProducer = new JsonProducer(producerConfig.stream, producerConfig);
 
-    return __private__.getNumCampaigns(appCreds, campaignEndpoint, statuses)
-        .then(function(numCampaigns) {
-            var skipNumbers = [];
-            for(var i=0;i<numCampaigns;i+=fetchNumber) {
-                skipNumbers.push(i);
-            }
-            return Q.allSettled(skipNumbers.map(function(skipNumber) {
-                return __private__.getCampaigns(appCreds, campaignEndpoint, {
-                    limit: fetchNumber,
-                    skip: skipNumber,
-                    sort: 'id,1',
-                    statuses: statuses.join(',')
-                }).then(function(campData) {
-                    if(fetchAnalytics) {
-                        return __private__.getAnalytics(campData, appCreds, analyticsEndpoint);
-                    } else {
-                        return campData;
-                    }
-                }).then(function(campData) {
-                    return __private__.produceResults(watchmanProducer, campData, prefix);
-                });
-            })).then(function(results) {
-                results.filter(function(result) {
-                    return result.state !== 'fulfilled';
-                }).forEach(function(result, index) {
-                    var reason = result.reason;
-                    log.warn('Error requesting page %1 of campaigns: %2', index, reason);
+        return __private__.getNumCampaigns(appCreds, campaignEndpoint, statuses)
+            .then(function(numCampaigns) {
+                var skipNumbers = [];
+                for(var i=0;i<numCampaigns;i+=fetchNumber) {
+                    skipNumbers.push(i);
+                }
+                return Q.allSettled(skipNumbers.map(function(skipNumber) {
+                    return __private__.getCampaigns(appCreds, campaignEndpoint, {
+                        limit: fetchNumber,
+                        skip: skipNumber,
+                        sort: 'id,1',
+                        statuses: statuses.join(',')
+                    }).then(function(campData) {
+                        if(fetchAnalytics) {
+                            return __private__.getAnalytics(campData, appCreds, analyticsEndpoint);
+                        } else {
+                            return campData;
+                        }
+                    }).then(function(campData) {
+                        return __private__.produceResults(watchmanProducer, campData, prefix);
+                    });
+                })).then(function(results) {
+                    results.filter(function(result) {
+                        return result.state !== 'fulfilled';
+                    }).forEach(function(result, index) {
+                        var reason = result.reason;
+                        log.warn('Error requesting page %1 of campaigns: %2', index, reason);
+                    });
                 });
             });
-        });
+    };
 }
 
 // Expose private functions for unit testing
 if (__ut__){
-    action.__private__ = __private__;
+    factory.__private__ = __private__;
 }
-module.exports = action;
+module.exports = factory;

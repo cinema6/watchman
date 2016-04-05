@@ -90,7 +90,7 @@ EventProcessor.prototype = {
             var actionOptions = action.options || null;
             var cloudWatchReporter = self.cloudWatchReporters[actionName];
             var start = Date.now();
-            return actionModule(event.data, actionOptions, self.config).then(function() {
+            return actionModule(event.data, actionOptions).then(function() {
                 log.trace('[%1 event processor] Successfully performed action %2',
                     self.name, actionNames[index]);
                 if(cloudWatchReporter) {
@@ -161,7 +161,7 @@ EventProcessor.prototype = {
             if(actionName in self.actions) {
                 delete require.cache[require.resolve(modulePath)];
             }
-            self.actions[actionName] = require(modulePath);
+            self.actions[actionName] = require(modulePath)(self.config);
         });
 
         // Load the required cloudWatch reporters

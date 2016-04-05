@@ -318,54 +318,58 @@ var __private__ = {
 };
 
 // The action function to be exported
-function action(data, options, config) {
-    var emailConfig = config.emails;
-    var emailType = options.type;
+function factory(config) {
+    return function action(data, options) {
+        var emailConfig = config.emails;
+        var emailType = options.type;
 
-    if(!emailType) {
-        return Q.reject('Must specify an email type');
-    }
+        if(!emailType) {
+            return Q.reject('Must specify an email type');
+        }
 
-    var emailOptions = {
-        from: emailConfig.sender,
-        to: __private__.getRecipient(data, options, config),
-        subject: __private__.getSubject(emailType, data),
-        html: __private__.getHtml(emailType, data, emailConfig),
-        text: null,
-        attachments: __private__.getAttachments([{ filename: 'logo.png', cid: 'reelContentLogo' }])
-    };
+        var emailOptions = {
+            from: emailConfig.sender,
+            to: __private__.getRecipient(data, options, config),
+            subject: __private__.getSubject(emailType, data),
+            html: __private__.getHtml(emailType, data, emailConfig),
+            text: null,
+            attachments: __private__.getAttachments([{
+                filename: 'logo.png', cid: 'reelContentLogo'
+            }])
+        };
 
-    // Ensure all email options have been computed
-    return Q.all(Object.keys(emailOptions).map(function(key) {
-        var value = emailOptions[key];
-        return Q.resolve(value).then(function(newValue) {
-            emailOptions[key] = newValue;
-        });
-    })).then(function() {
-        // Add text email option keeping in mind that links may get capitalized
-        var text = htmlToText.fromString(emailOptions.html);
-        var capsLinks = text.match(/\[HTTPS?:\/\/[^\]]+\]/g);
-        (capsLinks || []).forEach(function(link) {
-            text = text.replace(link, link.toLowerCase());
-        });
-        emailOptions.text = text;
+        // Ensure all email options have been computed
+        return Q.all(Object.keys(emailOptions).map(function(key) {
+            var value = emailOptions[key];
+            return Q.resolve(value).then(function(newValue) {
+                emailOptions[key] = newValue;
+            });
+        })).then(function() {
+            // Add text email option keeping in mind that links may get capitalized
+            var text = htmlToText.fromString(emailOptions.html);
+            var capsLinks = text.match(/\[HTTPS?:\/\/[^\]]+\]/g);
+            (capsLinks || []).forEach(function(link) {
+                text = text.replace(link, link.toLowerCase());
+            });
+            emailOptions.text = text;
 
-        // Send the email
-        return Q.Promise(function(resolve, reject) {
-            var transport = nodemailer.createTransport(sesTransport());
-            transport.sendMail(emailOptions, function(error) {
-                if(error) {
-                    reject(error);
-                } else {
-                    resolve();
-                }
+            // Send the email
+            return Q.Promise(function(resolve, reject) {
+                var transport = nodemailer.createTransport(sesTransport());
+                transport.sendMail(emailOptions, function(error) {
+                    if(error) {
+                        reject(error);
+                    } else {
+                        resolve();
+                    }
+                });
             });
         });
-    });
+    };
 }
 
 // Expose private functions for unit testing
 if(__ut__) {
-    action.__private__ = __private__;
+    factory.__private__ = __private__;
 }
-module.exports = action;
+module.exports = factory;
