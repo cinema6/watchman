@@ -237,8 +237,8 @@ describe('EventProcessor.js', function() {
                     'bad_action'
                 ]
             }).then(function() {
-                expect(mockGoodAction).toHaveBeenCalledWith('data', 'options');
-                expect(mockBadAction).toHaveBeenCalledWith('data', null);
+                expect(mockGoodAction).toHaveBeenCalledWith({ data: 'data', options: 'options' });
+                expect(mockBadAction).toHaveBeenCalledWith({ data: 'data', options: null });
                 done();
             }).catch(done.fail);
         });

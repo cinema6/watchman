@@ -90,7 +90,7 @@ EventProcessor.prototype = {
             var actionOptions = action.options || null;
             var cloudWatchReporter = self.cloudWatchReporters[actionName];
             var start = Date.now();
-            return actionModule(event.data, actionOptions).then(function() {
+            return actionModule({ data: event.data, options: actionOptions }).then(function() {
                 log.trace('[%1 event processor] Successfully performed action %2',
                     self.name, actionNames[index]);
                 if(cloudWatchReporter) {

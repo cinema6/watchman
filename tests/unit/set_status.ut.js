@@ -64,7 +64,7 @@ describe('set_status.js', function() {
             { campaign: { id: null } }
         ];
         Q.all(mockDatas.map(function(mockData) {
-            return setStatus(mockData, mockOptions);
+            return setStatus({ data: mockData, options: mockOptions });
         })).then(function() {
             expect(requestUtils.makeSignedRequest).not.toHaveBeenCalled();
             done();
@@ -80,7 +80,7 @@ describe('set_status.js', function() {
         mockOptions = {
             status: null
         };
-        setStatus(mockData, mockOptions).then(function() {
+        setStatus({ data: mockData, options: mockOptions }).then(function() {
             expect(requestUtils.makeSignedRequest).not.toHaveBeenCalled();
             done();
         }).catch(done.fail);
@@ -104,7 +104,7 @@ describe('set_status.js', function() {
         });
 
         it('should edit the status of the campaign', function(done) {
-            setStatus(mockData, mockOptions).then(function() {
+            setStatus({ data: mockData, options: mockOptions }).then(function() {
                 expect(requestUtils.makeSignedRequest).toHaveBeenCalledWith({
                     key: 'key',
                     secret: 'secret'
@@ -119,7 +119,7 @@ describe('set_status.js', function() {
         });
 
         it('should error if editing the campaign failed', function(done) {
-            setStatus(mockData, mockOptions).then(function() {
+            setStatus({ data: mockData, options: mockOptions }).then(function() {
                 expect(mockLog.error).toHaveBeenCalled();
                 done();
             }).catch(done.fail);

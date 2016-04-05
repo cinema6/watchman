@@ -114,7 +114,8 @@ var __private__ = {
 };
 
 function factory(config) {
-    return function action(data, options) {
+    return function action(event) {
+        var options = event.options;
         var apiRoot = config.cwrx.api.root;
         var appCreds = config.appCreds;
         var analyticsEndpoint = apiRoot + config.cwrx.api.analytics.endpoint + '/campaigns';

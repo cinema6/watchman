@@ -1008,7 +1008,7 @@ describe('campaign_email.js', function() {
 
     describe('the exported action function', function() {
         it('should reject if there is no "type" option', function(done) {
-            email(data, options).then(done.fail).catch(function(error) {
+            email({ data: data, options: options }).then(done.fail).catch(function(error) {
                 expect(error).toBeDefined();
                 done();
             });
@@ -1033,7 +1033,7 @@ describe('campaign_email.js', function() {
                 sendMail: sendMailSpy
             });
             mockTransport.and.returnValue('transport');
-            email(data, options).then(function() {
+            email({ data: data, options: options }).then(function() {
                 expect(emailFactory.__private__.getRecipient).toHaveBeenCalledWith(data, options, config);
                 expect(emailFactory.__private__.getSubject).toHaveBeenCalledWith('emailType', data);
                 expect(emailFactory.__private__.getHtml).toHaveBeenCalledWith('emailType', data,
@@ -1061,7 +1061,7 @@ describe('campaign_email.js', function() {
                 sender: 'sender@gmail.com'
             };
             emailFactory.__private__.getRecipient.and.returnValue(Q.reject('epic fail'));
-            email(data, options).then(done.fail).catch(function(error) {
+            email({ data: data, options: options }).then(done.fail).catch(function(error) {
                 expect(error).toBe('epic fail');
                 done();
             });
@@ -1073,7 +1073,7 @@ describe('campaign_email.js', function() {
                 sender: 'sender@gmail.com'
             };
             emailFactory.__private__.getHtml.and.returnValue(Q.reject('epic fail'));
-            email(data, options).then(done.fail).catch(function(error) {
+            email({ data: data, options: options }).then(done.fail).catch(function(error) {
                 expect(error).toBe('epic fail');
                 done();
             });
@@ -1085,7 +1085,7 @@ describe('campaign_email.js', function() {
                 sender: 'sender@gmail.com'
             };
             emailFactory.__private__.getAttachments.and.returnValue(Q.reject('epic fail'));
-            email(data, options).then(done.fail).catch(function(error) {
+            email({ data: data, options: options }).then(done.fail).catch(function(error) {
                 expect(error).toBe('epic fail');
                 done();
             });
@@ -1110,7 +1110,7 @@ describe('campaign_email.js', function() {
                 sendMail: sendMailSpy
             });
             mockTransport.and.returnValue('transport');
-            email(data, options).then(done.fail).catch(function(error) {
+            email({ data: data, options: options }).then(done.fail).catch(function(error) {
                 expect(error).toBe('epic fail');
                 done();
             });

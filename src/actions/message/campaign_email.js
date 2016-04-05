@@ -319,7 +319,9 @@ var __private__ = {
 
 // The action function to be exported
 function factory(config) {
-    return function action(data, options) {
+    return function action(event) {
+        var data = event.data;
+        var options = event.options;
         var emailConfig = config.emails;
         var emailType = options.type;
 

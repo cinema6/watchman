@@ -450,7 +450,7 @@ describe('fetch_campaigns.js', function() {
     describe('the action', function() {
         it('should get the number of campaigns with the given statuses', function(done) {
             fetchCampaignsFactory.__private__.getNumCampaigns.and.returnValue(Q.resolve(0));
-            fetchCampaigns(mockData, mockOptions).then(function() {
+            fetchCampaigns({ data: mockData, options: mockOptions }).then(function() {
                 expect(fetchCampaignsFactory.__private__.getNumCampaigns).toHaveBeenCalledWith(
                     mockConfig.appCreds, 'http://hostname/api/campaigns', ['status1','status2']);
                 done();
@@ -461,7 +461,7 @@ describe('fetch_campaigns.js', function() {
                 function(done) {
             fetchCampaignsFactory.__private__.getNumCampaigns.and.returnValue(Q.resolve(5));
             fetchCampaignsFactory.__private__.getCampaigns.and.returnValue(Q.resolve('campData'));
-            fetchCampaigns(mockData, mockOptions).then(function() {
+            fetchCampaigns({ data: mockData, options: mockOptions }).then(function() {
                 expect(fetchCampaignsFactory.__private__.getCampaigns).toHaveBeenCalledWith(
                     mockConfig.appCreds, 'http://hostname/api/campaigns', {
                         limit: 2,
@@ -493,7 +493,7 @@ describe('fetch_campaigns.js', function() {
             fetchCampaignsFactory.__private__.getCampaigns.and.returnValue(Q.resolve('campData'));
             fetchCampaignsFactory.__private__.getAnalytics.and.returnValue(Q.resolve('populatedCampData'));
             mockOptions.analytics = true;
-            fetchCampaigns(mockData, mockOptions).then(function() {
+            fetchCampaigns({ data: mockData, options: mockOptions }).then(function() {
                 expect(fetchCampaignsFactory.__private__.getAnalytics).toHaveBeenCalledWith('campData',
                     mockConfig.appCreds, 'http://hostname/api/analytics/campaigns');
                 expect(fetchCampaignsFactory.__private__.getAnalytics.calls.count()).toBe(3);
@@ -506,7 +506,7 @@ describe('fetch_campaigns.js', function() {
             fetchCampaignsFactory.__private__.getCampaigns.and.returnValue(Q.resolve('campData'));
             fetchCampaignsFactory.__private__.getAnalytics.and.returnValue(Q.resolve('populatedCampData'));
             mockOptions.analytics = true;
-            fetchCampaigns(mockData, mockOptions).then(function() {
+            fetchCampaigns({ data: mockData, options: mockOptions }).then(function() {
                 expect(fetchCampaignsFactory.__private__.produceResults).toHaveBeenCalledWith(
                     jasmine.any(JsonProducer), 'populatedCampData', 'prefix');
                 expect(fetchCampaignsFactory.__private__.produceResults.calls.count()).toBe(3);
@@ -523,7 +523,7 @@ describe('fetch_campaigns.js', function() {
                     return Q.reject();
                 }
             });
-            fetchCampaigns(mockData, mockOptions).then(function() {
+            fetchCampaigns({ data: mockData, options: mockOptions }).then(function() {
                 expect(fetchCampaignsFactory.__private__.produceResults).toHaveBeenCalledWith(
                     jasmine.any(JsonProducer), 'campData', 'prefix');
                 expect(fetchCampaignsFactory.__private__.produceResults.calls.count()).toBe(1);
@@ -540,7 +540,7 @@ describe('fetch_campaigns.js', function() {
                     return Q.reject();
                 }
             });
-            fetchCampaigns(mockData, mockOptions).then(function() {
+            fetchCampaigns({ data: mockData, options: mockOptions }).then(function() {
                 expect(mockLog.warn.calls.count()).toBe(2);
                 done();
             }).catch(done.fail);

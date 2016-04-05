@@ -5,7 +5,9 @@ var logger = require('cwrx/lib/logger.js');
 var requestUtils = require('cwrx/lib/requestUtils.js');
 
 module.exports = function(config) {
-    return function (data, options) {
+    return function (event) {
+        var data = event.data;
+        var options = event.options;
         var apiRoot = config.cwrx.api.root;
         var appCreds = config.appCreds;
         var campaignEndpoint = apiRoot + config.cwrx.api.campaigns.endpoint;

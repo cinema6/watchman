@@ -6,7 +6,8 @@ var enums = require('cwrx/lib/enums.js');
 var logger = require('cwrx/lib/logger.js');
 
 module.exports = function(config) {
-    return function (data) {
+    return function (event) {
+        var data = event.data;
         var campaign = data.campaign;
         var log = logger.getLog();
         var producerConfig = config.kinesis.producer;
