@@ -43,11 +43,11 @@ module.exports = function(grunt) {
             var appSecret = grunt.option('appSecret');
             var auth = grunt.option('awsAuth') || path.join(process.env.HOME, '.aws.json');
             var cloudStack = grunt.option('formation');
-            var mongoHost = options.mongoHost;
             var region = grunt.option('region') || 'us-east-1';
             var timeStream = options.timeStream;
             var watchmanStream = options.watchmanStream;
             var cwrxStream = options.cwrxStream;
+            var mongoHost = grunt.option('dbHost') || options.mongoHost;
 
             initCloudFormation(auth, region);
 

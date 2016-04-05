@@ -315,6 +315,11 @@ describe('campaign_email.js', function() {
             });
         });
 
+        it('should get the subject for paymentMade emails', function() {
+            expect(getSubject('paymentMade')).toBe(
+                'Your payment has been approved');
+        });
+
         describe('if the type is "activateAccount"', function() {
             var type, data;
 
@@ -565,6 +570,73 @@ describe('campaign_email.js', function() {
                         requester: 'app-key',
                         campName: 'Nombre',
                         reviewLink: 'review link for campaign c-123'
+                    });
+                    expect();
+                    done();
+                }).catch(done.fail);
+            });
+        });
+
+        describe('compiling a paymentMade email', function() {
+            beforeEach(function() {
+                data.payment = {
+                    id: 'pay1',
+                    amount: 666.6612,
+                    createdAt: '2016-04-04T19:06:11.821Z',
+                    method: {
+                        type: 'creditCard',
+                        cardType: 'Visa',
+                        cardholderName: 'Johnny Testmonkey',
+                        last4: '1234'
+                    }
+                };
+                data.user = {
+                    id: 'u-1',
+                    email: 'foo@test.com'
+                };
+                data.balance = 9001.9876;
+            });
+
+            it('should handle payments from credit cards', function(done) {
+                getHtml('paymentMade', data, emailConfig).then(function() {
+                    expect(email.__private__.loadTemplate).toHaveBeenCalledWith(
+                        'paymentReceipt.html');
+                    expect(handlebars.compile).toHaveBeenCalledWith('template');
+                    expect(compileSpy).toHaveBeenCalledWith({
+                        contact: 'support@reelcontent.com',
+                        amount: '$666.66',
+                        isCreditCard: true,
+                        method: {
+                            type: 'creditCard',
+                            cardType: 'Visa',
+                            cardholderName: 'Johnny Testmonkey',
+                            last4: '1234'
+                        },
+                        date: 'Monday, April 04, 2016',
+                        balance: '$9001.99'
+                    });
+                    expect();
+                    done();
+                }).catch(done.fail);
+            });
+
+            it('should handle payments from paypal accounts', function(done) {
+                data.payment.method = { type: 'paypal', email: 'johnny@moneybags.com' };
+
+                getHtml('paymentMade', data, emailConfig).then(function() {
+                    expect(email.__private__.loadTemplate).toHaveBeenCalledWith(
+                        'paymentReceipt.html');
+                    expect(handlebars.compile).toHaveBeenCalledWith('template');
+                    expect(compileSpy).toHaveBeenCalledWith({
+                        contact: 'support@reelcontent.com',
+                        amount: '$666.66',
+                        isCreditCard: false,
+                        method: {
+                            type: 'paypal',
+                            email: 'johnny@moneybags.com'
+                        },
+                        date: 'Monday, April 04, 2016',
+                        balance: '$9001.99'
                     });
                     expect();
                     done();

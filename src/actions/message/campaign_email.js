@@ -102,6 +102,8 @@ var __private__ = {
                 submitter = data.application.key;
             }
             return 'New update request from ' + submitter + ' for campaign "' + campName + '"';
+        case 'paymentMade':
+            return 'Your payment has been approved';
         case 'activateAccount':
             switch (data.target) {
             case 'bob':
@@ -188,6 +190,17 @@ var __private__ = {
                     (data.application && data.application.key),
                 campName: data.campaign.name,
                 reviewLink: emailConfig.reviewLink.replace(':campId', data.campaign.id)
+            };
+            break;
+        case 'paymentMade':
+            template = 'paymentReceipt.html';
+            templateData = {
+                contact         : emailConfig.supportAddress,
+                amount          : '$' + data.payment.amount.toFixed(2),
+                isCreditCard    : data.payment.method.type === 'creditCard',
+                method          : data.payment.method,
+                date            : new Date(data.payment.createdAt).toLocaleDateString(),
+                balance         : '$' + data.balance.toFixed(2),
             };
             break;
         case 'activateAccount':
