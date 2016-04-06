@@ -180,7 +180,8 @@ KclApp.prototype = {
                 supportAddress: 'string',
                 passwordResetPages: 'object',
                 forgotTargets: 'object'
-            }
+            },
+            paymentPlans: 'object'
         };
         return validate(config, schema);
     },

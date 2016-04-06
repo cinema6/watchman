@@ -60,6 +60,9 @@ describe('KclApp.js', function() {
                 supportAddress: 'support',
                 passwordResetPages: { },
                 forgotTargets: { }
+            },
+            paymentPlans: {
+                'pp-0Ek5Na02vCohpPgw': 49.99
             }
         };
         runSpy = jasmine.createSpy('run()');
@@ -472,6 +475,18 @@ describe('KclApp.js', function() {
                 config.emails.forgotTargets = 123;
                 var configError = app.checkConfig(config, 0);
                 expect(configError).toBe('emails: forgotTargets: Not a object');
+            });
+        });
+
+        describe('paymentPlans', function() {
+            it('should return an error mesage if missing', function() {
+                delete config.paymentPlans;
+                expect(app.checkConfig(config, 0)).toBe('paymentPlans: Missing value');
+            });
+
+            it('should return an error message if not an object', function() {
+                config.paymentPlans = 'foo';
+                expect(app.checkConfig(config, 0)).toBe('paymentPlans: Not a object');
             });
         });
     });
