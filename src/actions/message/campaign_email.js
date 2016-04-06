@@ -10,6 +10,7 @@ var path = require('path');
 var requestUtils = require('cwrx/lib/requestUtils.js');
 var sesTransport = require('nodemailer-ses-transport');
 var util = require('util');
+var resolveURL = require('url').resolve;
 
 var TEMPLATE_DIR = '../../../templates';
 
@@ -70,6 +71,20 @@ var __private__ = {
                         return Q.reject('Error requesting user');
                     }
                 });
+            } else if (data.org) {
+                return requestUtils.makeSignedRequest(config.appCreds, 'get', {
+                    qs: { fields: 'email', org: data.org.id, sort: 'created,1' },
+                    url: resolveURL(config.cwrx.api.root, config.cwrx.api.users.endpoint)
+                }).then(function handleResponse(result) {
+                    var response = result.response;
+                    var body = result.body;
+
+                    if (response.statusCode !== 200) {
+                        throw new Error('Failed to get users for org ' + data.org.id + ': ' + body);
+                    }
+
+                    return body[0].email;
+                });
             } else {
                 return Q.reject('Could not find a recipient');
             }
@@ -122,6 +137,8 @@ var __private__ = {
             return 'Reelcontent: Multiple-Failed Logins';
         case 'forgotPassword':
             return 'Forgot Your Password?';
+        case 'chargePaymentPlanFailure':
+            return 'We Hit a Snag';
         default:
             return '';
         }
@@ -265,6 +282,16 @@ var __private__ = {
             template = 'passwordReset.html';
             templateData = {
                 resetLink: resetLink
+            };
+            break;
+        case 'chargePaymentPlanFailure':
+            template = 'chargePaymentPlanFailure.html';
+            templateData = {
+                contact: emailConfig.supportAddress,
+                amount: '$' + data.paymentPlan.price,
+                cardType: data.paymentMethod.cardType,
+                cardLast4: data.paymentMethod.last4,
+                paypalEmail: data.paymentMethod.email
             };
             break;
         default:
