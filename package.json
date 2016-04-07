@@ -27,6 +27,7 @@
     "readable-stream": "^2.0.6"
   },
   "devDependencies": {
+    "braintree": "^1.37.1",
     "grunt": "^0.4.5",
     "grunt-c6-util": "git+ssh://git@github.com:cinema6/c6-grunt-util#master",
     "grunt-contrib-jshint": "^0.11.3",
@@ -37,6 +38,7 @@
     "load-grunt-config": "^0.19.1",
     "pg.js": "^4.1.1",
     "proxyquire": "^1.7.3",
-    "rc-uuid": "^2.0.1"
+    "rc-uuid": "^2.0.1",
+    "request": "^2.70.0"
   }
 }

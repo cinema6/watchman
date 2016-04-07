@@ -48,6 +48,7 @@ module.exports = function(grunt) {
             var watchmanStream = options.watchmanStream;
             var cwrxStream = options.cwrxStream;
             var mongoHost = grunt.option('dbHost') || options.mongoHost;
+            var apiRoot = grunt.option('apiRoot') || options.apiRoot;
 
             initCloudFormation(auth, region);
 
@@ -98,6 +99,7 @@ module.exports = function(grunt) {
                 } catch (error) {
                     process.env.awsCreds = null;
                 }
+                process.env.apiRoot = apiRoot;
                 process.env.mongo = JSON.stringify(mongoCfg);
                 process.env.timeStream = timeStream;
                 process.env.watchmanStream = watchmanStream;
