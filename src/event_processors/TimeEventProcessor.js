@@ -16,7 +16,7 @@ TimeEventProcessor.prototype = Object.create(EventProcessor.prototype, {
         value: function(message) {
             return (message.type) ? {
                 name: message.type,
-                data: null
+                data: message.data || null
             } : null;
         }
     }
