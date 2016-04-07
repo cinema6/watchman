@@ -53,6 +53,12 @@
                             },
                             "payments": {
                                 "endpoint": "/api/payments/"
+							},
+                            "promotions": {
+                                "endpoint": "/api/promotions"
+                            },
+                            "transactions": {
+                                "endpoint": "/api/transactions"
                             }
                         }
                     },
