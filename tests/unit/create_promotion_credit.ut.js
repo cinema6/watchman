@@ -4,10 +4,10 @@ var q               = require('q');
 var util            = require('util');
 var logger          = require('cwrx/lib/logger.js');
 var requestUtils    = require('cwrx/lib/requestUtils');
-var actionFactory   = require('../../src/actions/fulfill_promotion.js');
+var actionFactory   = require('../../src/actions/create_promotion_credit.js');
 
-describe('check_signup_promotion.js', function() {
-    var mockOptions, mockConfig, mockLog, event, transResp, fulfillProm;
+describe('create_promotion_credit.js', function() {
+    var mockOptions, mockConfig, mockLog, event, transResp, createCredit;
 
     beforeEach(function() {
         mockOptions = { };
@@ -17,7 +17,7 @@ describe('check_signup_promotion.js', function() {
                 api: {
                     root: 'http://test.com',
                     transactions: {
-                        endpoint: '/api/transactions/',
+                        endpoint: '/api/transactions',
                     }
                 }
             }
@@ -56,17 +56,18 @@ describe('check_signup_promotion.js', function() {
             }
         };
         
-        spyOn(requestUtils, 'makeSignedRequest').and.callFake(function(creds, method, opts) {
+        spyOn(requestUtils, 'makeSignedRequest').and.callFake(function(/*creds, method, opts*/) {
             return q(transResp);
         });
         
-        fulfillProm = actionFactory(mockConfig);
+        createCredit = actionFactory(mockConfig);
     });
 
     it('should skip if the event contains no org or promotion', function(done) {
-        q.all([{}, { org: event.data.org }, { promotion: event.data.promotion }].map(function(data) {
+        q.all([{}, { org: event.data.org }, { promotion: event.data.promotion }]
+        .map(function(data) {
             event.data = data;
-            return fulfillProm(event);
+            return createCredit(event);
         }))
         .then(function() {
             expect(requestUtils.makeSignedRequest).not.toHaveBeenCalled();
@@ -77,9 +78,9 @@ describe('check_signup_promotion.js', function() {
     });
 
     it('should create a credit transaction', function(done) {
-        fulfillProm(event).then(function() {
+        createCredit(event).then(function() {
             expect(requestUtils.makeSignedRequest).toHaveBeenCalledWith('i am watchman', 'post', {
-                url: 'http://test.com/api/transactions/',
+                url: 'http://test.com/api/transactions',
                 json: {
                     amount: 50,
                     org: 'o-1',
@@ -94,7 +95,7 @@ describe('check_signup_promotion.js', function() {
     
     it('should warn and skip if the promotion type is unrecognized', function(done) {
         event.data.promotion.type = 'freeee money';
-        fulfillProm(event).then(function() {
+        createCredit(event).then(function() {
             expect(requestUtils.makeSignedRequest).not.toHaveBeenCalled();
             expect(mockLog.warn).toHaveBeenCalled();
             expect(mockLog.error).not.toHaveBeenCalled();
@@ -104,7 +105,7 @@ describe('check_signup_promotion.js', function() {
 
     it('should log an error if creating the transaction returns a 4xx', function(done) {
         transResp = { response: { statusCode: 400 }, body: 'I got a problem with YOU' };
-        fulfillProm(event).then(function() {
+        createCredit(event).then(function() {
             expect(mockLog.error).toHaveBeenCalled();
             expect(mockLog.error.calls.mostRecent().args).toContain(util.inspect({
                 message: 'Error creating transaction',
@@ -119,9 +120,10 @@ describe('check_signup_promotion.js', function() {
 
     it('should log an error if creating the transaction rejects', function(done) {
         transResp = q.reject('I GOT A PROBLEM');
-        fulfillProm(event).then(function() {
+        createCredit(event).then(function() {
             expect(mockLog.error).toHaveBeenCalled();
-            expect(mockLog.error.calls.mostRecent().args).toContain(util.inspect('I GOT A PROBLEM'));
+            expect(mockLog.error.calls.mostRecent().args)
+                .toContain(util.inspect('I GOT A PROBLEM'));
             done();
         }).catch(done.fail);
     });

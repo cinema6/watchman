@@ -4,8 +4,10 @@ var JsonProducer = require('rc-kinesis').JsonProducer;
 var Q = require('q');
 var testUtils = require('cwrx/test/e2e/testUtils.js');
 
+var APP_CREDS = JSON.parse(process.env.appCreds);
 var AWS_CREDS = JSON.parse(process.env.awsCreds);
 var CWRX_STREAM = process.env.cwrxStream;
+var WAIT_TIME = 1000;
 
 describe('cwrxStream', function() {
     var producer;
@@ -48,6 +50,36 @@ describe('cwrxStream', function() {
             rejectionReason: 'your campaign is bad'
         };
     });
+    
+    // Setup watchman app
+    beforeEach(function(done) {
+        var mockApp = {
+            id: 'app-e2e-watchman',
+            key: APP_CREDS.key,
+            status: 'active',
+            secret: APP_CREDS.secret,
+            permissions: {
+                campaigns: { read: 'all', edit: 'all' },
+                cards: { read: 'all', edit: 'all' },
+                users: { read: 'all' },
+                orgs: { read: 'all', edit: 'all' },
+                promotions: { read: 'all' },
+                transactions: { create: 'all' }
+            },
+            entitlements: {
+                directEditCampaigns: true
+            },
+            fieldValidation: {
+                campaigns: {
+                    status: {
+                        __allowed: true
+                    }
+                }
+            }
+        };
+        
+        return testUtils.mongoUpsert('applications', { key: mockApp.key }, mockApp).done(done);
+    });
 
     afterEach(function() {
         mailman.removeAllListeners();
@@ -58,6 +90,18 @@ describe('cwrxStream', function() {
         mailman.stop();
         mailman2.stop();
     });
+
+    function waitForTrue(promise) {
+        return Q.resolve().then(promise).then(function(value) {
+            if(!value) {
+                return Q.Promise(function(resolve, reject) {
+                    setTimeout(function() {
+                        waitForTrue(promise).then(resolve, reject);
+                    }, WAIT_TIME);
+                });
+            }
+        });
+    }
 
     describe('when a campaignStateChange event occurs', function() {
         describe('when an active campaign expires', function() {
@@ -411,48 +455,128 @@ describe('cwrxStream', function() {
         }).catch(done.fail);
     });
 
-    it('should send an email notifying the user that their account has been activated',
-            function(done) {
-        producer.produce({
-            type: 'accountActivated',
-            data: {
-                user: mockUser
-            }
-        }).then(function() {
-            mailman.once('Your Account is Now Active',
-                    function(msg) {
-                expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
-                expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                var regex = /account\s*is\s*now\s*active/;
-                expect(msg.text).toMatch(regex);
-                expect(msg.html).toMatch(regex);
-                expect((new Date() - msg.date)).toBeLessThan(30000);
-                done();
-            });
-        }).catch(done.fail);
-    });
+    
+    describe('when an account was activated', function() {
+        it('should send an email notifying the user that their account has been activated',
+                function(done) {
+            producer.produce({
+                type: 'accountActivated',
+                data: {
+                    user: mockUser
+                }
+            }).then(function() {
+                mailman.once('Your Account is Now Active',
+                        function(msg) {
+                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                    var regex = /account\s*is\s*now\s*active/;
+                    expect(msg.text).toMatch(regex);
+                    expect(msg.html).toMatch(regex);
+                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    done();
+                });
+            }).catch(done.fail);
+        });
 
-    it('should send an email notifying the user that their bob account has been activated',
-            function(done) {
-        producer.produce({
-            type: 'accountActivated',
-            data: {
-                user: mockUser,
-                target: 'bob'
-            }
-        }).then(function() {
-            mailman.once('Your Account is Now Active',
-                    function(msg) {
-                expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
-                expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                var regex = /account\s*is\s*now\s*active/;
-                expect(msg.text).toMatch(regex);
-                expect(msg.html).toMatch(regex);
-                expect(msg.text).toContain('ADD MY FIRST PRODUCT');
-                expect((new Date() - msg.date)).toBeLessThan(30000);
-                done();
+        it('should send an email notifying the user that their bob account has been activated',
+                function(done) {
+            producer.produce({
+                type: 'accountActivated',
+                data: {
+                    user: mockUser,
+                    target: 'bob'
+                }
+            }).then(function() {
+                mailman.once('Your Account is Now Active',
+                        function(msg) {
+                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                    var regex = /account\s*is\s*now\s*active/;
+                    expect(msg.text).toMatch(regex);
+                    expect(msg.html).toMatch(regex);
+                    expect(msg.text).toContain('ADD MY FIRST PRODUCT');
+                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    done();
+                });
+            }).catch(done.fail);
+        });
+        
+        describe('with a promotion', function() {
+            /* jshint camelcase: false */
+            var testOrg, testPromotion;
+            beforeEach(function(done) {
+                mockUser.org = 'o-e2e-1';
+                mockUser.promotion = 'pro-e2e-1';
+                testOrg = {
+                    id: 'o-e2e-1',
+                    name: 'test org',
+                    status: 'active',
+                    promotions: []
+                };
+                testPromotion = {
+                    id: 'pro-e2e-1',
+                    type: 'signupReward',
+                    data: { rewardAmount: 50 }
+                };
+                
+                return Q.all([
+                    testUtils.resetCollection('orgs', testOrg),
+                    testUtils.resetCollection('promotions', testPromotion),
+                    testUtils.resetPGTable('fct.billing_transactions')
+                ]).then(function() { done(); }, done.fail);
             });
-        }).catch(done.fail);
+            
+            it('should apply the promotional credit to the org\'s account balance', function(done) {
+                function waitForTransaction() {
+                    return waitForTrue(function() {
+                        return testUtils.pgQuery(
+                            'SELECT * FROM fct.billing_transactions WHERE org_id = $1',
+                            ['o-e2e-1']
+                        ).then(function(results) {
+                            return results.rows.length > 0;
+                        });
+                    });
+                }
+
+                producer.produce({
+                    type: 'accountActivated',
+                    data: {
+                        user: mockUser
+                    }
+                }).then(function() {
+                    return waitForTransaction();
+                }).then(function() {
+                    return testUtils.mongoFind('orgs', { id: 'o-e2e-1' });
+                }).then(function(orgs) {
+                    expect(orgs[0].promotions).toEqual([
+                        { id: 'pro-e2e-1', date: jasmine.anything() }
+                    ]);
+                
+                    return testUtils.pgQuery(
+                        'SELECT * FROM fct.billing_transactions WHERE org_id = $1',
+                        ['o-e2e-1']
+                    );
+                }).then(function(results) {
+                    expect(results.rows.length).toBe(1);
+                    expect(results.rows[0]).toEqual(jasmine.objectContaining({
+                        rec_key         : jasmine.any(String),
+                        rec_ts          : jasmine.any(Date),
+                        transaction_id  : jasmine.any(String),
+                        transaction_ts  : results.rows[0].rec_ts,
+                        org_id          : 'o-e2e-1',
+                        amount          : '50.0000',
+                        sign            : 1,
+                        units           : 1,
+                        campaign_id     : null,
+                        braintree_id    : null,
+                        promotion_id    : 'pro-e2e-1',
+                        description     : JSON.stringify({eventType: 'credit', source: 'promotion'})
+                    }));
+                    done();
+                }).catch(done.fail);
+            });
+            /* jshint camelcase: true */
+        });
     });
 
     it('should send an email notifying the user that their password has been changed',

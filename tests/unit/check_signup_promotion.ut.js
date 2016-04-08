@@ -8,7 +8,8 @@ var requestUtils    = require('cwrx/lib/requestUtils');
 var actionFactory   = require('../../src/actions/check_signup_promotion.js');
 
 describe('check_signup_promotion.js', function() {
-    var mockOptions, mockConfig, mockLog, mockProducer, event, mockOrg, mockPromotion, resps, checkSignupProm;
+    var mockOptions, mockConfig, mockLog, mockProducer, event, mockOrg, mockPromotion,
+        resps, checkSignupProm;
 
     beforeEach(function() {
         mockOptions = { };
@@ -18,10 +19,10 @@ describe('check_signup_promotion.js', function() {
                 api: {
                     root: 'http://test.com',
                     promotions: {
-                        endpoint: '/api/promotions/',
+                        endpoint: '/api/promotions',
                     },
                     orgs: {
-                        endpoint: '/api/account/orgs/'
+                        endpoint: '/api/account/orgs'
                     }
                 }
             },
@@ -76,8 +77,11 @@ describe('check_signup_promotion.js', function() {
         };
         
         spyOn(requestUtils, 'makeSignedRequest').and.callFake(function(creds, method, opts) {
-            if (/orgs/.test(opts.url)) return q(resps.orgs[method]);
-            else return q(resps.promotions[method]);
+            if (/orgs/.test(opts.url)) {
+                return q(resps.orgs[method]);
+            } else {
+                return q(resps.promotions[method]);
+            }
         });
         
         checkSignupProm = actionFactory(mockConfig);
@@ -99,7 +103,8 @@ describe('check_signup_promotion.js', function() {
 
     it('should update the org and produce a promotionFulfilled event', function(done) {
         checkSignupProm(event).then(function() {
-            expect(rcKinesis.JsonProducer).toHaveBeenCalledWith('UTStream', mockConfig.kinesis.producer);
+            expect(rcKinesis.JsonProducer)
+                .toHaveBeenCalledWith('UTStream', mockConfig.kinesis.producer);
             expect(requestUtils.makeSignedRequest.calls.count()).toBe(3);
             expect(requestUtils.makeSignedRequest).toHaveBeenCalledWith('i am watchman', 'get', {
                 url: 'http://test.com/api/account/orgs/o-1'
@@ -143,13 +148,17 @@ describe('check_signup_promotion.js', function() {
         checkSignupProm(event).then(function() {
             expect(requestUtils.makeSignedRequest).toHaveBeenCalledWith('i am watchman', 'put', {
                 url: 'http://test.com/api/account/orgs/o-1',
-                json: jasmine.objectContaining({ promotions: [{ id: 'pro-signup-1', date: jasmine.any(Date) }] })
+                json: jasmine.objectContaining({
+                    promotions: [{ id: 'pro-signup-1', date: jasmine.any(Date) }]
+                })
             });
             expect(mockProducer.produce).toHaveBeenCalledWith({
                 type: 'promotionFulfilled',
                 data: {
                     promotion: mockPromotion,
-                    org: jasmine.objectContaining({ promotions: [{ id: 'pro-signup-1', date: jasmine.any(Date) }] })
+                    org: jasmine.objectContaining({
+                        promotions: [{ id: 'pro-signup-1', date: jasmine.any(Date) }]
+                    })
                 }
             });
             expect(mockLog.warn).not.toHaveBeenCalled();
@@ -162,7 +171,8 @@ describe('check_signup_promotion.js', function() {
         mockOrg.promotions[0].id = event.data.user.promotion;
         checkSignupProm(event).then(function() {
             expect(requestUtils.makeSignedRequest.calls.count()).toBe(2);
-            expect(requestUtils.makeSignedRequest).not.toHaveBeenCalledWith('i am watchman', 'put', jasmine.any(Object));
+            expect(requestUtils.makeSignedRequest)
+                .not.toHaveBeenCalledWith('i am watchman', 'put', jasmine.any(Object));
             expect(mockProducer.produce).not.toHaveBeenCalled();
             expect(mockLog.warn).toHaveBeenCalled();
             expect(mockLog.error).not.toHaveBeenCalled();
@@ -170,17 +180,23 @@ describe('check_signup_promotion.js', function() {
         }).catch(done.fail);
     });
     
-    [{ obj: 'orgs', verb: 'get' }, { obj: 'orgs', verb: 'put' }, { obj: 'promotions', verb: 'get' }].forEach(function(cfg) {
+    [{ obj: 'orgs', verb: 'get' }, { obj: 'orgs', verb: 'put' }, { obj: 'promotions', verb: 'get' }]
+    .forEach(function(cfg) {
         var reqStr = cfg.verb.toUpperCase() + ' /' + cfg.obj;
 
         it('should log an error if the ' + reqStr + ' request returns a 4xx', function(done) {
-            resps[cfg.obj][cfg.verb] = { response: { statusCode: 400 }, body: 'I got a problem with YOU' };
+            resps[cfg.obj][cfg.verb] = {
+                response: { statusCode: 400 },
+                body: 'I got a problem with YOU'
+            };
             
-            var url = mockConfig.cwrx.api.root + mockConfig.cwrx.api[cfg.obj].endpoint + (cfg.obj === 'orgs' ? 'o-1' : 'pro-signup-1');
+            var url = mockConfig.cwrx.api.root + mockConfig.cwrx.api[cfg.obj].endpoint +
+                                                 (cfg.obj === 'orgs' ? '/o-1' : '/pro-signup-1');
 
             checkSignupProm(event).then(function() {
                 if (cfg.verb === 'get') {
-                    expect(requestUtils.makeSignedRequest).not.toHaveBeenCalledWith('i am watchman', 'put', jasmine.any(Object));
+                    expect(requestUtils.makeSignedRequest)
+                        .not.toHaveBeenCalledWith('i am watchman', 'put', jasmine.any(Object));
                 }
                 expect(mockLog.error).toHaveBeenCalled();
                 expect(mockLog.error.calls.mostRecent().args).toContain(util.inspect({
@@ -199,10 +215,12 @@ describe('check_signup_promotion.js', function() {
 
             checkSignupProm(event).then(function() {
                 if (cfg.verb === 'get') {
-                    expect(requestUtils.makeSignedRequest).not.toHaveBeenCalledWith('i am watchman', 'put', jasmine.any(Object));
+                    expect(requestUtils.makeSignedRequest)
+                        .not.toHaveBeenCalledWith('i am watchman', 'put', jasmine.any(Object));
                 }
                 expect(mockLog.error).toHaveBeenCalled();
-                expect(mockLog.error.calls.mostRecent().args).toContain(util.inspect('WHO WATCHES THE WATCHMAN'));
+                expect(mockLog.error.calls.mostRecent().args)
+                    .toContain(util.inspect('WHO WATCHES THE WATCHMAN'));
                 done();
             }).catch(done.fail);
         });
@@ -212,7 +230,8 @@ describe('check_signup_promotion.js', function() {
         mockProducer.produce.and.returnValue(q.reject('I GOT A PROBLEM'));
         checkSignupProm(event).then(function() {
             expect(mockLog.error).toHaveBeenCalled();
-            expect(mockLog.error.calls.mostRecent().args).toContain(util.inspect('I GOT A PROBLEM'));
+            expect(mockLog.error.calls.mostRecent().args)
+                .toContain(util.inspect('I GOT A PROBLEM'));
             done();
         }).catch(done.fail);
     });

@@ -2,7 +2,6 @@
 
 var q               = require('q'),
     util            = require('util'),
-    urlUtils        = require('url'),
     rcKinesis       = require('rc-kinesis'),
     logger          = require('cwrx/lib/logger.js'),
     requestUtils    = require('cwrx/lib/requestUtils.js');
@@ -34,12 +33,12 @@ module.exports = function(config) {
         }
         
         // Fetch the user's org + promotion
-        var orgUrl = urlUtils.resolve(config.cwrx.api.root, config.cwrx.api.orgs.endpoint),
-            promUrl = urlUtils.resolve(config.cwrx.api.root,config.cwrx.api.promotions.endpoint);
+        var orgUrl = config.cwrx.api.root + config.cwrx.api.orgs.endpoint,
+            promUrl = config.cwrx.api.root + config.cwrx.api.promotions.endpoint;
 
         return q.all([
-            sendRequest(appCreds, 'get', { url: urlUtils.resolve(orgUrl, user.org) }),
-            sendRequest(appCreds, 'get', { url: urlUtils.resolve(promUrl, user.promotion) }),
+            sendRequest(appCreds, 'get', { url: orgUrl + '/' + user.org }),
+            sendRequest(appCreds, 'get', { url: promUrl + '/' + user.promotion }),
         ])
         .spread(function(org, promotion) {
             org.promotions = org.promotions || [];
@@ -58,7 +57,7 @@ module.exports = function(config) {
             org.promotions.push({ id: promotion.id, date: new Date() });
             
             return sendRequest(appCreds, 'put', {
-                url: urlUtils.resolve(orgUrl, org.id),
+                url: orgUrl + '/' + org.id,
                 json: org
             })
             .then(function(updated) {

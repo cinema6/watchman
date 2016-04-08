@@ -2,7 +2,6 @@
 
 var q               = require('q'),
     util            = require('util'),
-    urlUtils        = require('url'),
     logger          = require('cwrx/lib/logger.js'),
     requestUtils    = require('cwrx/lib/requestUtils.js');
 
@@ -29,10 +28,8 @@ module.exports = function(config) {
                 return q();
         }
         
-        //TODO: may need to check if transaction for promotion already exists??
-
         return requestUtils.makeSignedRequest(appCreds, 'post', {
-            url: urlUtils.resolve(config.cwrx.api.root, config.cwrx.api.transactions.endpoint),
+            url: config.cwrx.api.root + config.cwrx.api.transactions.endpoint,
             json: {
                 amount: amount,
                 org: org.id,
@@ -51,7 +48,7 @@ module.exports = function(config) {
                      resp.body.id, resp.body.amount, promotion.id, org.id);
         })
         .catch(function(error) {
-            log.error('Error fulfilling promotion %1 for org %2: %3',
+            log.error('Error creating credit for promotion %1 for org %2: %3',
                       promotion.id, org.id, util.inspect(error));
         });
     };
