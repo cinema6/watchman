@@ -307,6 +307,16 @@
                                     }
                                 }
                             ]
+                        },
+                        "resendActivation": {
+                            "actions": [
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "activateAccount"
+                                    }
+                                }
+                            ]
                         }
                     }
                 }

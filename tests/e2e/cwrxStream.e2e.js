@@ -290,7 +290,7 @@ describe('cwrxStream', function() {
             });
         }).catch(done.fail);
     });
-    
+
     describe('when handling a paymentMade event', function() {
         var mockPayment, msgRegexes;
         beforeEach(function() {
@@ -304,7 +304,7 @@ describe('cwrxStream', function() {
                     last4: '1234'
                 }
             };
-            
+
             msgRegexes = [
                 /Amount:\s*\$123.45/,
                 /Processed:\s*Monday,\s*April\s*04,\s*2016/,
@@ -562,6 +562,27 @@ describe('cwrxStream', function() {
                 expect(msg.text).toMatch(regex);
                 expect(msg.html).toMatch(regex);
                 expect((new Date() - msg.date)).toBeLessThan(30000);
+                done();
+            });
+        }).catch(done.fail);
+    });
+
+    it('should be able to resend an activation email', function(done) {
+        producer.produce({
+            type: 'resendActivation',
+            data: {
+                target: 'selfie',
+                token: 'secret-token',
+                user: mockUser
+            }
+        }).then(function() {
+            mailman.once('Welcome to Reelcontent Video Ads!', function(msg) {
+                expect(msg.from[0].address).toBe('no-reply@reelcontent.com');
+                expect(msg.to[0].address).toBe('c6e2etester@gmail.com');
+                var regex = /https?:\/\/.+id.+u-123.+token.+secret-token/;
+                expect(msg.text).toMatch(regex);
+                expect(msg.html).toMatch(regex);
+                expect(new Date() - msg.date).toBeLessThan(30000);
                 done();
             });
         }).catch(done.fail);
