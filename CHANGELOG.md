@@ -2,6 +2,7 @@
 
 * *[v0.2.0-rc1]*
   * [FEATURE]: Added functionality to campaign_email action to send receipt emails for `paymentMade` event
+  * [FEATURE]: Add `create_promotion_credit` and `check_signup_promotion` actions
   * [DEV]: Refactor the action API
   * [FEATURE]: Add logic to bill orgs with payment plans every month
   * **Extra Deployment Steps**:
