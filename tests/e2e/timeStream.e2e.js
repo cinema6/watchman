@@ -170,6 +170,11 @@ describe('timeStream', function() {
                     'status': {
                         '__allowed': true
                     }
+                },
+                orgs: {
+                    promotions: {
+                        __allowed: true
+                    }
                 }
             }
         };

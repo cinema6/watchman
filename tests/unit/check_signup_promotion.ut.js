@@ -5,6 +5,7 @@ var util            = require('util');
 var rcKinesis       = require('rc-kinesis');
 var logger          = require('cwrx/lib/logger.js');
 var requestUtils    = require('cwrx/lib/requestUtils');
+var Status          = require('cwrx/lib/enums').Status;
 var actionFactory   = require('../../src/actions/check_signup_promotion.js');
 
 describe('check_signup_promotion.js', function() {
@@ -64,6 +65,7 @@ describe('check_signup_promotion.js', function() {
         mockPromotion = {
             id: 'pro-signup-1',
             type: 'signupReward',
+            status: Status.Active,
             data: { rewardAmount: 50 }
         };
         resps = {
@@ -167,6 +169,30 @@ describe('check_signup_promotion.js', function() {
         }).catch(done.fail);
     });
     
+    it('should warn and skip if the promotion is invalid', function(done) {
+        mockPromotion.status = Status.Inactive;
+        checkSignupProm(event).then(function() {
+            expect(requestUtils.makeSignedRequest.calls.count()).toBe(2);
+            expect(requestUtils.makeSignedRequest)
+                .not.toHaveBeenCalledWith('i am watchman', 'put', jasmine.any(Object));
+            expect(mockLog.warn).toHaveBeenCalled();
+            
+            requestUtils.makeSignedRequest.calls.reset();
+            mockLog.warn.calls.reset();
+            mockPromotion.status = Status.Active;
+            mockPromotion.type = 'loyaltyReward';
+            return checkSignupProm(event);
+        }).then(function() {
+            expect(requestUtils.makeSignedRequest.calls.count()).toBe(2);
+            expect(requestUtils.makeSignedRequest)
+                .not.toHaveBeenCalledWith('i am watchman', 'put', jasmine.any(Object));
+            expect(mockLog.warn).toHaveBeenCalled();
+            expect(mockProducer.produce).not.toHaveBeenCalled();
+            expect(mockLog.error).not.toHaveBeenCalled();
+            done();
+        }).catch(done.fail);
+    });
+    
     it('should warn and skip if the org already has the promotion', function(done) {
         mockOrg.promotions[0].id = event.data.user.promotion;
         checkSignupProm(event).then(function() {
@@ -180,27 +206,40 @@ describe('check_signup_promotion.js', function() {
         }).catch(done.fail);
     });
     
-    [{ obj: 'orgs', verb: 'get' }, { obj: 'orgs', verb: 'put' }, { obj: 'promotions', verb: 'get' }]
-    .forEach(function(cfg) {
-        var reqStr = cfg.verb.toUpperCase() + ' /' + cfg.obj;
+    it('should warn and skip if fetching the promotion returns a 4xx', function(done) {
+        resps.promotions.get = {
+            response: { statusCode: 404 },
+            body: 'dat aint real'
+        };
+        
+        checkSignupProm(event).then(function() {
+            expect(requestUtils.makeSignedRequest.calls.count()).toBe(2);
+            expect(requestUtils.makeSignedRequest)
+                .not.toHaveBeenCalledWith('i am watchman', 'put', jasmine.any(Object));
+            expect(mockProducer.produce).not.toHaveBeenCalled();
+            expect(mockLog.warn).toHaveBeenCalled();
+            expect(mockLog.error).not.toHaveBeenCalled();
+            done();
+        }).catch(done.fail);
+    });
+    
+    ['get', 'put'].forEach(function(verb) {
+        var reqStr = verb.toUpperCase() + ' /orgs';
 
         it('should log an error if the ' + reqStr + ' request returns a 4xx', function(done) {
-            resps[cfg.obj][cfg.verb] = {
+            resps.orgs[verb] = {
                 response: { statusCode: 400 },
                 body: 'I got a problem with YOU'
             };
             
-            var url = mockConfig.cwrx.api.root + mockConfig.cwrx.api[cfg.obj].endpoint +
-                                                 (cfg.obj === 'orgs' ? '/o-1' : '/pro-signup-1');
-
             checkSignupProm(event).then(function() {
-                if (cfg.verb === 'get') {
+                if (verb === 'get') {
                     expect(requestUtils.makeSignedRequest)
                         .not.toHaveBeenCalledWith('i am watchman', 'put', jasmine.any(Object));
                 }
                 expect(mockLog.error).toHaveBeenCalled();
                 expect(mockLog.error.calls.mostRecent().args).toContain(util.inspect({
-                    message: 'Error calling ' + cfg.verb.toUpperCase() + ' ' + url,
+                    message: util.format('Error %s org', (verb === 'get' ? 'fetching' : 'editing')),
                     reason: {
                         code: 400,
                         body: 'I got a problem with YOU'
@@ -209,6 +248,11 @@ describe('check_signup_promotion.js', function() {
                 done();
             }).catch(done.fail);
         });
+    });
+    
+    [{ obj: 'orgs', verb: 'get' }, { obj: 'orgs', verb: 'put' }, { obj: 'promotions', verb: 'get' }]
+    .forEach(function(cfg) {
+        var reqStr = cfg.verb.toUpperCase() + ' /' + cfg.obj;
 
         it('should log an error if the ' + reqStr + ' request rejects', function(done) {
             resps[cfg.obj][cfg.verb] = q.reject('WHO WATCHES THE WATCHMAN');

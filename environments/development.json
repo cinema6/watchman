@@ -53,7 +53,7 @@
                             },
                             "payments": {
                                 "endpoint": "/api/payments/"
-							},
+                            },
                             "promotions": {
                                 "endpoint": "/api/promotions"
                             },

@@ -74,6 +74,11 @@ describe('cwrxStream', function() {
                     status: {
                         __allowed: true
                     }
+                },
+                orgs: {
+                    promotions: {
+                        __allowed: true
+                    }
                 }
             }
         };
@@ -503,25 +508,25 @@ describe('cwrxStream', function() {
         
         describe('with a promotion', function() {
             /* jshint camelcase: false */
-            var testOrg, testPromotion;
+            var testOrg, testPromotions;
             beforeEach(function(done) {
                 mockUser.org = 'o-e2e-1';
-                mockUser.promotion = 'pro-e2e-1';
+                mockUser.promotion = 'pro-valid';
                 testOrg = {
                     id: 'o-e2e-1',
                     name: 'test org',
                     status: 'active',
                     promotions: []
                 };
-                testPromotion = {
-                    id: 'pro-e2e-1',
-                    type: 'signupReward',
-                    data: { rewardAmount: 50 }
-                };
+                testPromotions = [
+                    { id: 'pro-valid', status: 'active', type: 'signupReward', data: { rewardAmount: 50 } },
+                    { id: 'pro-inactive', status: 'inactive', type: 'signupReward', data: { rewardAmount: 50 } },
+                    { id: 'pro-loyalty', status: 'active', type: 'loyaltyReward', data: { rewardAmount: 50 } }
+                ];
                 
                 return Q.all([
                     testUtils.resetCollection('orgs', testOrg),
-                    testUtils.resetCollection('promotions', testPromotion),
+                    testUtils.resetCollection('promotions', testPromotions),
                     testUtils.resetPGTable('fct.billing_transactions')
                 ]).then(function() { done(); }, done.fail);
             });
@@ -549,7 +554,7 @@ describe('cwrxStream', function() {
                     return testUtils.mongoFind('orgs', { id: 'o-e2e-1' });
                 }).then(function(orgs) {
                     expect(orgs[0].promotions).toEqual([
-                        { id: 'pro-e2e-1', date: jasmine.anything() }
+                        { id: 'pro-valid', date: jasmine.anything() }
                     ]);
                 
                     return testUtils.pgQuery(
@@ -569,12 +574,36 @@ describe('cwrxStream', function() {
                         units           : 1,
                         campaign_id     : null,
                         braintree_id    : null,
-                        promotion_id    : 'pro-e2e-1',
+                        promotion_id    : 'pro-valid',
                         description     : JSON.stringify({eventType: 'credit', source: 'promotion'})
                     }));
                     done();
                 }).catch(done.fail);
             });
+            
+            it('should not apply the promotional credit if the promotion is invalid', function(done) {
+                Q.all(['pro-inactive', 'pro-loyalty', 'faaaaaaake'].map(function(promId) {
+                    var newUser = JSON.parse(JSON.stringify(mockUser));
+                    newUser.promotion = promId;
+                    
+                    return producer.produce({ type: 'accountActivated', data: { user: newUser } });
+                }))
+                .then(Q.delay(5000))
+                .then(function() {
+                    return testUtils.mongoFind('orgs', { id: 'o-e2e-1' });
+                }).then(function(orgs) {
+                    expect(orgs[0].promotions).toEqual([]);
+                
+                    return testUtils.pgQuery(
+                        'SELECT * FROM fct.billing_transactions WHERE org_id = $1',
+                        ['o-e2e-1']
+                    );
+                }).then(function(results) {
+                    expect(results.rows.length).toBe(0);
+                    done();
+                }).catch(done.fail);
+            });
+            
             /* jshint camelcase: true */
         });
     });
