@@ -6,7 +6,7 @@ IVY_FILENAME="ivy-2.4.0.jar"
 mkdir -p ./jars
 if [ ! -f ./jars/$IVY_FILENAME ]; then
   echo 'Downloading ivy...'
-  wget -O ./jars/$IVY_FILENAME $IVY_URL
+  curl $IVY_URL --output ./jars/$IVY_FILENAME --location
 fi
 echo 'Downloading dependencies...'
 java -jar ./jars/$IVY_FILENAME \
