@@ -11,6 +11,8 @@ var nodemailer = require('nodemailer');
 var path = require('path');
 var proxyquire = require('proxyquire').noCallThru();
 var requestUtils = require('cwrx/lib/requestUtils.js');
+var uuid = require('rc-uuid');
+var resolveURL = require('url').resolve;
 
 describe('campaign_email.js', function() {
     var emailFactory;
@@ -237,6 +239,99 @@ describe('campaign_email.js', function() {
             });
         });
 
+        describe('when there is an org in the data', function() {
+            var success, failure;
+            var getUsersDeferred;
+
+            beforeEach(function(done) {
+                config = {
+                    appCreds: {
+                        key: 'watchman-dev',
+                        secret: 'dwei9fhj3489ghr7834909r'
+                    },
+                    cwrx: {
+                        api: {
+                            root: 'http://33.33.33.10/',
+                            users: {
+                                endpoint: '/api/account/users'
+                            }
+                        }
+                    }
+                };
+                data = {
+                    org: {
+                        id: 'o-' + uuid.createUuid()
+                    }
+                };
+                options = {};
+
+                success = jasmine.createSpy('success()');
+                failure = jasmine.createSpy('failure()');
+
+                requestUtils.makeSignedRequest.and.returnValue((getUsersDeferred = Q.defer()).promise);
+                requestUtils.makeSignedRequest.calls.reset();
+
+                emailFactory.__private__.getRecipient(data, options, config).then(success, failure);
+                process.nextTick(done);
+            });
+
+            it('should make a request for the org\'s users', function() {
+                expect(requestUtils.makeSignedRequest).toHaveBeenCalledWith(config.appCreds, 'get', {
+                    url: resolveURL(config.cwrx.api.root, config.cwrx.api.users.endpoint),
+                    qs: { org: data.org.id, fields: 'email', sort: 'created,1' }
+                });
+            });
+
+            describe('if the request fails', function() {
+                var reason;
+
+                beforeEach(function(done) {
+                    reason = new Error('Something bad happened.');
+                    getUsersDeferred.reject(reason);
+
+                    process.nextTick(done);
+                });
+
+                it('should reject the Promise', function() {
+                    expect(failure).toHaveBeenCalledWith(reason);
+                });
+            });
+
+            describe('if the request succeeds', function() {
+                var result, body, response;
+
+                describe('with a failing status code', function() {
+                    beforeEach(function(done) {
+                        body = 'INTERNAL ERROR';
+                        response = { statusCode: 500 };
+                        result = { response: response, body: body };
+
+                        getUsersDeferred.fulfill(result);
+                        process.nextTick(done);
+                    });
+
+                    it('should reject the Promise', function() {
+                        expect(failure).toHaveBeenCalledWith(new Error('Failed to get users for org ' + data.org.id + ': ' + body));
+                    });
+                });
+
+                describe('with a 200', function() {
+                    beforeEach(function(done) {
+                        body = [{ id: 'u-' + uuid.createUuid(), email: 'some.shmuck@reelcontent.com' }];
+                        response = { statusCode: 200 };
+                        result = { response: response, body: body };
+
+                        getUsersDeferred.fulfill(result);
+                        process.nextTick(done);
+                    });
+
+                    it('should fulfill with the first user\'s email', function() {
+                        expect(success).toHaveBeenCalledWith(body[0].email);
+                    });
+                });
+            });
+        });
+
         describe('when there is no way to get a recipient', function() {
             it('should reject with an error', function(done) {
                 emailFactory.__private__.getRecipient(data, options, config)
@@ -281,6 +376,10 @@ describe('campaign_email.js', function() {
         it('should get the subject for campaignUpdateRejected emails', function() {
             expect(getSubject('campaignUpdateRejected')).toBe(
                 'Your Campaign Change Request Has Been Rejected');
+        });
+
+        it('should get the subject for chargePaymentPlanFailure emails', function() {
+            expect(getSubject('chargePaymentPlanFailure')).toBe('We Hit a Snag');
         });
 
         describe('getting the subject of newUpdateRequest emails', function() {
@@ -725,6 +824,34 @@ describe('campaign_email.js', function() {
                     }).catch(done.fail);
                 });
             });
+        });
+
+        it('should be able to compile a "chargePaymentPlanFailure" email', function(done) {
+            data = {
+                org: {
+                    id: 'o-' + uuid.createUuid()
+                },
+                paymentPlan: {
+                    price: 49.99
+                },
+                paymentMethod: {
+                    type: 'creditCard',
+                    cardType: 'MasterCard',
+                    last4: '6738',
+                    email: 'a.user@gmail.com'
+                }
+            };
+            getHtml('chargePaymentPlanFailure', data, emailConfig).then(function() {
+                expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith('chargePaymentPlanFailure.html');
+                expect(handlebars.compile).toHaveBeenCalledWith('template');
+                expect(compileSpy).toHaveBeenCalledWith({
+                    contact: emailConfig.supportAddress,
+                    amount: '$' + data.paymentPlan.price.toString(),
+                    cardType: data.paymentMethod.cardType,
+                    cardLast4: data.paymentMethod.last4,
+                    paypalEmail: data.paymentMethod.email
+                });
+            }).then(done, done.fail);
         });
 
         describe('if the type is "accountWasActivated"', function() {

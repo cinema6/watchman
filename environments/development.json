@@ -47,6 +47,12 @@
                             },
                             "users": {
                                 "endpoint": "/api/account/users"
+                            },
+                            "orgs": {
+                                "endpoint": "/api/account/orgs"
+                            },
+                            "payments": {
+                                "endpoint": "/api/payments/"
                             }
                         }
                     },
@@ -83,6 +89,26 @@
                             "portal": "http://localhost:9000/#/password/reset",
                             "selfie": "http://localhost:9000/#/pass/reset?selfie=true"
                         }
+                    },
+                    "paymentPlans": {
+                        "pp-0Ek5Na02vCohpPgw": {
+                            "price": 49.99
+                        },
+                        "pp-0Ek2xF0332Eh3-FY": {
+                            "price": 39.99
+                        },
+                        "pp-0Ek2zH0332VnSBqZ": {
+                            "price": 29.99
+                        },
+                        "pp-0Ek2HA0334w6CXbl": {
+                            "price": 19.99
+                        },
+                        "pp-0Ek2Ik0334Dio8u_": {
+                            "price": 9.99
+                        },
+                        "pp-0EkadV034j3RVWIw": {
+                            "price": 2499
+                        }
                     }
                 }
             },
@@ -110,6 +136,16 @@
                                     }
                                 }
                             ]
+                        },
+                        "daily": {
+                            "actions": [
+                                {
+                                    "name": "fetch_orgs",
+                                    "options": {
+                                        "prefix": "daily"
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -126,6 +162,9 @@
                         }
                     },
                     "eventHandlers": {
+                        "daily_orgPulse": {
+                            "actions": ["check_payment_required"]
+                        },
                         "hourly_campaignPulse": {
                             "actions": ["check_expiry"]
                         },
@@ -145,6 +184,26 @@
                                     "name": "set_status",
                                     "options": {
                                         "status": "outOfBudget"
+                                    }
+                                }
+                            ]
+                        },
+                        "paymentRequired": {
+                            "actions": [
+                                {
+                                    "name": "charge_payment_plan",
+                                    "options": {
+                                        "target": "bob"
+                                    }
+                                }
+                            ]
+                        },
+                        "chargePaymentPlanFailure": {
+                            "actions": [
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "chargePaymentPlanFailure"
                                     }
                                 }
                             ]

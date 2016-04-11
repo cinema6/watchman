@@ -33,7 +33,7 @@ describe('TimeEventProcessor.js', function() {
             var expected = [
                 { name: 'tick', data: null },
                 { name: 'other', data: null },
-                { name: 'foo', data: null },
+                { name: 'foo', data: 'data' },
                 null
             ];
             input.forEach(function(message, index) {

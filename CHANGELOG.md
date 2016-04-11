@@ -3,6 +3,12 @@
 * *[v0.2.0-rc1]*
   * [FEATURE]: Added functionality to campaign_email action to send receipt emails for `paymentMade` event
   * [DEV]: Refactor the action API
+  * [FEATURE]: Add logic to bill orgs with payment plans every month
+  * **Extra Deployment Steps**:
+    * Update environments to include new configuration
+    * Update the watchman app's privileges to include the ability to
+      * Read all orgs
+      * makePaymentForAny
 
 ## v0.1.0 (April 4, 2016)
 * *[v0.1.0-rc1]*
