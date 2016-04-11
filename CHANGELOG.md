@@ -1,5 +1,6 @@
 # Watchman
 
+## v0.2.0 (April 11, 2016)
 * *[v0.2.0-rc1]*
   * [FEATURE]: Added functionality to campaign_email action to send receipt emails for `paymentMade` event
   * [FEATURE]: Add `create_promotion_credit` and `check_signup_promotion` actions
@@ -10,6 +11,7 @@
     * Update the watchman app's privileges to include the ability to
       * Read all orgs
       * makePaymentForAny
+* *[/v0.2.0-rc1]*
 
 ## v0.1.0 (April 4, 2016)
 * *[v0.1.0-rc1]*
