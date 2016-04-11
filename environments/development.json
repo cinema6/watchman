@@ -53,6 +53,12 @@
                             },
                             "payments": {
                                 "endpoint": "/api/payments/"
+                            },
+                            "promotions": {
+                                "endpoint": "/api/promotions"
+                            },
+                            "transactions": {
+                                "endpoint": "/api/transactions"
                             }
                         }
                     },
@@ -207,6 +213,13 @@
                                     }
                                 }
                             ]
+                        },
+                        "promotionFulfilled": {
+                            "actions": [
+                                {
+                                    "name": "create_promotion_credit"
+                                }
+                            ]
                         }
                     }
                 }
@@ -324,6 +337,9 @@
                                     "options": {
                                         "type": "accountWasActivated"
                                     }
+                                },
+                                {
+                                    "name": "check_signup_promotion"
                                 }
                             ]
                         },

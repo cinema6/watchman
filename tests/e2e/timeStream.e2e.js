@@ -155,9 +155,12 @@ describe('timeStream', function() {
             status: 'active',
             secret: APP_CREDS.secret,
             permissions: {
-                campaigns: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
-                cards: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
-                users: { read: 'all', create: 'all', edit: 'all', delete: 'all' }
+                campaigns: { read: 'all', edit: 'all' },
+                cards: { read: 'all', edit: 'all' },
+                users: { read: 'all' },
+                orgs: { read: 'all', edit: 'all' },
+                promotions: { read: 'all' },
+                transactions: { create: 'all' }
             },
             entitlements: {
                 'directEditCampaigns': true
@@ -166,6 +169,11 @@ describe('timeStream', function() {
                 'campaigns': {
                     'status': {
                         '__allowed': true
+                    }
+                },
+                orgs: {
+                    promotions: {
+                        __allowed: true
                     }
                 }
             }
