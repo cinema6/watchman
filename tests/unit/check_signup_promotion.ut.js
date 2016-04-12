@@ -8,9 +8,20 @@ var requestUtils    = require('cwrx/lib/requestUtils');
 var Status          = require('cwrx/lib/enums').Status;
 var actionFactory   = require('../../src/actions/check_signup_promotion.js');
 
+var FAKE_NOW = new Date('2016-02-10T17:25:38.555Z');
+
 describe('check_signup_promotion.js', function() {
     var mockOptions, mockConfig, mockLog, mockProducer, event, mockOrg, mockPromotion,
         resps, checkSignupProm;
+
+    beforeEach(function() {
+        jasmine.clock().install();
+        jasmine.clock().mockDate(FAKE_NOW);
+    });
+    
+    afterEach(function() {
+        jasmine.clock().uninstall();
+    });
 
     beforeEach(function() {
         mockOptions = { };
@@ -58,9 +69,12 @@ describe('check_signup_promotion.js', function() {
         mockOrg = {
             id: 'o-1',
             name: 'test org',
-            promotions: [
-                { id: 'pro-1', date: new Date('2016-04-07T19:39:43.671Z') }
-            ]
+            promotions: [{
+                id: 'pro-1',
+                status: Status.Active,
+                created: new Date('2016-04-07T19:39:43.671Z'),
+                lastUpdated: new Date('2016-04-12T21:47:31.554Z')
+            }]
         };
         mockPromotion = {
             id: 'pro-signup-1',
@@ -104,6 +118,21 @@ describe('check_signup_promotion.js', function() {
     });
 
     it('should update the org and produce a promotionFulfilled event', function(done) {
+        var expectedArr = [
+            {
+                id: 'pro-1',
+                status: Status.Active,
+                created: new Date('2016-04-07T19:39:43.671Z'),
+                lastUpdated: new Date('2016-04-12T21:47:31.554Z')
+            },
+            {
+                id: 'pro-signup-1',
+                status: Status.Active,
+                created: FAKE_NOW,
+                lastUpdated: FAKE_NOW
+            }
+        ];
+
         checkSignupProm(event).then(function() {
             expect(rcKinesis.JsonProducer)
                 .toHaveBeenCalledWith('UTStream', mockConfig.kinesis.producer);
@@ -116,27 +145,13 @@ describe('check_signup_promotion.js', function() {
             });
             expect(requestUtils.makeSignedRequest).toHaveBeenCalledWith('i am watchman', 'put', {
                 url: 'http://test.com/api/account/orgs/o-1',
-                json: {
-                    id: 'o-1',
-                    name: 'test org',
-                    promotions: [
-                        { id: 'pro-1', date: new Date('2016-04-07T19:39:43.671Z') },
-                        { id: 'pro-signup-1', date: jasmine.any(Date) }
-                    ]
-                }
+                json: { id: 'o-1', name: 'test org', promotions: expectedArr }
             });
             expect(mockProducer.produce).toHaveBeenCalledWith({
                 type: 'promotionFulfilled',
                 data: {
                     promotion: mockPromotion,
-                    org: {
-                        id: 'o-1',
-                        name: 'test org',
-                        promotions: [
-                            { id: 'pro-1', date: new Date('2016-04-07T19:39:43.671Z') },
-                            { id: 'pro-signup-1', date: jasmine.any(Date) }
-                        ]
-                    }
+                    org: { id: 'o-1', name: 'test org', promotions: expectedArr }
                 }
             });
             expect(mockLog.warn).not.toHaveBeenCalled();
@@ -146,21 +161,24 @@ describe('check_signup_promotion.js', function() {
     });
     
     it('should initialize the promotions array if not defined on the org', function(done) {
+        var expectedArr = [{
+            id: 'pro-signup-1',
+            status: Status.Active,
+            created: FAKE_NOW,
+            lastUpdated: FAKE_NOW
+        }];
+
         delete mockOrg.promotions;
         checkSignupProm(event).then(function() {
             expect(requestUtils.makeSignedRequest).toHaveBeenCalledWith('i am watchman', 'put', {
                 url: 'http://test.com/api/account/orgs/o-1',
-                json: jasmine.objectContaining({
-                    promotions: [{ id: 'pro-signup-1', date: jasmine.any(Date) }]
-                })
+                json: jasmine.objectContaining({ promotions: expectedArr })
             });
             expect(mockProducer.produce).toHaveBeenCalledWith({
                 type: 'promotionFulfilled',
                 data: {
                     promotion: mockPromotion,
-                    org: jasmine.objectContaining({
-                        promotions: [{ id: 'pro-signup-1', date: jasmine.any(Date) }]
-                    })
+                    org: jasmine.objectContaining({ promotions: expectedArr })
                 }
             });
             expect(mockLog.warn).not.toHaveBeenCalled();

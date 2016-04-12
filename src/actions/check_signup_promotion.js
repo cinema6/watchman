@@ -61,7 +61,13 @@ module.exports = function(config) {
             }
             
             // Add the new promotion to the org's promotions array and PUT the org
-            org.promotions.push({ id: promotion.id, date: new Date() });
+            var now = new Date();
+            org.promotions.push({
+                id: promotion.id,
+                created: now,
+                lastUpdated: now,
+                status: Status.Active
+            });
             
             return requestUtils.makeSignedRequest(appCreds, 'put', {
                 url: orgUrl + '/' + org.id,
