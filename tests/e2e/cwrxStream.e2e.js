@@ -553,9 +553,12 @@ describe('cwrxStream', function() {
                 }).then(function() {
                     return testUtils.mongoFind('orgs', { id: 'o-e2e-1' });
                 }).then(function(orgs) {
-                    expect(orgs[0].promotions).toEqual([
-                        { id: 'pro-valid', date: jasmine.anything() }
-                    ]);
+                    expect(orgs[0].promotions).toEqual([{
+                        id: 'pro-valid',
+                        created: jasmine.any(Date),
+                        lastUpdated: orgs[0].promotions[0].created,
+                        status: 'active'
+                    }]);
                 
                     return testUtils.pgQuery(
                         'SELECT * FROM fct.billing_transactions WHERE org_id = $1',
