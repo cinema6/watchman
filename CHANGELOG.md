@@ -1,7 +1,9 @@
 # Watchman
 
+## v0.2.1 (April 13, 2016)
 * *[v0.2.1-rc1]*
   * Set `created`, `lastUpdated`, and `status` on `promotions` entries in `check_signup_promotion` action
+* *[/v0.2.1-rc1]*
 
 ## v0.2.0 (April 11, 2016)
 * *[v0.2.0-rc1]*
