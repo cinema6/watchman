@@ -2,6 +2,7 @@
 
 var ActionsReporter = require('../../lib/ActionsReporter.js');
 var Q = require('q');
+var ld = require('lodash');
 var logger = require('cwrx/lib/logger.js');
 var util = require('util');
 
@@ -66,7 +67,7 @@ EventProcessor.prototype = {
             for(var i=0;i<dataKeys.length;i++) {
                 var key = dataKeys[i];
                 var regex = new RegExp(ifData[key]);
-                var dataProp = event.data[key];
+                var dataProp = ld.get(event.data, key, null);
                 if(!dataProp || !regex.test(dataProp)) {
                     return false;
                 }

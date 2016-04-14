@@ -180,7 +180,10 @@ describe('EventProcessor.js', function() {
                 eventProcessor.handleEvent({
                     name: 'tick',
                     data: {
-                        foo: 'foo@bar 123'
+                        foo: 'foo@bar 123',
+                        baz: {
+                            value: 777
+                        }
                     }
                 }, {
                     actions: [
@@ -193,7 +196,8 @@ describe('EventProcessor.js', function() {
                         {
                             name: 'bad_action',
                             ifData: {
-                                foo: '^foo@.* \\d{3}$'
+                                foo: '^foo@.* \\d{3}$',
+                                'baz.value': 777
                             }
                         }
                     ]
