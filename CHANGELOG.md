@@ -1,5 +1,12 @@
 # Watchman
 
+* *[v0.3.0-rc1]*
+  * Allow conditionally performing actions based on nested properties in an event's data
+  * Make logging CloudWatch reporting for actions more manageable
+  * [FEATURE]: Added the ability to configure a log action in response to events
+  * [FEATURE]: Added the ability to check_available_funds for campaigns
+  * [DEV]: Download dependencies using curl instead of wget
+
 ## v0.2.1 (April 13, 2016)
 * *[v0.2.1-rc1]*
   * Set `created`, `lastUpdated`, and `status` on `promotions` entries in `check_signup_promotion` action
