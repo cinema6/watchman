@@ -9,12 +9,12 @@ var APP_CREDS = JSON.parse(process.env.appCreds);
 var AWS_CREDS = JSON.parse(process.env.awsCreds);
 var TIME_STREAM = process.env.timeStream;
 var WAIT_TIME = 1000;
+var WATCHMAN_STREAM = process.env.watchmanStream;
 
 describe('timeStream', function() {
-    var producer;
+    var producer, mockman;
 
     beforeAll(function(done) {
-        jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000;
         var awsConfig = {
             region: 'us-east-1',
         };
@@ -23,6 +23,18 @@ describe('timeStream', function() {
             awsConfig.secretAccessKey = AWS_CREDS.secretAccessKey;
         }
         producer = new JsonProducer(TIME_STREAM, awsConfig);
+        mockman = new testUtils.Mockman({
+            streamName: WATCHMAN_STREAM
+        });
+        mockman.start().then(done, done.fail);
+    });
+
+    afterAll(function() {
+        mockman.stop();
+    });
+
+    beforeEach(function(done) {
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000;
         var mockCards = [
             {
                 id: 'e2e-rc-1',
@@ -104,7 +116,7 @@ describe('timeStream', function() {
                 name: 'camp 5',
                 status: 'active',
                 user: 'e2e-user',
-                org: 'o-selfie',
+                org: 'o-reelcontent',
                 advertiserId: 'advertiser',
                 cards: [ { id: 'e2e-rc-2' } ],
                 pricing: {
@@ -117,7 +129,7 @@ describe('timeStream', function() {
                 name: 'camp 6',
                 status: 'paused',
                 user: 'e2e-user',
-                org: 'o-selfie',
+                org: 'o-reelcontent',
                 advertiserId: 'advertiser',
                 cards: [ { id: 'e2e-rc-2' } ],
                 pricing: {
@@ -130,9 +142,22 @@ describe('timeStream', function() {
                 name: 'camp 7',
                 status: 'outOfBudget',
                 user: 'e2e-user',
-                org: 'o-selfie',
+                org: 'o-reelcontent',
                 advertiserId: 'advertiser',
                 cards: [ { id: 'e2e-rc-1' } ],
+                pricing: {
+                    budget: 300
+                }
+            },
+            // Active, not reached end data, not reached total budget
+            {
+                id: 'e2e-cam-8',
+                name: 'camp 8',
+                status: 'active',
+                user: 'e2e-user',
+                org: 'o-new',
+                advertiserId: 'advertiser',
+                cards: [ { id: 'e2e-rc-2' } ],
                 pricing: {
                     budget: 300
                 }
@@ -147,6 +172,23 @@ describe('timeStream', function() {
                 password : '$2a$10$XomlyDak6mGSgrC/g1L7FO.4kMRkj4UturtKSzy6mFeL8QWOBmIWq',
                 org: 'e2e-org',
                 permissions: {}
+            }
+        ];
+        var mockOrgs = [
+            {
+                id: 'o-selfie',
+                name: 'Selfie Org',
+                status: 'active'
+            },
+            {
+                id: 'o-reelcontent',
+                name: 'Reelcontent Org',
+                status: 'active'
+            },
+            {
+                id: 'o-new',
+                name: 'Brand New Org',
+                status: 'active'
             }
         ];
         var mockApp = {
@@ -179,42 +221,65 @@ describe('timeStream', function() {
             }
         };
 
-        var today = ((new Date()).toISOString()).substr(0, 10);
-        var pgdataBillingTransactions = [
-            'INSERT INTO fct.billing_transactions (rec_ts,transaction_ts,transaction_id,',
-            '   org_id,campaign_id,sign,units,amount) VALUES',
-            '(now(),\'' + today + ' 00:00:00+00\',\'t-1\',\'o1\',\'e2e-cam-1\',-1,0,0),',
-            '(now(),\'' + today + ' 00:00:00+00\',\'t-1\',\'o1\',\'e2e-cam-2\',-1,100,100),',
-            '(now(),\'' + today + ' 00:00:00+00\',\'t-1\',\'o1\',\'e2e-cam-3\',-1,200,200),',
-            '(now(),\'' + today + ' 00:00:00+00\',\'t-1\',\'o1\',\'e2e-cam-4\',-1,300,300),',
-            '(now(),\'' + today + ' 00:00:00+00\',\'t-1\',\'o1\',\'e2e-cam-5\',-1,400,400),',
-            '(now(),\'' + today + ' 01:00:00+00\',\'t-2\',\'o1\',\'e2e-cam-6\',-1,500,500),',
-            '(now(),\'' + today + ' 00:00:00+00\',\'t-3\',\'o2\',\'e2e-cam-7\',-1,600,600);'
-        ];
+        var transCounter = 9999;
+
+        function creditRecord(org, amount, braintreeId, promotion) {
+            var recKey = transCounter++,
+                id = 't-e2e-' + String(recKey),
+                desc = '';
+
+            braintreeId = braintreeId || '';
+            promotion = promotion || '';
+
+            return '(' + recKey + ',\'2016-03-21T15:53:11.927Z\',\'' + id + '\',\'2016-03-21T15:53:11.927Z\',\'' +
+                   org + '\',' + amount + ',1,1,\'\',\'' + braintreeId + '\',\'' + promotion + '\',\'' + desc + '\')';
+        }
+
+        function debitRecord(org, amount, units, campaign) {
+            var recKey = transCounter++,
+                id = 't-e2e-' + String(recKey),
+                desc = '';
+
+            units = units || 1;
+            campaign = campaign || '';
+
+            return '(' + recKey + ',\'2016-03-21T15:53:11.927Z\',\'' + id + '\',\'2016-03-21T15:53:11.927Z\',\'' +
+                   org + '\',' + amount + ',-1,' + units + ',\'' + campaign + '\',\'\',\'\',\'' + desc + '\')';
+        }
 
         function pgTruncate() {
             return testUtils.pgQuery('TRUNCATE TABLE fct.billing_transactions');
         }
 
-        function pgInsert() {
-            return testUtils.pgQuery(pgdataBillingTransactions.join(' '));
-        }
+        var testTransactions = [
+            debitRecord('o-selfie', 100, 100, 'e2e-cam-2'),
+            debitRecord('o-selfie', 200, 200, 'e2e-cam-3'),
+            debitRecord('o-selfie', 300, 300, 'e2e-cam-4'),
+            creditRecord('o-reelcontent', 5000, 'pay-1'),
+            debitRecord('o-reelcontent', 400, 400, 'e2e-cam-5'),
+            debitRecord('o-reelcontent', 500, 500, 'e2e-cam-6'),
+            debitRecord('o-reelcontent', 600, 600, 'e2e-cam-7')
+        ];
 
         pgTruncate().then(function() {
             return Q.all([
-                pgInsert(),
+                testUtils.resetPGTable('fct.billing_transactions', testTransactions),
                 testUtils.resetCollection('cards', mockCards),
                 testUtils.resetCollection('campaigns', mockCampaigns),
                 testUtils.resetCollection('users', mockUsers),
+                testUtils.resetCollection('orgs', mockOrgs),
                 testUtils.mongoUpsert('applications', { key: 'watchman-app' }, mockApp)
             ]);
         }).then(done, done.fail);
     });
 
     afterAll(function(done) {
-        testUtils.closeDbs().then(done).catch(function(error) {
-            done.fail(error);
-        });
+        mockman.stop();
+        testUtils.closeDbs().then(done, done.fail);
+    });
+
+    afterEach(function() {
+        mockman.removeAllListeners();
     });
 
     function waitForTrue(promise) {
@@ -229,9 +294,22 @@ describe('timeStream', function() {
         });
     }
 
+    function waitForMockman(eventType, n) {
+        var records = [];
+        return Q.Promise(function(resolve) {
+            mockman.on(eventType, function(record) {
+                records.push(record);
+                if(records.length === n) {
+                    mockman.removeAllListeners();
+                    resolve(records);
+                }
+            });
+        });
+    }
+
     describe('the time event prompting campaigns to be fetched', function() {
-        beforeAll(function(done) {
-            producer.produce({ type: 'hourly' }).then(done, done.fail);
+        beforeEach(function(done) {
+            producer.produce({ type: 'hourly', data: { date: new Date() } }).then(done, done.fail);
         });
 
         describe('when an active, paused, or outOfBudget campaign has reached its end date',
@@ -246,7 +324,8 @@ describe('timeStream', function() {
                     });
                 }
 
-                return waitForStatus().then(function() {
+                var promises = [ waitForStatus(), waitForMockman('campaignOutOfFunds', 3) ];
+                Q.all(promises).then(function() {
                     var ids = ['e2e-cam-1', 'e2e-cam-2', 'e2e-cam-3', 'e2e-cam-4', 'e2e-cam-7'];
                     return testUtils.mongoFind('campaigns', { id: { $in: ids } }, { id: 1 });
                 }).then(function(campaigns) {
@@ -271,7 +350,8 @@ describe('timeStream', function() {
                     });
                 }
 
-                return waitForStatus().then(function() {
+                var promises = [ waitForStatus(), waitForMockman('campaignOutOfFunds', 3) ];
+                Q.all(promises).then(function() {
                     var ids = ['e2e-cam-3', 'e2e-cam-4', 'e2e-cam-5', 'e2e-cam-6'];
                     return testUtils.mongoFind('campaigns', { id: { $in: ids } }, { id: 1 });
                 }).then(function(campaigns) {
@@ -281,6 +361,19 @@ describe('timeStream', function() {
                     expect(campaigns[3].status).toBe('outOfBudget');
                     done();
                 }).catch(done.fail);
+            });
+        });
+
+        describe('when an org has a non positive balance', function() {
+            it('should produce a campaignOutOfFunds event for each active campaign in the org', function(done) {
+                waitForMockman('campaignOutOfFunds', 3).then(function(records) {
+                    var campaignIds = records.map(function(record) {
+                        return record.data.campaign.id;
+                    });
+                    ['e2e-cam-1', 'e2e-cam-3', 'e2e-cam-8'].forEach(function(id) {
+                        expect(campaignIds).toContain(id);
+                    });
+                }).then(done, done.fail);
             });
         });
     });

@@ -24,7 +24,7 @@ describe('CwrxEntities(endpoint, appCreds)', function() {
                 secret: 'dwieydh8349hrd8374hr483uery8fh347'
             };
 
-            entities = new CwrxEntities(endpoint, appCreds);
+            entities = new CwrxEntities(endpoint, appCreds, { foo: 'bar' });
         });
 
         it('should be a ReadableStream in object mode', function() {
@@ -37,6 +37,7 @@ describe('CwrxEntities(endpoint, appCreds)', function() {
         it('should create a CwrxRequest()', function() {
             expect(entities.__private__.request).toEqual(jasmine.any(CwrxRequest));
             expect(entities.__private__.request.creds).toEqual(appCreds);
+            expect(entities.__private__.query).toEqual({ foo: 'bar' });
         });
 
         describe('methods:', function() {
@@ -110,7 +111,8 @@ describe('CwrxEntities(endpoint, appCreds)', function() {
                         qs: {
                             limit: size,
                             skip: 0,
-                            sort: 'created,1'
+                            sort: 'created,1',
+                            foo: 'bar'
                         }
                     });
                 });
@@ -153,7 +155,8 @@ describe('CwrxEntities(endpoint, appCreds)', function() {
                                 qs: {
                                     limit: size,
                                     skip: 50,
-                                    sort: 'created,1'
+                                    sort: 'created,1',
+                                    foo: 'bar'
                                 }
                             });
                         });

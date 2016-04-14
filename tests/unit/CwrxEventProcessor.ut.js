@@ -1,12 +1,14 @@
 'use strict';
 
-var EventProcessor = require('../../src/event_processors/EventProcessor.js');
+var ActionsReporter = require('../../lib/ActionsReporter.js');
 var CwrxEventProcessor = require('../../src/event_processors/CwrxEventProcessor.js');
+var EventProcessor = require('../../src/event_processors/EventProcessor.js');
 
 describe('CwrxEventProcessor.js', function() {
     var cwrxEventProcessor;
 
     beforeEach(function() {
+        spyOn(ActionsReporter.prototype, 'autoflush');
         spyOn(EventProcessor.prototype, 'loadActions');
         cwrxEventProcessor = new CwrxEventProcessor('config');
     });
