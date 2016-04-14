@@ -1,11 +1,12 @@
 'use strict';
 
-var CloudWatchReporter = require('cwrx/lib/cloudWatchReporter.js');
-var EventProcessor = require('../../src/event_processors/EventProcessor.js');
+var EventProcessor;
 var Q = require('q');
 var logger = require('cwrx/lib/logger.js');
+var proxyquire = require('proxyquire').noCallThru();
 
 describe('EventProcessor.js', function() {
+    var MockActionsReporter;
     var eventProcessor;
     var mockLog;
     var mockGoodAction;
@@ -20,6 +21,15 @@ describe('EventProcessor.js', function() {
         };
         mockGoodAction = jasmine.createSpy('mockGoodAction()').and.returnValue(Q.resolve());
         mockBadAction = jasmine.createSpy('mockBadAction()').and.returnValue(Q.reject());
+        MockActionsReporter = jasmine.createSpy('MockActionsReporter()');
+        MockActionsReporter.prototype = {
+            autoflush: jasmine.createSpy('autoflush()'),
+            pushMetricForAction: jasmine.createSpy('pushMetricForAction()'),
+            updateReportingActions: jasmine.createSpy('updateReportingActions()')
+        };
+        EventProcessor = proxyquire('../../src/event_processors/EventProcessor.js', {
+            '../../lib/ActionsReporter.js': MockActionsReporter
+        });
         spyOn(EventProcessor.prototype, 'loadActions');
         eventProcessor = new EventProcessor('time', 'config');
         spyOn(eventProcessor, 'getActionPath').and.callFake(function(actionName) {
@@ -28,10 +38,6 @@ describe('EventProcessor.js', function() {
         spyOn(eventProcessor, 'handleEvent').and.callThrough();
         spyOn(eventProcessor, 'recordToEvent').and.callThrough();
         spyOn(logger, 'getLog').and.returnValue(mockLog);
-        spyOn(CloudWatchReporter.prototype, 'autoflush');
-        spyOn(CloudWatchReporter.prototype, 'flush');
-        spyOn(CloudWatchReporter.prototype, 'on');
-        spyOn(CloudWatchReporter.prototype, 'removeAllListeners');
     });
 
     describe('the constructor', function() {
@@ -39,7 +45,6 @@ describe('EventProcessor.js', function() {
             expect(eventProcessor.config).toBe('config');
             expect(eventProcessor.name).toBe('time');
             expect(eventProcessor.actions).toEqual({ });
-            expect(eventProcessor.cloudWatchReporters).toEqual({ });
         });
 
         it('should throw an error if not provided with a name', function() {
@@ -64,6 +69,11 @@ describe('EventProcessor.js', function() {
 
         it('should load the required actions', function() {
             expect(eventProcessor.loadActions).toHaveBeenCalledWith();
+        });
+
+        it('should initialize the actions reporter', function() {
+            expect(eventProcessor.reporter).toEqual(jasmine.any(MockActionsReporter));
+            expect(eventProcessor.reporter.autoflush).toHaveBeenCalledWith(true);
         });
     });
 
@@ -238,7 +248,7 @@ describe('EventProcessor.js', function() {
                 ]
             }).then(function() {
                 expect(mockGoodAction).toHaveBeenCalledWith({ data: 'data', options: 'options' });
-                expect(mockBadAction).toHaveBeenCalledWith({ data: 'data', options: null });
+                expect(mockBadAction).toHaveBeenCalledWith({ data: 'data', options: { } });
                 done();
             }).catch(done.fail);
         });
@@ -258,20 +268,10 @@ describe('EventProcessor.js', function() {
             }).catch(done.fail);
         });
 
-        it('should push metrics to cloudWatch for actions that succeed', function(done) {
-            var pushGoodAction = jasmine.createSpy('pushGoodAction()');
-            var pushBadAction = jasmine.createSpy('pushBadAction()');
+        it('should push metrics to the actions reporter for actions that succeed', function(done) {
             eventProcessor.actions = {
                 'good_action': mockGoodAction,
                 'bad_action': mockBadAction
-            };
-            eventProcessor.cloudWatchReporters = {
-                'good_action': {
-                    push: pushGoodAction
-                },
-                'bad_action': {
-                    push: pushBadAction
-                }
             };
             eventProcessor.handleEvent({
                 name: 'tick',
@@ -285,8 +285,8 @@ describe('EventProcessor.js', function() {
                     'bad_action'
                 ]
             }).then(function() {
-                expect(pushGoodAction).toHaveBeenCalledWith(jasmine.any(Number));
-                expect(pushBadAction).not.toHaveBeenCalled();
+                expect(eventProcessor.reporter.pushMetricForAction).toHaveBeenCalledWith('good_action', jasmine.any(Number));
+                expect(eventProcessor.reporter.pushMetricForAction.calls.count()).toBe(1);
                 done();
             }).catch(done.fail);
         });
@@ -308,17 +308,19 @@ describe('EventProcessor.js', function() {
             eventProcessor.config = {
                 eventHandlers: {
                     tick: {
-                        actions: ['action3', 'action4']
+                        actions: ['action3', {
+                            name: 'action4',
+                            options: {
+                                reporting: false
+                            }
+                        }]
                     }
                 },
                 cloudWatch: {
                     namespace: 'namespace',
                     region: 'region',
                     dimensions: 'dimensions',
-                    sendInterval: 1000,
-                    action3: {
-                        sendInterval: 2000
-                    }
+                    sendInterval: 1000
                 }
             };
             eventProcessor.loadActions();
@@ -333,9 +335,6 @@ describe('EventProcessor.js', function() {
             Object.keys(eventProcessor.actions).forEach(function(action) {
                 loadedActions[action] = eventProcessor.actions[action];
             });
-            Object.keys(eventProcessor.cloudWatchReporters).forEach(function(action) {
-                loadedReporters[action] = eventProcessor.cloudWatchReporters[action];
-            });
         });
 
         it('should call the factory function for each action', function() {
@@ -348,31 +347,8 @@ describe('EventProcessor.js', function() {
             expect(eventProcessor.actions.action4).toContain('my name is mock action four');
         });
 
-        it('should be able to load all enabled cloudWatch reporters', function() {
-            expect(eventProcessor.cloudWatchReporters.action3).toEqual(
-                jasmine.any(CloudWatchReporter));
-            expect(eventProcessor.cloudWatchReporters.action3.namespace).toBe('namespace');
-            expect(eventProcessor.cloudWatchReporters.action3.metricData).toEqual({
-                MetricName: 'action3-Time',
-                Unit: 'Milliseconds',
-                Dimensions: 'dimensions'
-            });
-            expect(eventProcessor.cloudWatchReporters.action3.on).toHaveBeenCalledWith('flush',
-                jasmine.any(Function));
-            expect(eventProcessor.cloudWatchReporters.action3.autoflush)
-                .toHaveBeenCalledWith(2000);
-            expect(eventProcessor.cloudWatchReporters.action4).toEqual(
-                jasmine.any(CloudWatchReporter));
-            expect(eventProcessor.cloudWatchReporters.action4.namespace).toBe('namespace');
-            expect(eventProcessor.cloudWatchReporters.action4.metricData).toEqual({
-                MetricName: 'action4-Time',
-                Unit: 'Milliseconds',
-                Dimensions: 'dimensions'
-            });
-            expect(eventProcessor.cloudWatchReporters.action4.on).toHaveBeenCalledWith('flush',
-                jasmine.any(Function));
-            expect(eventProcessor.cloudWatchReporters.action4.autoflush)
-                .toHaveBeenCalledWith(1000);
+        it('should update the actions for the actions reporter', function() {
+            expect(eventProcessor.reporter.updateReportingActions).toHaveBeenCalledWith(['action3']);
         });
 
         describe('reloading actions at some point in the future', function() {
@@ -412,64 +388,6 @@ describe('EventProcessor.js', function() {
 
             it('should remove unused actions', function() {
                 expect(eventProcessor.actions.action4).not.toBeDefined();
-            });
-        });
-
-        describe('reloading cloudWatch reporters at some point in the future', function() {
-            beforeEach(function() {
-                eventProcessor.config.eventHandlers = {
-                    tick: {
-                        actions: ['action1', 'action2']
-                    },
-                    foo: {
-                        actions: [{ name: 'action3' }, { name: 'action4' }]
-                    }
-                };
-                eventProcessor.config.cloudWatch.action4 = {
-                    enabled: false
-                };
-                CloudWatchReporter.prototype.autoflush.calls.reset();
-                CloudWatchReporter.prototype.flush.calls.reset();
-                eventProcessor.loadActions();
-            });
-
-            it('should create a reporter for newly added actions', function() {
-                expect(eventProcessor.cloudWatchReporters.action1).toEqual(
-                    jasmine.any(CloudWatchReporter));
-                expect(eventProcessor.cloudWatchReporters.action1.namespace).toBe('namespace');
-                expect(eventProcessor.cloudWatchReporters.action1.metricData).toEqual({
-                    MetricName: 'action1-Time',
-                    Unit: 'Milliseconds',
-                    Dimensions: 'dimensions'
-                });
-                expect(eventProcessor.cloudWatchReporters.action1.on).toHaveBeenCalledWith('flush',
-                    jasmine.any(Function));
-                expect(eventProcessor.cloudWatchReporters.action1.autoflush)
-                    .toHaveBeenCalledWith(1000);
-                expect(eventProcessor.cloudWatchReporters.action2).toEqual(
-                    jasmine.any(CloudWatchReporter));
-                expect(eventProcessor.cloudWatchReporters.action2.namespace).toBe('namespace');
-                expect(eventProcessor.cloudWatchReporters.action2.metricData).toEqual({
-                    MetricName: 'action2-Time',
-                    Unit: 'Milliseconds',
-                    Dimensions: 'dimensions'
-                });
-                expect(eventProcessor.cloudWatchReporters.action2.on).toHaveBeenCalledWith('flush',
-                    jasmine.any(Function));
-                expect(eventProcessor.cloudWatchReporters.action2.autoflush)
-                    .toHaveBeenCalledWith(1000);
-            });
-
-            it('should update existing reporters', function() {
-                expect(eventProcessor.cloudWatchReporters.action3.autoflush)
-                    .toHaveBeenCalledWith(2000);
-            });
-
-            it('should remove unused reporters', function() {
-                expect(loadedReporters.action4.autoflush).toHaveBeenCalledWith(0);
-                expect(loadedReporters.action4.flush).toHaveBeenCalled();
-                expect(loadedReporters.action4.removeAllListeners).toHaveBeenCalled();
-                expect(eventProcessor.cloudWatchReporters.action4).not.toBeDefined();
             });
         });
     });
