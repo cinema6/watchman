@@ -71,8 +71,10 @@
                                         <h2 style="color:#282f33;font-size:18px;font-weight:bold;margin-bottom:7px;margin-top:30px;text-align:left!important" align="left">Payment Details</h2>
                                         {{#if isCreditCard}}
                                             <p style="line-height:1.5;margin:0 0 17px;">Payment Method: Credit Card<br>Cardholder Name: {{method.cardholderName}}<br>Card Type: {{method.cardType}}<br>Last 4 Digits: {{method.last4}}</p>
+                                            <p style="line-height:1.5;margin:24px 0 17px;text-align:left!important;" align="left">Note: this payment will appear on your credit card statement as coming from "Cinema6, Inc.", which is our parent company.</p>
                                         {{else}}
                                             <p style="line-height:1.5;margin:0 0 17px;">Payment Method: PayPal<br>Email: {{method.email}}</p>
+                                            <p style="line-height:1.5;margin:24px 0 17px;text-align:left!important;" align="left">Note: this payment will appear on your PayPal statement as coming from "Cinema6, Inc.", which is our parent company.</p>
                                         {{/if}}
                                     </td>
                                 </tr>

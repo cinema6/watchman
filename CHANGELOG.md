@@ -1,5 +1,10 @@
 # Watchman
 
+## v0.3.1 (April 18, 2016)
+* *[v0.3.1-rc1]*
+  * Update payment receipt email template
+* *[/v0.3.1-rc1]*
+
 ## v0.3.0 (April 18, 2016)
 * *[v0.3.0-rc1]*
   * Allow conditionally performing actions based on nested properties in an event's data
