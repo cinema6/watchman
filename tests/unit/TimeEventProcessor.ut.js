@@ -1,5 +1,6 @@
 'use strict';
 
+var ActionsReporter = require('../../lib/ActionsReporter.js');
 var EventProcessor = require('../../src/event_processors/EventProcessor.js');
 var TimeEventProcessor = require('../../src/event_processors/TimeEventProcessor.js');
 
@@ -7,6 +8,7 @@ describe('TimeEventProcessor.js', function() {
     var timeEventProcessor;
 
     beforeEach(function() {
+        spyOn(ActionsReporter.prototype, 'autoflush');
         spyOn(EventProcessor.prototype, 'loadActions');
         timeEventProcessor = new TimeEventProcessor('config');
     });

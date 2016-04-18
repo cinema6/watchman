@@ -2,7 +2,6 @@
 
 var KclApp;
 var fs = require('fs');
-var logger = require('cwrx/lib/logger.js');
 var proxyquire = require('proxyquire').noCallThru();
 
 describe('KclApp.js', function() {
@@ -13,6 +12,7 @@ describe('KclApp.js', function() {
     var mockEventProcessor;
     var mockRecordProcessor;
     var mockLog;
+    var logger;
 
     beforeEach(function() {
         config = {
@@ -78,11 +78,16 @@ describe('KclApp.js', function() {
             error: jasmine.createSpy('error()'),
             refresh: jasmine.createSpy('refresh()')
         };
+        logger = {
+            createLog: jasmine.createSpy('createLog()').and.returnValue(mockLog),
+            getLog: jasmine.createSpy('getLog()').and.returnValue(mockLog)
+        };
         KclApp = proxyquire('../../src/KclApp.js', {
             'aws-kcl': mockKcl,
             './event_processors/ValidProcessor.js': mockEventProcessor,
             './record_processors/RecordProcessor.js': mockRecordProcessor,
-            '/valid-file-secrets': 'so secret'
+            '/valid-file-secrets': 'so secret',
+            'cwrx/lib/logger.js': logger
         });
         app = new KclApp();
         spyOn(fs, 'statSync').and.callFake(function(path) {
@@ -104,7 +109,6 @@ describe('KclApp.js', function() {
         spyOn(app, 'parseCmdLine');
         spyOn(app, 'checkConfig');
         spyOn(app, 'loadConfig');
-        spyOn(logger, 'createLog').and.returnValue(mockLog);
         spyOn(process, 'on');
         spyOn(process, 'exit');
         spyOn(process, 'kill');

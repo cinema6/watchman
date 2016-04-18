@@ -50,7 +50,7 @@ describe('cwrxStream', function() {
             rejectionReason: 'your campaign is bad'
         };
     });
-    
+
     // Setup watchman app
     beforeEach(function(done) {
         var mockApp = {
@@ -82,7 +82,7 @@ describe('cwrxStream', function() {
                 }
             }
         };
-        
+
         return testUtils.mongoUpsert('applications', { key: mockApp.key }, mockApp).done(done);
     });
 
@@ -460,7 +460,7 @@ describe('cwrxStream', function() {
         }).catch(done.fail);
     });
 
-    
+
     describe('when an account was activated', function() {
         it('should send an email notifying the user that their account has been activated',
                 function(done) {
@@ -505,7 +505,7 @@ describe('cwrxStream', function() {
                 });
             }).catch(done.fail);
         });
-        
+
         describe('with a promotion', function() {
             /* jshint camelcase: false */
             var testOrg, testPromotions;
@@ -523,14 +523,14 @@ describe('cwrxStream', function() {
                     { id: 'pro-inactive', status: 'inactive', type: 'signupReward', data: { rewardAmount: 50 } },
                     { id: 'pro-loyalty', status: 'active', type: 'loyaltyReward', data: { rewardAmount: 50 } }
                 ];
-                
+
                 return Q.all([
                     testUtils.resetCollection('orgs', testOrg),
                     testUtils.resetCollection('promotions', testPromotions),
                     testUtils.resetPGTable('fct.billing_transactions')
                 ]).then(function() { done(); }, done.fail);
             });
-            
+
             it('should apply the promotional credit to the org\'s account balance', function(done) {
                 function waitForTransaction() {
                     return waitForTrue(function() {
@@ -559,7 +559,6 @@ describe('cwrxStream', function() {
                         lastUpdated: orgs[0].promotions[0].created,
                         status: 'active'
                     }]);
-                
                     return testUtils.pgQuery(
                         'SELECT * FROM fct.billing_transactions WHERE org_id = $1',
                         ['o-e2e-1']
@@ -583,12 +582,12 @@ describe('cwrxStream', function() {
                     done();
                 }).catch(done.fail);
             });
-            
+
             it('should not apply the promotional credit if the promotion is invalid', function(done) {
                 Q.all(['pro-inactive', 'pro-loyalty', 'faaaaaaake'].map(function(promId) {
                     var newUser = JSON.parse(JSON.stringify(mockUser));
                     newUser.promotion = promId;
-                    
+
                     return producer.produce({ type: 'accountActivated', data: { user: newUser } });
                 }))
                 .then(Q.delay(5000))
@@ -596,7 +595,7 @@ describe('cwrxStream', function() {
                     return testUtils.mongoFind('orgs', { id: 'o-e2e-1' });
                 }).then(function(orgs) {
                     expect(orgs[0].promotions).toEqual([]);
-                
+
                     return testUtils.pgQuery(
                         'SELECT * FROM fct.billing_transactions WHERE org_id = $1',
                         ['o-e2e-1']
@@ -606,7 +605,7 @@ describe('cwrxStream', function() {
                     done();
                 }).catch(done.fail);
             });
-            
+
             /* jshint camelcase: true */
         });
     });

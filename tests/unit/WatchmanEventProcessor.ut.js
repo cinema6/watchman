@@ -1,5 +1,6 @@
 'use strict';
 
+var ActionsReporter = require('../../lib/ActionsReporter.js');
 var EventProcessor = require('../../src/event_processors/EventProcessor.js');
 var WatchmanEventProcessor = require('../../src/event_processors/WatchmanEventProcessor.js');
 
@@ -7,6 +8,7 @@ describe('WatchmanEventProcessor.js', function() {
     var watchmanEventProcessor;
 
     beforeEach(function() {
+        spyOn(ActionsReporter.prototype, 'autoflush');
         spyOn(EventProcessor.prototype, 'loadActions');
         watchmanEventProcessor = new WatchmanEventProcessor('config');
     });

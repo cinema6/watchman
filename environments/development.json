@@ -59,6 +59,9 @@
                             },
                             "transactions": {
                                 "endpoint": "/api/transactions"
+                            },
+                            "accounting": {
+                                "endpoint": "/api/accounting"
                             }
                         }
                     },
@@ -140,6 +143,12 @@
                                         "analytics": true,
                                         "number": 50
                                     }
+                                },
+                                {
+                                    "name": "fetch_orgs",
+                                    "options": {
+                                        "prefix": "hourly"
+                                    }
                                 }
                             ]
                         },
@@ -173,6 +182,20 @@
                         },
                         "hourly_campaignPulse": {
                             "actions": ["check_expiry"]
+                        },
+                        "hourly_orgPulse": {
+                            "actions": ["check_available_funds"]
+                        },
+                        "campaignOutOfFunds": {
+                            "actions": [
+                                {
+                                    "name": "message/log",
+                                    "options": {
+                                        "text": "[activity] Campaign {{campaign.name}} ({{campaign.id}}) is out of funds",
+                                        "level": "warn"
+                                    }
+                                }
+                            ]
                         },
                         "campaignExpired": {
                             "actions": [
