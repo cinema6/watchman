@@ -57,6 +57,9 @@ module.exports = function(grunt) {
                     return getStackOutputs(cloudStack).then(function(outputs) {
                         outputs.forEach(function(output) {
                             switch(output.OutputKey) {
+                            case 'apiServer':
+                                apiRoot = 'http://' + output.OutputValue;
+                                break;
                             case 'mongo':
                                 mongoHost = output.OutputValue;
                                 break;
