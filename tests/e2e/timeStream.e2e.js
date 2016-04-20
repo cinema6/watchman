@@ -34,7 +34,7 @@ describe('timeStream', function() {
     });
 
     beforeEach(function(done) {
-        jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000;
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 60000;
         var mockCards = [
             {
                 id: 'e2e-rc-1',
