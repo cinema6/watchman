@@ -63,7 +63,11 @@ describe('KclApp.js', function() {
             },
             paymentPlans: {
                 'pp-0Ek5Na02vCohpPgw': 49.99
-            }
+            },
+            promotions: [
+                { type: 'signupReward', fulfillImmediately: true },
+                { type: 'freeTrial', fulfillImmediately: false }
+            ]
         };
         runSpy = jasmine.createSpy('run()');
         mockKcl = jasmine.createSpy('kcl').and.returnValue({
@@ -491,6 +495,18 @@ describe('KclApp.js', function() {
             it('should return an error message if not an object', function() {
                 config.paymentPlans = 'foo';
                 expect(app.checkConfig(config, 0)).toBe('paymentPlans: Not a object');
+            });
+        });
+
+        describe('promotions', function() {
+            it('should return an error mesage if missing', function() {
+                delete config.promotions;
+                expect(app.checkConfig(config, 0)).toBe('promotions: Missing value');
+            });
+
+            it('should return an error message if not an object', function() {
+                config.promotions = 'foo';
+                expect(app.checkConfig(config, 0)).toBe('promotions: Not a object');
             });
         });
     });

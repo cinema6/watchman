@@ -118,7 +118,17 @@
                         "pp-0EkadV034j3RVWIw": {
                             "price": 2499
                         }
-                    }
+                    },
+                    "promotions": [
+                        {
+                            "type": "signupReward",
+                            "fulfillImmediately": true
+                        },
+                        {
+                            "type": "freeTrial",
+                            "fulfillImmediately": false
+                        }
+                    ]
                 }
             },
             "devTimeStreamApplication": {

@@ -181,7 +181,8 @@ KclApp.prototype = {
                 passwordResetPages: 'object',
                 forgotTargets: 'object'
             },
-            paymentPlans: 'object'
+            paymentPlans: 'object',
+            promotions: 'object'
         };
         return validate(config, schema);
     },
