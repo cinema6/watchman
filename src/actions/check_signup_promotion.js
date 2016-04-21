@@ -2,6 +2,7 @@
 
 var q               = require('q'),
     util            = require('util'),
+    ld              = require('lodash'),
     rcKinesis       = require('rc-kinesis'),
     logger          = require('cwrx/lib/logger.js'),
     Status          = require('cwrx/lib/enums.js').Status,
@@ -14,6 +15,7 @@ module.exports = function(config) {
         var log = logger.getLog();
         var appCreds = config.appCreds;
         var producerConfig = config.kinesis.producer;
+        var promotionsConfig = config.promotions;
         var watchmanProducer = new rcKinesis.JsonProducer(producerConfig.stream, producerConfig);
         var user = event.data.user;
         
@@ -41,9 +43,10 @@ module.exports = function(config) {
                          user.promotion, promResp.response.statusCode, promResp.body);
                 return q();
             }
-            var org = orgResp.body, promotion = promResp.body;
+            var org = orgResp.body, promotion = promResp.body,
+                promotionConfig = ld.find(promotionsConfig, { type: promotion.type });
 
-            if (promotion.type !== 'signupReward' || promotion.status !== Status.Active) {
+            if (!promotionConfig || promotion.status !== Status.Active) {
                 log.warn('User %1 has invalid promotion %2, skipping', user.id, promotion.id);
                 return q();
             }
@@ -51,9 +54,9 @@ module.exports = function(config) {
             org.promotions = org.promotions || [];
 
             // Warn and exit if org already has this same promotion
-            var existing = org.promotions.filter(function(promWrapper) {
+            var existing = org.promotions.some(function(promWrapper) {
                 return promWrapper.id === promotion.id;
-            })[0];
+            });
             if (!!existing) {
                 log.warn('Org %1 already has signup promotion %2, not re-applying',
                          org.id, promotion.id);
@@ -84,15 +87,17 @@ module.exports = function(config) {
                 
                 log.info('Applied signup promotion %1 from user %2 to org %3',
                          promotion.id, user.id, org.id);
-                
-                // Produce promotionFulfilled event so credit can be created
-                return watchmanProducer.produce({
-                    type: 'promotionFulfilled',
-                    data: {
-                        org: org,
-                        promotion: promotion
-                    }
-                });
+
+                if (promotionConfig.fulfillImmediately) {
+                    // Produce promotionFulfilled event so credit can be created
+                    return watchmanProducer.produce({
+                        type: 'promotionFulfilled',
+                        data: {
+                            org: org,
+                            promotion: promotion
+                        }
+                    });
+                }
             });
         })
         .catch(function(error) {
