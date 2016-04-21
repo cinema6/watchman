@@ -92,6 +92,30 @@ describe('create_promotion_credit.js', function() {
             done();
         }).catch(done.fail);
     });
+
+    it('should create a credit transaction for a freeTrial', function(done) {
+        event.data.promotion = {
+            id: 'pro-1',
+            type: 'freeTrial',
+            data: {
+                trialLength: 15
+            }
+        };
+        event.data.paymentPlan = { price: 49.51 };
+
+        createCredit(event).then(function() {
+            expect(requestUtils.makeSignedRequest).toHaveBeenCalledWith('i am watchman', 'post', {
+                url: 'http://test.com/api/transactions',
+                json: {
+                    amount: 24.76,
+                    org: 'o-1',
+                    promotion: 'pro-1'
+                }
+            });
+            expect(mockLog.warn).not.toHaveBeenCalled();
+            expect(mockLog.error).not.toHaveBeenCalled();
+        }).then(done, done.fail);
+    });
     
     it('should warn and skip if the promotion type is unrecognized', function(done) {
         event.data.promotion.type = 'freeee money';
