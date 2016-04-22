@@ -292,6 +292,16 @@
                                 }
                             ]
                         },
+                        "campaignCreated": {
+                            "actions": [
+                                {
+                                    "name": "activate_payment_plan",
+                                    "ifData": {
+                                        "campaign.application": "^bob$"
+                                    }
+                                }
+                            ]
+                        },
                         "campaignApproved": {
                             "actions": [
                                 {
