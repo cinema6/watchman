@@ -10,6 +10,12 @@ var actionFactory   = require('../../src/actions/check_signup_promotion.js');
 
 var FAKE_NOW = new Date('2016-02-10T17:25:38.555Z');
 
+function series(fns) {
+    return fns.reduce(function(promise, fn) {
+        return promise.then(fn);
+    }, q());
+}
+
 describe('check_signup_promotion.js', function() {
     var mockOptions, mockConfig, mockLog, mockProducer, event, mockOrg, mockPromotion,
         resps, checkSignupProm;
@@ -42,7 +48,11 @@ describe('check_signup_promotion.js', function() {
                 producer: {
                     stream: 'UTStream'
                 }
-            }
+            },
+            promotions: [
+                { type: 'signupReward', fulfillImmediately: true },
+                { type: 'freeTrial', fulfillImmediately: false }
+            ]
         };
         event = { data: { user: {
             id: 'u-1',
@@ -222,6 +232,33 @@ describe('check_signup_promotion.js', function() {
             expect(mockLog.error).not.toHaveBeenCalled();
             done();
         }).catch(done.fail);
+    });
+
+    it('should not skip if the promotion type is recognized', function(done) {
+        series(mockConfig.promotions.map(function(promotionConfig) {
+            return function() {
+                mockPromotion.status = Status.Active;
+                delete mockOrg.promotions;
+                requestUtils.makeSignedRequest.calls.reset();
+                mockPromotion.type = promotionConfig.type;
+
+                return checkSignupProm(event).then(function() {
+                    expect(requestUtils.makeSignedRequest).toHaveBeenCalledWith('i am watchman', 'put', jasmine.any(Object));
+                    expect(requestUtils.makeSignedRequest.calls.count()).toBe(3, 'Not enough request were made for promotion type "' + promotionConfig.type + '"');
+                });
+            };
+        })).then(done, done.fail);
+    });
+
+    it('should not produce a record is fulfillImmediately is false', function(done) {
+        mockPromotion.status = Status.Active;
+        delete mockOrg.promotions;
+        mockPromotion.type = 'freeTrial';
+        mockProducer.produce.calls.reset();
+
+        checkSignupProm(event).then(function() {
+            expect(mockProducer.produce).not.toHaveBeenCalled();
+        }).then(done, done.fail);
     });
     
     it('should warn and skip if fetching the promotion returns a 4xx', function(done) {

@@ -90,7 +90,7 @@ describe('timeStream payment plan billing', function() {
             data: {
                 date: time.format()
             }
-        }).delay(15000);
+        });
     }
 
     function getMail(subject) {
@@ -120,6 +120,15 @@ describe('timeStream payment plan billing', function() {
         }).spread(function(body) { return body; });
     }
 
+    function updatePaymentPlanStart(start) {
+        return request.put({
+            url: api('/api/account/orgs/' + org.id),
+            json: {
+                paymentPlanStart: start&& start.format()
+            }
+        }).spread(function(body) { return body; });
+    }
+
     function createUser() {
         var orgId = createId('o');
         var userId = createId('u');
@@ -129,7 +138,8 @@ describe('timeStream payment plan billing', function() {
             id: orgId,
             status: 'active',
             name: 'The Best Org',
-            paymentPlanId: getPaymentPlanId()
+            paymentPlanId: getPaymentPlanId(),
+            paymentPlanStart: moment().format(),
         }]).then(function makePolicy() {
             return testUtils.resetCollection('policies', [{
                 id: policyId,
@@ -257,7 +267,8 @@ describe('timeStream payment plan billing', function() {
                     org: { __allowed: true }
                 },
                 orgs: {
-                    referralCode: { __allowed: true }
+                    referralCode: { __allowed: true },
+                    paymentPlanId: { __allowed: true }
                 }
             },
             entitlements: {
@@ -280,10 +291,14 @@ describe('timeStream payment plan billing', function() {
                 makePaymentForAny: true
             },
             fieldValidation: {
-                'campaigns': {
-                    'status': {
-                        '__allowed': true
+                campaigns: {
+                    status: {
+                        __allowed: true
                     }
+                },
+                orgs: {
+                    paymentPlanStart: { __allowed: true },
+                    paymentPlanId: { __allowed: true }
                 }
             }
         };
@@ -329,18 +344,80 @@ describe('timeStream payment plan billing', function() {
     });
 
     describe('if no payments have been made', function() {
-        var payment;
+        describe('and the org has no paymentPlanStart', function() {
+            var payments;
 
-        beforeEach(function(done) {
-            dailyEvent(moment().add(3, 'hours')).then(function() {
-                return getMostRecentPayment();
-            }).then(function(/*payment*/) {
-                payment = arguments[0];
-            }).then(done, done.fail);
+            beforeEach(function(done) {
+                updatePaymentPlanStart(null).then(function() {
+                    return dailyEvent(moment().add(3, 'hours'));
+                }).then(function() {
+                    return wait(5000);
+                }).then(function() {
+                    return getPayments();
+                }).then(function(/*payments*/) {
+                    payments = arguments[0];
+                }).then(done, done.fail);
+            });
+
+            it('should not make a payment', function() {
+                expect(payments.length).not.toBeGreaterThan(0, 'A payment was made.');
+            });
         });
 
-        it('should make a payment for the amount of the payment plan', function() {
-            expect(payment.amount).toBe(paymentPlan.price);
+        describe('and the org\'s paymentPlanStart is in the future', function() {
+            var payments;
+
+            beforeEach(function(done) {
+                updatePaymentPlanStart(moment().add(1, 'day')).then(function() {
+                    return dailyEvent(moment().add(3, 'hours'));
+                }).then(function() {
+                    return wait(5000);
+                }).then(function() {
+                    return getPayments();
+                }).then(function(/*payments*/) {
+                    payments = arguments[0];
+                }).then(done, done.fail);
+            });
+
+            it('should not make a payment', function() {
+                expect(payments.length).not.toBeGreaterThan(0, 'A payment was made.');
+            });
+        });
+
+        describe('and the org\'s paymentPlanStart is today', function() {
+            var payment;
+
+            beforeEach(function(done) {
+                updatePaymentPlanStart(moment()).then(function() {
+                    return dailyEvent(moment().add(3, 'hours'));
+                }).then(function() {
+                    return getMostRecentPayment();
+                }).then(function(/*payment*/) {
+                    payment = arguments[0];
+                }).then(done, done.fail);
+            });
+
+            it('should make a payment for the amount of the payment plan', function() {
+                expect(payment.amount).toBe(paymentPlan.price);
+            });
+        });
+
+        describe('and the org\'s paymentPlanStart was in the past', function() {
+            var payment;
+
+            beforeEach(function(done) {
+                updatePaymentPlanStart(moment().subtract(1, 'day')).then(function() {
+                    return dailyEvent(moment().add(3, 'hours'));
+                }).then(function() {
+                    return getMostRecentPayment();
+                }).then(function(/*payment*/) {
+                    payment = arguments[0];
+                }).then(done, done.fail);
+            });
+
+            it('should make a payment for the amount of the payment plan', function() {
+                expect(payment.amount).toBe(paymentPlan.price);
+            });
         });
     });
 
@@ -354,7 +431,7 @@ describe('timeStream payment plan billing', function() {
 
             beforeEach(function(done) {
                 dailyEvent(moment().add(1, 'month').subtract(1, 'day')).then(function() {
-                    return wait(3000);
+                    return wait(5000);
                 }).then(function() {
                     return getPayments();
                 }).then(function(/*payments*/) {

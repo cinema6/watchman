@@ -2,6 +2,7 @@
 
 var q               = require('q'),
     util            = require('util'),
+    ld              = require('lodash'),
     logger          = require('cwrx/lib/logger.js'),
     requestUtils    = require('cwrx/lib/requestUtils.js');
 
@@ -11,6 +12,7 @@ module.exports = function(config) {
         var appCreds = config.appCreds;
         var org = event.data.org;
         var promotion = event.data.promotion;
+        var paymentPlan = event.data.paymentPlan;
         
         if (!org || !promotion) {
             return q();
@@ -21,6 +23,11 @@ module.exports = function(config) {
         switch (promotion.type) {
             case 'signupReward':
                 amount = promotion.data.rewardAmount;
+                break;
+            case 'freeTrial':
+                // Calculate the amount of credit by prorating the monthly price across each day of
+                // the trial (assuming a month is 30 days.)
+                amount = ld.round((promotion.data.trialLength / 30) * paymentPlan.price, 2);
                 break;
             default:
                 log.warn('Dont know how to get amount for promotion type %1 (id %2)',

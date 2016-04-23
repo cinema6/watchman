@@ -1,5 +1,8 @@
 # Watchman
 
+* *[v0.4.0-rc1]*
+  * [FEATURE]: Add support for free trial promotions
+
 ## v0.3.1 (April 18, 2016)
 * *[v0.3.1-rc1]*
   * Update payment receipt email template

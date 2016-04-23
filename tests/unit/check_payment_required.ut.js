@@ -5,7 +5,7 @@ describe('(action factory) check_payment_required', function() {
     var uuid, q, MockObjectStore, resolveURL, moment;
     var factory;
 
-    beforeEach(function() {
+    beforeAll(function() {
         Object.keys(require.cache).forEach(function(dep) {
             delete require.cache[dep];
         });
@@ -105,7 +105,8 @@ describe('(action factory) check_payment_required', function() {
             beforeEach(function() {
                 data = {
                     org: {
-                        id: 'o-' + uuid.createUuid()
+                        id: 'o-' + uuid.createUuid(),
+                        paymentPlanStart: moment().format()
                     },
                     date: new Date(2016, 3, 15).toISOString()
                 };
@@ -118,6 +119,128 @@ describe('(action factory) check_payment_required', function() {
             describe('if the org has no paymentPlanId', function() {
                 beforeEach(function(done) {
                     data.org.paymentPlanId = null;
+
+                    result = checkPaymentRequired(event);
+                    process.nextTick(done);
+                });
+
+                it('should not fetch any payments', function() {
+                    expect(request.get).not.toHaveBeenCalled();
+                });
+
+                it('should return a promise resolved to undefined', function() {
+                    expect(result.inspect().value).toBeUndefined();
+                    expect(result.inspect().state).toBe('fulfilled');
+                });
+            });
+
+            describe('if the org has no paymentPlanStart', function() {
+                beforeEach(function(done) {
+                    delete data.org.paymentPlanStart;
+                    data.org.paymentPlanId = 'pp-0Ek5Na02vCohpPgw';
+
+                    result = checkPaymentRequired(event);
+                    process.nextTick(done);
+                });
+
+                it('should not fetch any payments', function() {
+                    expect(request.get).not.toHaveBeenCalled();
+                });
+
+                it('should return a promise resolved to undefined', function() {
+                    expect(result.inspect().value).toBeUndefined();
+                    expect(result.inspect().state).toBe('fulfilled');
+                });
+            });
+
+            describe('if the paymentPlanStart is today', function() {
+                var paymentMethod;
+
+                beforeEach(function(done) {
+                    data.org.paymentPlanId = 'pp-0Ek5Na02vCohpPgw';
+                    data.org.paymentPlanStart = moment().format();
+
+                    paymentMethod = {
+                        token: 'dq9whudfuier',
+                        default: true
+                    };
+
+                    request.get.and.callFake(function(requestConfig) {
+                        if (requestConfig.url === resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint)) {
+                            return q([[], { statusCode: 200 }]);
+                        } else if (requestConfig.url === resolveURL(resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint), 'methods')) {
+                            return q([[paymentMethod], { statusCode: 200 }]);
+                        }
+                    });
+                    watchmanStream.produce.and.returnValue(q({ type: 'paymentRequired' }));
+
+                    result = checkPaymentRequired(event);
+                    process.nextTick(done);
+                });
+
+                it('should add a record to the watchman stream', function() {
+                    expect(watchmanStream.produce).toHaveBeenCalledWith({
+                        type: 'paymentRequired',
+                        data: {
+                            org: data.org,
+                            paymentPlan: config.paymentPlans[data.org.paymentPlanId],
+                            paymentMethod: paymentMethod
+                        }
+                    });
+                });
+
+                it('should return a promise resolved to undefined', function() {
+                    expect(result.inspect().value).toBeUndefined();
+                    expect(result.inspect().state).toBe('fulfilled');
+                });
+            });
+
+            describe('if the paymentPlanStart is before today', function() {
+                var paymentMethod;
+
+                beforeEach(function(done) {
+                    data.org.paymentPlanId = 'pp-0Ek5Na02vCohpPgw';
+                    data.org.paymentPlanStart = moment().subtract(1, 'day').format();
+
+                    paymentMethod = {
+                        token: 'dq9whudfuier',
+                        default: true
+                    };
+
+                    request.get.and.callFake(function(requestConfig) {
+                        if (requestConfig.url === resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint)) {
+                            return q([[], { statusCode: 200 }]);
+                        } else if (requestConfig.url === resolveURL(resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint), 'methods')) {
+                            return q([[paymentMethod], { statusCode: 200 }]);
+                        }
+                    });
+                    watchmanStream.produce.and.returnValue(q({ type: 'paymentRequired' }));
+
+                    result = checkPaymentRequired(event);
+                    process.nextTick(done);
+                });
+
+                it('should add a record to the watchman stream', function() {
+                    expect(watchmanStream.produce).toHaveBeenCalledWith({
+                        type: 'paymentRequired',
+                        data: {
+                            org: data.org,
+                            paymentPlan: config.paymentPlans[data.org.paymentPlanId],
+                            paymentMethod: paymentMethod
+                        }
+                    });
+                });
+
+                it('should return a promise resolved to undefined', function() {
+                    expect(result.inspect().value).toBeUndefined();
+                    expect(result.inspect().state).toBe('fulfilled');
+                });
+            });
+
+            describe('if the paymentPlanStart is after today', function() {
+                beforeEach(function(done) {
+                    data.org.paymentPlanId = 'pp-0Ek5Na02vCohpPgw';
+                    data.org.paymentPlanStart = moment().add(1, 'day').format();
 
                     result = checkPaymentRequired(event);
                     process.nextTick(done);

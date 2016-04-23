@@ -521,7 +521,8 @@ describe('cwrxStream', function() {
                 testPromotions = [
                     { id: 'pro-valid', status: 'active', type: 'signupReward', data: { rewardAmount: 50 } },
                     { id: 'pro-inactive', status: 'inactive', type: 'signupReward', data: { rewardAmount: 50 } },
-                    { id: 'pro-loyalty', status: 'active', type: 'loyaltyReward', data: { rewardAmount: 50 } }
+                    { id: 'pro-loyalty', status: 'active', type: 'loyaltyReward', data: { rewardAmount: 50 } },
+                    { id: 'pro-trial', status: 'active', type: 'freeTrial', data: { trialLength: 14 } }
                 ];
 
                 return Q.all([
@@ -604,6 +605,32 @@ describe('cwrxStream', function() {
                     expect(results.rows.length).toBe(0);
                     done();
                 }).catch(done.fail);
+            });
+
+            it('should not apply the promotional credit for freeTrials', function(done) {
+                var newUser = JSON.parse(JSON.stringify(mockUser));
+
+                newUser.promotion = 'pro-trial';
+
+                producer.produce({ type: 'accountActivated', data: { user: newUser } }).then(function() {
+                    return Q.delay(5000);
+                }).then(function() {
+                    return testUtils.mongoFind('orgs', { id: 'o-e2e-1' });
+                }).then(function(orgs) {
+                    expect(orgs[0].promotions).toEqual([{
+                        id: 'pro-trial',
+                        created: jasmine.any(Date),
+                        lastUpdated: orgs[0].promotions[0].created,
+                        status: 'active'
+                    }]);
+                }).then(function() {
+                    return testUtils.pgQuery(
+                        'SELECT * FROM fct.billing_transactions WHERE org_id = $1',
+                        ['o-e2e-1']
+                    );
+                }).then(function(results) {
+                    expect(results.rows.length).toBe(0);
+                }).then(done, done.fail);
             });
 
             /* jshint camelcase: true */

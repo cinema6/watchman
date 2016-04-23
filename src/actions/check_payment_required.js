@@ -16,6 +16,7 @@ module.exports = function checkPaymentRequiredFactory(config) {
     return function checkPaymentRequired(event) {
         var data = event.data;
         var org = data.org;
+        var paymentPlanStart = org.paymentPlanStart && moment(org.paymentPlanStart);
 
         function needsPayment(lastPayment) {
             var today = moment(data.date);
@@ -24,7 +25,13 @@ module.exports = function checkPaymentRequiredFactory(config) {
             return !lastPayment || nextPaymentDate.isSameOrBefore(today, 'day');
         }
 
-        if (!(org.paymentPlanId in config.paymentPlans)) { return q(); }
+        if (
+            !(org.paymentPlanId in config.paymentPlans) ||
+            !paymentPlanStart ||
+            paymentPlanStart.isAfter(moment(), 'day')
+        ) {
+            return q();
+        }
 
         return request.get({ url: paymentsEndpoint, qs: { org: org.id } })
             .spread(function checkPayments(payments) {
