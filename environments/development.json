@@ -299,6 +299,16 @@
                                         "previousState": "pending",
                                         "currentState": "active"
                                     }
+                                },
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "campaignSubmitted"
+                                    },
+                                    "ifData": {
+                                        "previousState": "draft",
+                                        "currentState": "pending"
+                                    }
                                 }
                             ]
                         },

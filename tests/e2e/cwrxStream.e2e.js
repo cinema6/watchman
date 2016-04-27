@@ -247,6 +247,33 @@ describe('cwrxStream', function() {
                 });
             });
         });
+
+        describe('when a campaign transitions from draft to pending', function() {
+            beforeEach(function(done) {
+                producer.produce({
+                    type: 'campaignStateChange',
+                    data: {
+                        previousState: 'draft',
+                        currentState: 'pending',
+                        campaign: mockCampaign,
+                        user: mockUser,
+                        date: new Date()
+                    }
+                }).then(done, done.fail);
+            });
+
+            it('should send a campaign submitted email', function(done) {
+                mailman.once('We\'ve Got It! Cooltastic Campaign Has Been Submitted for Approval.', function(msg) {
+                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                    var regex = new RegExp('.*Terry[\\s\\S]*You’ve submitted Cooltastic Campaign - high five!.*');
+                    expect(msg.text).toMatch(regex);
+                    expect(msg.html).toMatch(regex);
+                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    done();
+                });
+            });
+        });
     });
 
     it('should send an email when a campaign update request has been approved', function(done) {

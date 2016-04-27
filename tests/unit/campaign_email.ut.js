@@ -517,6 +517,11 @@ describe('campaign_email.js', function() {
             expect(getSubject('campaignActive', data)).toBe('Amazing Campaign Is Now Live!');
         });
 
+        it('should get the subject for campaignSubmitted emails', function() {
+            var data = { campaign: { name: 'Amazing Campaign' } };
+            expect(getSubject('campaignSubmitted', data)).toBe('We\'ve Got It! Amazing Campaign Has Been Submitted for Approval.');
+        });
+
         it('should return an empty string for an unknown email type', function() {
             expect(getSubject('unknown email type')).toBe('');
         });
@@ -1099,6 +1104,20 @@ describe('campaign_email.js', function() {
                 expect(compileSpy).toHaveBeenCalledWith({
                     campName: 'Amazing Campaign',
                     dashboardLink: 'dashboard link'
+                });
+            }).then(done, done.fail);
+        });
+
+        it('should be able to compile campaignSubmitted emails', function(done) {
+            data.campaign = { id: 'c-123', name: 'Amazing Campaign' };
+            data.user = { firstName: 'Emma' };
+            getHtml('campaignSubmitted', data, emailConfig).then(function() {
+                expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith('campaignSubmitted.html');
+                expect(handlebars.compile).toHaveBeenCalledWith('template');
+                expect(compileSpy).toHaveBeenCalledWith({
+                    firstName: 'Emma',
+                    campaignId: 'c-123',
+                    campName: 'Amazing Campaign'
                 });
             }).then(done, done.fail);
         });

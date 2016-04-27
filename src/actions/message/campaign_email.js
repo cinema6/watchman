@@ -143,6 +143,8 @@ var __private__ = {
             return 'We Hit a Snag';
         case 'campaignActive':
             return campName + ' Is Now Live!';
+        case 'campaignSubmitted':
+            return 'We\'ve Got It! ' + campName + ' Has Been Submitted for Approval.';
         default:
             return '';
         }
@@ -303,6 +305,14 @@ var __private__ = {
             templateData = {
                 campName: data.campaign.name,
                 dashboardLink: emailConfig.dashboardLink
+            };
+            break;
+        case 'campaignSubmitted':
+            template = 'campaignSubmitted.html';
+            templateData = {
+                campName: data.campaign.name,
+                campaignId: data.campaign.id,
+                firstName: data.user.firstName
             };
             break;
         default:
