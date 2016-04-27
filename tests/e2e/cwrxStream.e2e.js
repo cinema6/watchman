@@ -44,7 +44,8 @@ describe('cwrxStream', function() {
         mockUser = {
             company: 'Evil Corp',
             email: 'c6e2etester@gmail.com',
-            id: 'u-123'
+            id: 'u-123',
+            firstName: 'Terry'
         };
         mockUpdateRequest = {
             rejectionReason: 'your campaign is bad'
@@ -219,27 +220,60 @@ describe('cwrxStream', function() {
                 });
             });
         });
-    });
 
-    it('should send an email when a campaign has been approved', function(done) {
-        producer.produce({
-            type: 'campaignApproved',
-            data: {
-                campaign: mockCampaign,
-                user: mockUser
-            }
-        }).then(function() {
-            mailman.once('Reelcontent Campaign Approved', function(msg) {
-                expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
-                expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                var regex = new RegExp(
-                    'Your\\s*campaign.*Cooltastic Campaign.*has\\s*been\\s*approved');
-                expect(msg.text).toMatch(regex);
-                expect(msg.html).toMatch(regex);
-                expect((new Date() - msg.date)).toBeLessThan(30000);
-                done();
+        describe('when a campaign transitions from pending to active', function() {
+            beforeEach(function(done) {
+                producer.produce({
+                    type: 'campaignStateChange',
+                    data: {
+                        previousState: 'pending',
+                        currentState: 'active',
+                        campaign: mockCampaign,
+                        user: mockUser,
+                        date: new Date()
+                    }
+                }).then(done, done.fail);
             });
-        }).catch(done.fail);
+
+            it('should send a campaign active email', function(done) {
+                mailman.once('Cooltastic Campaign Is Now Live!', function(msg) {
+                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                    var regex = new RegExp('.*"Cooltastic Campaign" is live! Sit back and relax\..*');
+                    expect(msg.text).toMatch(regex);
+                    expect(msg.html).toMatch(regex);
+                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    done();
+                });
+            });
+        });
+
+        describe('when a campaign transitions from draft to pending', function() {
+            beforeEach(function(done) {
+                producer.produce({
+                    type: 'campaignStateChange',
+                    data: {
+                        previousState: 'draft',
+                        currentState: 'pending',
+                        campaign: mockCampaign,
+                        user: mockUser,
+                        date: new Date()
+                    }
+                }).then(done, done.fail);
+            });
+
+            it('should send a campaign submitted email', function(done) {
+                mailman.once('We\'ve Got It! Cooltastic Campaign Has Been Submitted for Approval.', function(msg) {
+                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                    var regex = new RegExp('.*Terry[\\s\\S]*You’ve submitted Cooltastic Campaign - high five!.*');
+                    expect(msg.text).toMatch(regex);
+                    expect(msg.html).toMatch(regex);
+                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    done();
+                });
+            });
+        });
     });
 
     it('should send an email when a campaign update request has been approved', function(done) {
@@ -424,7 +458,7 @@ describe('cwrxStream', function() {
                 user: mockUser
             }
         }).then(function() {
-            mailman.once('Welcome to Reelcontent Video Ads!',
+            mailman.once('Terry, Welcome to Reelcontent',
                     function(msg) {
                 expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
                 expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
@@ -446,7 +480,7 @@ describe('cwrxStream', function() {
                 target: 'bob'
             }
         }).then(function() {
-            mailman.once('Welcome to Reelcontent Marketing!',
+            mailman.once('Terry, Welcome to Reelcontent Marketing!',
                     function(msg) {
                 expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
                 expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
@@ -460,7 +494,6 @@ describe('cwrxStream', function() {
         }).catch(done.fail);
     });
 
-
     describe('when an account was activated', function() {
         it('should send an email notifying the user that their account has been activated',
                 function(done) {
@@ -470,7 +503,7 @@ describe('cwrxStream', function() {
                     user: mockUser
                 }
             }).then(function() {
-                mailman.once('Your Account is Now Active',
+                mailman.once('Terry, Your Reelcontent Account Is Ready To Go',
                         function(msg) {
                     expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
@@ -492,7 +525,7 @@ describe('cwrxStream', function() {
                     target: 'bob'
                 }
             }).then(function() {
-                mailman.once('Your Account is Now Active',
+                mailman.once('Terry, Your Reelcontent Account Is Ready To Go',
                         function(msg) {
                     expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
@@ -758,7 +791,7 @@ describe('cwrxStream', function() {
                 user: mockUser
             }
         }).then(function() {
-            mailman.once('Welcome to Reelcontent Video Ads!', function(msg) {
+            mailman.once('Terry, Welcome to Reelcontent', function(msg) {
                 expect(msg.from[0].address).toBe('no-reply@reelcontent.com');
                 expect(msg.to[0].address).toBe('c6e2etester@gmail.com');
                 var regex = /https?:\/\/.+id.+u-123.+token.+secret-token/;

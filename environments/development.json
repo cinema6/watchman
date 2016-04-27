@@ -289,6 +289,26 @@
                                     "ifData": {
                                         "currentState": "outOfBudget"
                                     }
+                                },
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "campaignActive"
+                                    },
+                                    "ifData": {
+                                        "previousState": "pending",
+                                        "currentState": "active"
+                                    }
+                                },
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "campaignSubmitted"
+                                    },
+                                    "ifData": {
+                                        "previousState": "draft",
+                                        "currentState": "pending"
+                                    }
                                 }
                             ]
                         },
@@ -298,16 +318,6 @@
                                     "name": "activate_payment_plan",
                                     "ifData": {
                                         "campaign.application": "^bob$"
-                                    }
-                                }
-                            ]
-                        },
-                        "campaignApproved": {
-                            "actions": [
-                                {
-                                    "name": "message/campaign_email",
-                                    "options": {
-                                        "type": "campaignApproved"
                                     }
                                 }
                             ]

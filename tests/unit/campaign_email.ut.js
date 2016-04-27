@@ -428,12 +428,19 @@ describe('campaign_email.js', function() {
 
             beforeEach(function() {
                 type = 'activateAccount';
-                data = {};
+                data = { user: { firstName: 'Emma' } };
             });
 
             describe('and the data has no target', function() {
                 it('should be a subject for selfie', function() {
-                    expect(getSubject(type, data)).toBe('Welcome to Reelcontent Video Ads!');
+                    expect(getSubject(type, data)).toBe('Emma, Welcome to Reelcontent');
+                });
+
+                it('should be a different subject if the user has no first name', function() {
+                    delete data.user.firstName;
+                    expect(getSubject(type, data)).toBe('Welcome to Reelcontent');
+                    delete data.user;
+                    expect(getSubject(type, data)).toBe('Welcome to Reelcontent');
                 });
             });
 
@@ -443,7 +450,14 @@ describe('campaign_email.js', function() {
                 });
 
                 it('should be a subject for selfie', function() {
-                    expect(getSubject(type, data)).toBe('Welcome to Reelcontent Video Ads!');
+                    expect(getSubject(type, data)).toBe('Emma, Welcome to Reelcontent');
+                });
+
+                it('should be a different subject if the user has no first name', function() {
+                    delete data.user.firstName;
+                    expect(getSubject(type, data)).toBe('Welcome to Reelcontent');
+                    delete data.user;
+                    expect(getSubject(type, data)).toBe('Welcome to Reelcontent');
                 });
             });
 
@@ -453,13 +467,33 @@ describe('campaign_email.js', function() {
                 });
 
                 it('should be a subject for bob', function() {
+                    expect(getSubject(type, data)).toBe('Emma, Welcome to Reelcontent Marketing!');
+                });
+
+                it('should be a different subject if the user has no first name', function() {
+                    delete data.user.firstName;
+                    expect(getSubject(type, data)).toBe('Welcome to Reelcontent Marketing!');
+                    delete data.user;
                     expect(getSubject(type, data)).toBe('Welcome to Reelcontent Marketing!');
                 });
             });
         });
 
-        it('should get the subject for accountWasActivated emails', function() {
-            expect(getSubject('accountWasActivated')).toBe('Your Account is Now Active');
+        describe('the subject for accountWasActivated emails', function() {
+            it('should include the user\'s name if it exists', function() {
+                var data = { user: { firstName: 'Emma' } };
+                expect(getSubject('accountWasActivated', data)).toBe('Emma, Your Reelcontent Account Is Ready To Go');
+            });
+
+            it('should not include a name if one does not exist on the user', function() {
+                var data = { user: { } };
+                expect(getSubject('accountWasActivated', data)).toBe('Your Reelcontent Account Is Ready To Go');
+            });
+
+            it('should not incldue a name if there is no user', function() {
+                var data = { };
+                expect(getSubject('accountWasActivated', data)).toBe('Your Reelcontent Account Is Ready To Go');
+            });
         });
 
         it('should get the subject for passwordChanged emails', function() {
@@ -476,6 +510,16 @@ describe('campaign_email.js', function() {
 
         it('should get the subject for forgotPassword emails', function() {
             expect(getSubject('forgotPassword')).toBe('Forgot Your Password?');
+        });
+
+        it('should get the subject for campaignActive emails', function() {
+            var data = { campaign: { name: 'Amazing Campaign' } };
+            expect(getSubject('campaignActive', data)).toBe('Amazing Campaign Is Now Live!');
+        });
+
+        it('should get the subject for campaignSubmitted emails', function() {
+            var data = { campaign: { name: 'Amazing Campaign' } };
+            expect(getSubject('campaignSubmitted', data)).toBe('We\'ve Got It! Amazing Campaign Has Been Submitted for Approval.');
         });
 
         it('should return an empty string for an unknown email type', function() {
@@ -1050,6 +1094,32 @@ describe('campaign_email.js', function() {
                     done();
                 }).catch(done.fail);
             });
+        });
+
+        it('should be able to compile campaignActive emails', function(done) {
+            data.campaign = { name: 'Amazing Campaign' };
+            getHtml('campaignActive', data, emailConfig).then(function() {
+                expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith('campaignActive.html');
+                expect(handlebars.compile).toHaveBeenCalledWith('template');
+                expect(compileSpy).toHaveBeenCalledWith({
+                    campName: 'Amazing Campaign',
+                    dashboardLink: 'dashboard link'
+                });
+            }).then(done, done.fail);
+        });
+
+        it('should be able to compile campaignSubmitted emails', function(done) {
+            data.campaign = { id: 'c-123', name: 'Amazing Campaign' };
+            data.user = { firstName: 'Emma' };
+            getHtml('campaignSubmitted', data, emailConfig).then(function() {
+                expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith('campaignSubmitted.html');
+                expect(handlebars.compile).toHaveBeenCalledWith('template');
+                expect(compileSpy).toHaveBeenCalledWith({
+                    firstName: 'Emma',
+                    campaignId: 'c-123',
+                    campName: 'Amazing Campaign'
+                });
+            }).then(done, done.fail);
         });
     });
 

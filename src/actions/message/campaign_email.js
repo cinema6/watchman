@@ -95,6 +95,9 @@ var __private__ = {
     * Gets the subject of the email given an email type.
     */
     getSubject: function(type, data) {
+        var campName = data && data.campaign && data.campaign.name;
+        var prefix = (data && data.user && data.user.firstName) ? data.user.firstName + ', ' : '';
+
         switch(type) {
         case 'campaignExpired':
             return 'Your Campaign Has Ended';
@@ -109,7 +112,6 @@ var __private__ = {
         case 'campaignUpdateRejected':
             return 'Your Campaign Change Request Has Been Rejected';
         case 'newUpdateRequest':
-            var campName = data.campaign.name;
             var submitter = null;
             if (data.user) {
                 submitter = data.user.company || (data.user.firstName + ' ' + data.user.lastName);
@@ -122,13 +124,13 @@ var __private__ = {
         case 'activateAccount':
             switch (data.target) {
             case 'bob':
-                return 'Welcome to Reelcontent Marketing!';
+                return prefix + 'Welcome to Reelcontent Marketing!';
             default:
-                return 'Welcome to Reelcontent Video Ads!';
+                return prefix + 'Welcome to Reelcontent';
             }
             return;
         case 'accountWasActivated':
-            return 'Your Account is Now Active';
+            return prefix + 'Your Reelcontent Account Is Ready To Go';
         case 'passwordChanged':
             return 'Reelcontent Password Change Notice';
         case 'emailChanged':
@@ -139,6 +141,10 @@ var __private__ = {
             return 'Forgot Your Password?';
         case 'chargePaymentPlanFailure':
             return 'We Hit a Snag';
+        case 'campaignActive':
+            return campName + ' Is Now Live!';
+        case 'campaignSubmitted':
+            return 'We\'ve Got It! ' + campName + ' Has Been Submitted for Approval.';
         default:
             return '';
         }
@@ -292,6 +298,21 @@ var __private__ = {
                 cardType: data.paymentMethod.cardType,
                 cardLast4: data.paymentMethod.last4,
                 paypalEmail: data.paymentMethod.email
+            };
+            break;
+        case 'campaignActive':
+            template = 'campaignActive.html';
+            templateData = {
+                campName: data.campaign.name,
+                dashboardLink: emailConfig.dashboardLink
+            };
+            break;
+        case 'campaignSubmitted':
+            template = 'campaignSubmitted.html';
+            templateData = {
+                campName: data.campaign.name,
+                campaignId: data.campaign.id,
+                firstName: data.user.firstName
             };
             break;
         default:
