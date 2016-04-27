@@ -128,7 +128,8 @@ var __private__ = {
             }
             return;
         case 'accountWasActivated':
-            return 'Your Account is Now Active';
+            var prefix = (data.user && data.user.firstName) ? data.user.firstName + ', ' : '';
+            return prefix + 'Your Reelcontent Account Is Ready To Go';
         case 'passwordChanged':
             return 'Reelcontent Password Change Notice';
         case 'emailChanged':

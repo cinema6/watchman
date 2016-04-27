@@ -458,8 +458,21 @@ describe('campaign_email.js', function() {
             });
         });
 
-        it('should get the subject for accountWasActivated emails', function() {
-            expect(getSubject('accountWasActivated')).toBe('Your Account is Now Active');
+        describe('the subject for accountWasActivated emails', function() {
+            it('should include the user\'s name if it exists', function() {
+                var data = { user: { firstName: 'Emma' } };
+                expect(getSubject('accountWasActivated', data)).toBe('Emma, Your Reelcontent Account Is Ready To Go');
+            });
+
+            it('should not include a name if one does not exist on the user', function() {
+                var data = { user: { } };
+                expect(getSubject('accountWasActivated', data)).toBe('Your Reelcontent Account Is Ready To Go');
+            });
+
+            it('should not incldue a name if there is no user', function() {
+                var data = { };
+                expect(getSubject('accountWasActivated', data)).toBe('Your Reelcontent Account Is Ready To Go');
+            });
         });
 
         it('should get the subject for passwordChanged emails', function() {

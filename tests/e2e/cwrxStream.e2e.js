@@ -44,7 +44,8 @@ describe('cwrxStream', function() {
         mockUser = {
             company: 'Evil Corp',
             email: 'c6e2etester@gmail.com',
-            id: 'u-123'
+            id: 'u-123',
+            firstName: 'Terry'
         };
         mockUpdateRequest = {
             rejectionReason: 'your campaign is bad'
@@ -470,7 +471,7 @@ describe('cwrxStream', function() {
                     user: mockUser
                 }
             }).then(function() {
-                mailman.once('Your Account is Now Active',
+                mailman.once('Terry, Your Reelcontent Account Is Ready To Go',
                         function(msg) {
                     expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
@@ -492,7 +493,7 @@ describe('cwrxStream', function() {
                     target: 'bob'
                 }
             }).then(function() {
-                mailman.once('Your Account is Now Active',
+                mailman.once('Terry, Your Reelcontent Account Is Ready To Go',
                         function(msg) {
                     expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
