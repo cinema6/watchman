@@ -791,7 +791,7 @@ describe('cwrxStream', function() {
                 user: mockUser
             }
         }).then(function() {
-            mailman.once('Welcome to Reelcontent Video Ads!', function(msg) {
+            mailman.once('Terry, Welcome to Reelcontent', function(msg) {
                 expect(msg.from[0].address).toBe('no-reply@reelcontent.com');
                 expect(msg.to[0].address).toBe('c6e2etester@gmail.com');
                 var regex = /https?:\/\/.+id.+u-123.+token.+secret-token/;
