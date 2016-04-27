@@ -428,12 +428,19 @@ describe('campaign_email.js', function() {
 
             beforeEach(function() {
                 type = 'activateAccount';
-                data = {};
+                data = { user: { firstName: 'Emma' } };
             });
 
             describe('and the data has no target', function() {
                 it('should be a subject for selfie', function() {
-                    expect(getSubject(type, data)).toBe('Welcome to Reelcontent Video Ads!');
+                    expect(getSubject(type, data)).toBe('Emma, Welcome to Reelcontent');
+                });
+
+                it('should be a different subject if the user has no first name', function() {
+                    delete data.user.firstName;
+                    expect(getSubject(type, data)).toBe('Welcome to Reelcontent');
+                    delete data.user;
+                    expect(getSubject(type, data)).toBe('Welcome to Reelcontent');
                 });
             });
 
@@ -443,7 +450,14 @@ describe('campaign_email.js', function() {
                 });
 
                 it('should be a subject for selfie', function() {
-                    expect(getSubject(type, data)).toBe('Welcome to Reelcontent Video Ads!');
+                    expect(getSubject(type, data)).toBe('Emma, Welcome to Reelcontent');
+                });
+
+                it('should be a different subject if the user has no first name', function() {
+                    delete data.user.firstName;
+                    expect(getSubject(type, data)).toBe('Welcome to Reelcontent');
+                    delete data.user;
+                    expect(getSubject(type, data)).toBe('Welcome to Reelcontent');
                 });
             });
 
@@ -453,6 +467,13 @@ describe('campaign_email.js', function() {
                 });
 
                 it('should be a subject for bob', function() {
+                    expect(getSubject(type, data)).toBe('Emma, Welcome to Reelcontent Marketing!');
+                });
+
+                it('should be a different subject if the user has no first name', function() {
+                    delete data.user.firstName;
+                    expect(getSubject(type, data)).toBe('Welcome to Reelcontent Marketing!');
+                    delete data.user;
                     expect(getSubject(type, data)).toBe('Welcome to Reelcontent Marketing!');
                 });
             });

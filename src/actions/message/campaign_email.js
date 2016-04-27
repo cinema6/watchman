@@ -95,6 +95,8 @@ var __private__ = {
     * Gets the subject of the email given an email type.
     */
     getSubject: function(type, data) {
+        var prefix = (data && data.user && data.user.firstName) ? data.user.firstName + ', ' : '';
+
         switch(type) {
         case 'campaignExpired':
             return 'Your Campaign Has Ended';
@@ -122,13 +124,12 @@ var __private__ = {
         case 'activateAccount':
             switch (data.target) {
             case 'bob':
-                return 'Welcome to Reelcontent Marketing!';
+                return prefix + 'Welcome to Reelcontent Marketing!';
             default:
-                return 'Welcome to Reelcontent Video Ads!';
+                return prefix + 'Welcome to Reelcontent';
             }
             return;
         case 'accountWasActivated':
-            var prefix = (data.user && data.user.firstName) ? data.user.firstName + ', ' : '';
             return prefix + 'Your Reelcontent Account Is Ready To Go';
         case 'passwordChanged':
             return 'Reelcontent Password Change Notice';

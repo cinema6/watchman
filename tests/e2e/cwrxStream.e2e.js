@@ -425,7 +425,7 @@ describe('cwrxStream', function() {
                 user: mockUser
             }
         }).then(function() {
-            mailman.once('Welcome to Reelcontent Video Ads!',
+            mailman.once('Terry, Welcome to Reelcontent',
                     function(msg) {
                 expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
                 expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
@@ -447,7 +447,7 @@ describe('cwrxStream', function() {
                 target: 'bob'
             }
         }).then(function() {
-            mailman.once('Welcome to Reelcontent Marketing!',
+            mailman.once('Terry, Welcome to Reelcontent Marketing!',
                     function(msg) {
                 expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
                 expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
