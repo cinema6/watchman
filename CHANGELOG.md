@@ -1,10 +1,12 @@
 # Watchman
 
+## v0.4.0 (April 27, 2016)
 * *[v0.4.0-rc1]*
   * [FEATURE]: Add support for free trial promotions
   * [FEATURE]: Add email template for when Campagin is Active
   * [FEATURE]: Add email template for when Campaign is Submitted  
   * Updated email templates for Welcome/Activate, Account is Active
+* *[/v0.4.0-rc1]*
 
 ## v0.3.1 (April 18, 2016)
 * *[v0.3.1-rc1]*
