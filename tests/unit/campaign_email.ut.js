@@ -512,6 +512,11 @@ describe('campaign_email.js', function() {
             expect(getSubject('forgotPassword')).toBe('Forgot Your Password?');
         });
 
+        it('should get the subject for campaignActive emails', function() {
+            var data = { campaign: { name: 'Amazing Campaign' } };
+            expect(getSubject('campaignActive', data)).toBe('Amazing Campaign Is Now Live!');
+        });
+
         it('should return an empty string for an unknown email type', function() {
             expect(getSubject('unknown email type')).toBe('');
         });
@@ -1084,6 +1089,18 @@ describe('campaign_email.js', function() {
                     done();
                 }).catch(done.fail);
             });
+        });
+
+        it('should be able to compile campaignActive emails', function(done) {
+            data.campaign = { name: 'Amazing Campaign' };
+            getHtml('campaignActive', data, emailConfig).then(function() {
+                expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith('campaignActive.html');
+                expect(handlebars.compile).toHaveBeenCalledWith('template');
+                expect(compileSpy).toHaveBeenCalledWith({
+                    campName: 'Amazing Campaign',
+                    dashboardLink: 'dashboard link'
+                });
+            }).then(done, done.fail);
         });
     });
 

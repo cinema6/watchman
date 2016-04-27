@@ -95,6 +95,7 @@ var __private__ = {
     * Gets the subject of the email given an email type.
     */
     getSubject: function(type, data) {
+        var campName = data && data.campaign && data.campaign.name;
         var prefix = (data && data.user && data.user.firstName) ? data.user.firstName + ', ' : '';
 
         switch(type) {
@@ -111,7 +112,6 @@ var __private__ = {
         case 'campaignUpdateRejected':
             return 'Your Campaign Change Request Has Been Rejected';
         case 'newUpdateRequest':
-            var campName = data.campaign.name;
             var submitter = null;
             if (data.user) {
                 submitter = data.user.company || (data.user.firstName + ' ' + data.user.lastName);
@@ -141,6 +141,8 @@ var __private__ = {
             return 'Forgot Your Password?';
         case 'chargePaymentPlanFailure':
             return 'We Hit a Snag';
+        case 'campaignActive':
+            return campName + ' Is Now Live!';
         default:
             return '';
         }
@@ -294,6 +296,13 @@ var __private__ = {
                 cardType: data.paymentMethod.cardType,
                 cardLast4: data.paymentMethod.last4,
                 paypalEmail: data.paymentMethod.email
+            };
+            break;
+        case 'campaignActive':
+            template = 'campaignActive.html';
+            templateData = {
+                campName: data.campaign.name,
+                dashboardLink: emailConfig.dashboardLink
             };
             break;
         default:
