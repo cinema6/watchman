@@ -308,11 +308,12 @@ var __private__ = {
             };
             break;
         case 'campaignSubmitted':
+            var previewLink = emailConfig.previewLink.replace(':campId', data.campaign.id);
             template = 'campaignSubmitted.html';
             templateData = {
                 campName: data.campaign.name,
-                campaignId: data.campaign.id,
-                firstName: data.user.firstName
+                firstName: data.user.firstName,
+                previewLink: previewLink
             };
             break;
         default:

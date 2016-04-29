@@ -550,7 +550,8 @@ describe('campaign_email.js', function() {
                 forgotTargets: {
                     portal: 'http://localhost:9000/#/password/reset',
                     selfie: 'http://localhost:9000/#/pass/reset?selfie=true'
-                }
+                },
+                previewLink: 'preview link for campaign :campId'
             };
         });
 
@@ -1116,8 +1117,8 @@ describe('campaign_email.js', function() {
                 expect(handlebars.compile).toHaveBeenCalledWith('template');
                 expect(compileSpy).toHaveBeenCalledWith({
                     firstName: 'Emma',
-                    campaignId: 'c-123',
-                    campName: 'Amazing Campaign'
+                    campName: 'Amazing Campaign',
+                    previewLink: 'preview link for campaign c-123'
                 });
             }).then(done, done.fail);
         });

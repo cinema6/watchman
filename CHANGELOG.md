@@ -1,6 +1,10 @@
 # Watchman
 
 ## v0.4.0 (April 27, 2016)
+* *[v0.4.0-rc2]*
+  * [FIX]: Fix for an issue where an email template link was incorrect
+* *[/v0.4.0-rc2]*
+
 * *[v0.4.0-rc1]*
   * [FEATURE]: Add support for free trial promotions
   * [FEATURE]: Add email template for when Campagin is Active
