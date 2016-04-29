@@ -109,6 +109,14 @@ describe('cwrxStream', function() {
         });
     }
 
+    function waitForEmails(subjects) {
+        return Q.all(subjects.map(function(subject) {
+            return Q.Promise(function(resolve) {
+                mailman.once(subject, resolve);
+            });
+        }));
+    }
+
     describe('when a campaignStateChange event occurs', function() {
         describe('when an active campaign expires', function() {
             beforeEach(function(done) {
@@ -247,33 +255,6 @@ describe('cwrxStream', function() {
                 });
             });
         });
-
-        describe('when a campaign transitions from draft to pending', function() {
-            beforeEach(function(done) {
-                producer.produce({
-                    type: 'campaignStateChange',
-                    data: {
-                        previousState: 'draft',
-                        currentState: 'pending',
-                        campaign: mockCampaign,
-                        user: mockUser,
-                        date: new Date()
-                    }
-                }).then(done, done.fail);
-            });
-
-            it('should send a campaign submitted email', function(done) {
-                mailman.once('We\'ve Got It! Cooltastic Campaign Has Been Submitted for Approval.', function(msg) {
-                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
-                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                    var regex = new RegExp('.*Terry[\\s\\S]*You’ve submitted Cooltastic Campaign - high five!.*');
-                    expect(msg.text).toMatch(regex);
-                    expect(msg.html).toMatch(regex);
-                    expect((new Date() - msg.date)).toBeLessThan(30000);
-                    done();
-                });
-            });
-        });
     });
 
     it('should send an email when a campaign update request has been approved', function(done) {
@@ -348,16 +329,26 @@ describe('cwrxStream', function() {
         }).catch(done.fail);
     });
 
-    it('should send an email when there is a new update request', function(done) {
-        producer.produce({
-            type: 'newUpdateRequest',
-            data: {
-                campaign: mockCampaign,
-                user: mockUser
-            }
-        }).then(function() {
-            mailman.once('New update request from Evil Corp for campaign "Cooltastic Campaign"',
-                    function(msg) {
+    describe('when there is a new update request', function() {
+        beforeEach(function(done) {
+            producer.produce({
+                type: 'newUpdateRequest',
+                data: {
+                    campaign: mockCampaign,
+                    user: mockUser,
+                    updateRequest: {
+                        initialSubmit: true
+                    }
+                }
+            }).then(done, done.fail);
+        });
+
+        it('should send an email', function(done) {
+            waitForEmails([
+                'New update request from Evil Corp for campaign "Cooltastic Campaign"',
+                'We\'ve Got It! Cooltastic Campaign Has Been Submitted for Approval.'
+            ]).then(function(messages) {
+                var msg = messages[0];
                 expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
                 expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                 [
@@ -369,9 +360,23 @@ describe('cwrxStream', function() {
                     expect(msg.html).toMatch(regex);
                 });
                 expect((new Date() - msg.date)).toBeLessThan(30000);
-                done();
-            });
-        }).catch(done.fail);
+            }).then(done, done.fail);
+        });
+
+        it('should send a campaign submitted email', function(done) {
+            waitForEmails([
+                'New update request from Evil Corp for campaign "Cooltastic Campaign"',
+                'We\'ve Got It! Cooltastic Campaign Has Been Submitted for Approval.'
+            ]).then(function(messages) {
+                var msg = messages[1];
+                expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                var regex = new RegExp('.*Terry[\\s\\S]*You’ve submitted Cooltastic Campaign - high five!.*');
+                expect(msg.text).toMatch(regex);
+                expect(msg.html).toMatch(regex);
+                expect((new Date() - msg.date)).toBeLessThan(30000);
+            }).then(done, done.fail);
+        });
     });
 
     describe('when handling a paymentMade event', function() {

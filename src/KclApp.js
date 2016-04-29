@@ -179,7 +179,8 @@ KclApp.prototype = {
                 activationTargets: 'object',
                 supportAddress: 'string',
                 passwordResetPages: 'object',
-                forgotTargets: 'object'
+                forgotTargets: 'object',
+                previewLink: 'string'
             },
             paymentPlans: 'object',
             promotions: 'object'

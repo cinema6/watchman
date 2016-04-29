@@ -59,7 +59,8 @@ describe('KclApp.js', function() {
                 activationTargets: { },
                 supportAddress: 'support',
                 passwordResetPages: { },
-                forgotTargets: { }
+                forgotTargets: { },
+                previewLink: 'preview'
             },
             paymentPlans: {
                 'pp-0Ek5Na02vCohpPgw': 49.99

@@ -97,7 +97,8 @@
                         "forgotTargets": {
                             "portal": "http://localhost:9000/#/password/reset",
                             "selfie": "http://localhost:9000/#/pass/reset?selfie=true"
-                        }
+                        },
+                        "previewLink": "https://reelcontent.com/preview/?previewSource=platform&campaign=:campId"
                     },
                     "paymentPlans": {
                         "pp-0Ek5Na02vCohpPgw": {
@@ -299,16 +300,6 @@
                                         "previousState": "pending",
                                         "currentState": "active"
                                     }
-                                },
-                                {
-                                    "name": "message/campaign_email",
-                                    "options": {
-                                        "type": "campaignSubmitted"
-                                    },
-                                    "ifData": {
-                                        "previousState": "draft",
-                                        "currentState": "pending"
-                                    }
                                 }
                             ]
                         },
@@ -359,6 +350,15 @@
                                     "options": {
                                         "toSupport": true,
                                         "type": "newUpdateRequest"
+                                    }
+                                },
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "campaignSubmitted"
+                                    },
+                                    "ifData": {
+                                        "updateRequest.initialSubmit": true
                                     }
                                 }
                             ]
