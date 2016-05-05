@@ -1,5 +1,10 @@
 # Watchman
 
+* *[v0.4.1-rc1]*
+  * [FIX]: Fix for an issue that prevented the expiration of campaigns with a pending update request
+  * **Extra Deployment Steps**:
+    * Update watchman app privileges to allow rejecting update requests
+
 ## v0.4.0 (April 27, 2016)
 * *[v0.4.0-rc2]*
   * [FIX]: Fix for an issue where an email template link was incorrect
