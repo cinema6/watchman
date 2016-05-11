@@ -1,7 +1,9 @@
 # Watchman
 
-* *[v0.4.1-rc1]*
+* *[v0.5.0-rc1]*
   * [FIX]: Fix for an issue that prevented the expiration of campaigns with a pending update request
+  * [FEATURE]: Increase the budget of showcase campaigns when their org
+    gets more funds
   * **Extra Deployment Steps**:
     * Update watchman app privileges to allow rejecting update requests
 

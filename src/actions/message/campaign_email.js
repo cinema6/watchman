@@ -123,7 +123,7 @@ var __private__ = {
             return 'Your payment has been approved';
         case 'activateAccount':
             switch (data.target) {
-            case 'bob':
+            case 'showcase':
                 return prefix + 'Welcome to Reelcontent Marketing!';
             default:
                 return prefix + 'Welcome to Reelcontent';
@@ -232,8 +232,8 @@ var __private__ = {
                 'id=' + data.user.id + '&token=' + data.token;
             template = (function() {
                 switch (data.target) {
-                case 'bob':
-                    return 'activateAccount--bob.html';
+                case 'showcase':
+                    return 'activateAccount--showcase.html';
                 default:
                     return 'activateAccount.html';
                 }
@@ -245,8 +245,8 @@ var __private__ = {
         case 'accountWasActivated':
             template = (function() {
                 switch (data.target) {
-                case 'bob':
-                    return 'accountWasActivated--bob.html';
+                case 'showcase':
+                    return 'accountWasActivated--showcase.html';
                 default:
                     return 'accountWasActivated.html';
                 }

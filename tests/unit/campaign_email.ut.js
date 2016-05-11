@@ -461,12 +461,12 @@ describe('campaign_email.js', function() {
                 });
             });
 
-            describe('and the target is bob', function() {
+            describe('and the target is showcase', function() {
                 beforeEach(function() {
-                    data.target = 'bob';
+                    data.target = 'showcase';
                 });
 
-                it('should be a subject for bob', function() {
+                it('should be a subject for showcase', function() {
                     expect(getSubject(type, data)).toBe('Emma, Welcome to Reelcontent Marketing!');
                 });
 
@@ -796,7 +796,7 @@ describe('campaign_email.js', function() {
             beforeEach(function() {
                 emailConfig.activationTargets = {
                     selfie: 'http://link.com',
-                    bob: 'http://bob-link.com'
+                    showcase: 'http://showcase-link.com'
                 };
                 data.user = {
                     id: 'u-123'
@@ -851,18 +851,18 @@ describe('campaign_email.js', function() {
                 });
             });
 
-            describe('if the target is bob', function() {
+            describe('if the target is showcase', function() {
                 beforeEach(function() {
-                    data.target = 'bob';
+                    data.target = 'showcase';
                 });
 
-                it('should use the bob template and data', function(done) {
+                it('should use the showcase template and data', function(done) {
                     getHtml('activateAccount', data, emailConfig).then(function() {
                         expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
-                            'activateAccount--bob.html');
+                            'activateAccount--showcase.html');
                         expect(handlebars.compile).toHaveBeenCalledWith('template');
                         expect(compileSpy).toHaveBeenCalledWith({
-                            activationLink: 'http://bob-link.com?id=u-123&token=token'
+                            activationLink: 'http://showcase-link.com?id=u-123&token=token'
                         });
                         expect();
                         done();
@@ -906,7 +906,7 @@ describe('campaign_email.js', function() {
                 type = 'accountWasActivated';
                 emailConfig.dashboardLinks = {
                     selfie: 'dashboard link',
-                    bob: 'bob dashboard link'
+                    showcase: 'showcase dashboard link'
                 };
             });
 
@@ -944,18 +944,18 @@ describe('campaign_email.js', function() {
                 });
             });
 
-            describe('with a bob target', function() {
+            describe('with a showcase target', function() {
                 beforeEach(function() {
-                    data.target = 'bob';
+                    data.target = 'showcase';
                 });
 
-                it('should use the bob template and data', function(done) {
+                it('should use the showcase template and data', function(done) {
                     getHtml('accountWasActivated', data, emailConfig).then(function() {
                         expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
-                            'accountWasActivated--bob.html');
+                            'accountWasActivated--showcase.html');
                         expect(handlebars.compile).toHaveBeenCalledWith('template');
                         expect(compileSpy).toHaveBeenCalledWith({
-                            dashboardLink: 'bob dashboard link'
+                            dashboardLink: 'showcase dashboard link'
                         });
                         expect();
                         done();
