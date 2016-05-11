@@ -373,6 +373,17 @@
                                 }
                             ]
                         },
+                        "transactionCreated": {
+                            "actions": [
+                                {
+                                    "name": "auto_increase_budget",
+                                    "options": {},
+                                    "ifData": {
+                                        "transaction.sign": "^1$"
+                                    }
+                                }
+                            ]
+                        },
                         "accountCreated": {
                             "actions": [
                                 {
