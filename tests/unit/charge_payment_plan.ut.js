@@ -110,7 +110,7 @@ describe('(action factory) charge_payment_plan', function() {
                     }
                 };
                 options = {
-                    target: 'bob'
+                    target: 'showcase'
                 };
                 event = { data: data, options: options };
 

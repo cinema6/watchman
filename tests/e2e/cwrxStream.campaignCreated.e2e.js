@@ -268,7 +268,7 @@ describe('cwrxStream campaignCreated', function() {
                 id: createId('cam'),
                 user: user.id,
                 org: org.id,
-                application: 'bob',
+                application: 'showcase',
                 cards: [],
                 created: moment().format()
             };

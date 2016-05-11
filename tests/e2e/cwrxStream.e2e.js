@@ -476,13 +476,13 @@ describe('cwrxStream', function() {
         }).catch(done.fail);
     });
 
-    it('should send an activation email when a new bob account has been created', function(done) {
+    it('should send an activation email when a new showcase account has been created', function(done) {
         producer.produce({
             type: 'accountCreated',
             data: {
                 token: 'secret-token',
                 user: mockUser,
-                target: 'bob'
+                target: 'showcase'
             }
         }).then(function() {
             mailman.once('Terry, Welcome to Reelcontent Marketing!',
@@ -521,13 +521,13 @@ describe('cwrxStream', function() {
             }).catch(done.fail);
         });
 
-        it('should send an email notifying the user that their bob account has been activated',
+        it('should send an email notifying the user that their showcase account has been activated',
                 function(done) {
             producer.produce({
                 type: 'accountActivated',
                 data: {
                     user: mockUser,
-                    target: 'bob'
+                    target: 'showcase'
                 }
             }).then(function() {
                 mailman.once('Terry, Your Reelcontent Account Is Ready To Go',

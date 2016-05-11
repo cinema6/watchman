@@ -81,13 +81,13 @@
                         "sender": "no-reply@reelcontent.com",
                         "dashboardLinks": {
                             "selfie": "http://localhost:9000/#/apps/selfie/campaigns",
-                            "bob": "http://localhost:9000/#/bob/products"
+                            "showcase": "http://localhost:9000/#/showcase/products"
                         },
                         "manageLink": "http://localhost:9000/#/apps/selfie/campaigns/manage/:campId/manage",
                         "reviewLink": "http://localhost:9000/#/apps/selfie/campaigns/manage/:campId/admin",
                         "activationTargets": {
                             "selfie": "http://localhost:9000/#/confirm?selfie=selfie",
-                            "bob": "http://localhost:9000/#/bob/confirm"
+                            "showcase": "http://localhost:9000/#/showcase/confirm"
                         },
                         "supportAddress": "c6e2etester@gmail.com",
                         "passwordResetPages": {
@@ -233,7 +233,7 @@
                                 {
                                     "name": "charge_payment_plan",
                                     "options": {
-                                        "target": "bob"
+                                        "target": "showcase"
                                     }
                                 }
                             ]
@@ -308,7 +308,7 @@
                                 {
                                     "name": "activate_payment_plan",
                                     "ifData": {
-                                        "campaign.application": "^bob$"
+                                        "campaign.application": "^showcase$"
                                     }
                                 }
                             ]
