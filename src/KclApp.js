@@ -268,7 +268,8 @@ KclApp.prototype = {
         try {
             var AppEventProcessor = require('./event_processors/' + consumerConfig.processor);
             var eventProcessor = new AppEventProcessor(config);
-            self.recordProcessor = new RecordProcessor(eventProcessor, config.pidPath);
+            self.recordProcessor = new RecordProcessor(eventProcessor, config.pidPath,
+                consumerConfig.appName);
             log.info('[%1] Starting application', consumerConfig.appName);
             kcl(self.recordProcessor).run();
         } catch(error) {

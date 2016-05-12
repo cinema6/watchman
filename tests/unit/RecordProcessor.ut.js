@@ -27,7 +27,7 @@ describe('RecordProcessor.js', function() {
         mockCheckpointer = {
             checkpoint: jasmine.createSpy('checkpoint()')
         };
-        recordProcessor = new RecordProcessor(mockProcessor, '/pid/path');
+        recordProcessor = new RecordProcessor(mockProcessor, '/pid/path', 'appName');
         spyOn(fs, 'existsSync');
         spyOn(fs, 'unlinkSync');
         spyOn(fs, 'writeFileSync');
@@ -41,6 +41,7 @@ describe('RecordProcessor.js', function() {
 
     describe('the constructor', function() {
         it('initialize its properties', function() {
+            expect(recordProcessor.appName).toBe('appName');
             expect(recordProcessor.name).toBe('name record processor');
             expect(recordProcessor.pidPath).toBe('/pid/path');
             expect(recordProcessor.processor).toEqual(mockProcessor);
@@ -88,7 +89,7 @@ describe('RecordProcessor.js', function() {
 
             it('should write a pid', function() {
                 initialize();
-                expect(fs.writeFileSync).toHaveBeenCalledWith('/pid/path/name-shard-000.pid',
+                expect(fs.writeFileSync).toHaveBeenCalledWith('/pid/path/appName-shard-000.pid',
                     jasmine.any(String));
             });
 
@@ -97,7 +98,7 @@ describe('RecordProcessor.js', function() {
                 expect(process.on).toHaveBeenCalledWith('exit', jasmine.any(Function));
                 var handler = process.on.calls.mostRecent().args[1];
                 handler();
-                expect(fs.unlinkSync).toHaveBeenCalledWith('/pid/path/name-shard-000.pid');
+                expect(fs.unlinkSync).toHaveBeenCalledWith('/pid/path/appName-shard-000.pid');
             });
         });
     });

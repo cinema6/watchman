@@ -572,7 +572,7 @@ describe('KclApp.js', function() {
             config.pidPath = '/pid/path';
             app.run();
             expect(mockRecordProcessor).toHaveBeenCalledWith(jasmine.any(mockEventProcessor),
-                '/pid/path');
+                '/pid/path', 'appName');
             expect(app.recordProcessor).toEqual(jasmine.any(mockRecordProcessor));
         });
 

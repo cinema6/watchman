@@ -1,6 +1,7 @@
 # Watchman
 
 * *[v0.5.0-rc1]*
+  * [FIX]: Fix for an issue that prevented configuration from being dynamically reloaded
   * [FIX]: Fix for an issue that prevented the expiration of campaigns with a pending update request
   * [FEATURE]: Increase the budget of showcase campaigns when their org
     gets more funds
