@@ -1,6 +1,6 @@
 'use strict';
 
-describe('(action factory) auto_increase_budget', function() {
+describe('(action factory) showcase/apps/auto_increase_budget', function() {
     var q, uuid, resolveURL, ld, logger;
     var JsonProducer, CwrxRequest;
     var factory;
@@ -36,8 +36,8 @@ describe('(action factory) auto_increase_budget', function() {
         }(require('../../lib/CwrxRequest')));
         require.cache[require.resolve('../../lib/CwrxRequest')].exports = CwrxRequest;
 
-        delete require.cache[require.resolve('../../src/actions/auto_increase_budget')];
-        factory = require('../../src/actions/auto_increase_budget');
+        delete require.cache[require.resolve('../../src/actions/showcase/apps/auto_increase_budget')];
+        factory = require('../../src/actions/showcase/apps/auto_increase_budget');
     });
 
     beforeEach(function() {
@@ -178,6 +178,9 @@ describe('(action factory) auto_increase_budget', function() {
                                     budget: 0.5,
                                     dailyLimit: 1
                                 }
+                            },
+                            product: {
+                                type: 'app'
                             }
                         },
                         {
@@ -196,6 +199,9 @@ describe('(action factory) auto_increase_budget', function() {
                                     budget: 0,
                                     dailyLimit: 1
                                 }
+                            },
+                            product: {
+                                type: 'app'
                             }
                         },
                         {
@@ -207,6 +213,27 @@ describe('(action factory) auto_increase_budget', function() {
                                 cost: 0.06,
                                 budget: 250,
                                 dailyLimit: 50
+                            }
+                        },
+                        {
+                            id: 'cam-' + uuid.createUuid(),
+                            status: 'outOfBudget',
+                            application: 'showcase',
+                            pricing: {
+                                model: 'cpv',
+                                cost: 0.01,
+                                budget: 0,
+                                dailyLimit: 2
+                            },
+                            externalCampaigns: {
+                                beeswax: {
+                                    externalId: uuid.createUuid(),
+                                    budget: 0,
+                                    dailyLimit: 1
+                                }
+                            },
+                            product: {
+                                type: 'ecommerce'
                             }
                         }
                     ];

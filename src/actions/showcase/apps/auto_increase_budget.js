@@ -1,6 +1,6 @@
 'use strict';
 
-var CwrxRequest = require('../../lib/CwrxRequest');
+var CwrxRequest = require('../../../../lib/CwrxRequest');
 var resolveURL = require('url').resolve;
 var ld = require('lodash');
 var filter = ld.filter;
@@ -26,7 +26,10 @@ module.exports = function autoIncreaseBudgetFactory(config) {
             url: campaignsEndpoint,
             qs: { org: transaction.org }
         }).spread(function increaseBudgets(campaigns) {
-            var showcaseCampaigns = filter(campaigns, { application: 'showcase' });
+            var showcaseCampaigns = filter(campaigns, {
+                application: 'showcase',
+                product: { type: 'app' }
+            });
 
             return q.all(showcaseCampaigns.map(function increaseBudget(campaign) {
                 var externalCampaign = campaign.externalCampaigns.beeswax;

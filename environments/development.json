@@ -381,8 +381,11 @@
                         "transactionCreated": {
                             "actions": [
                                 {
-                                    "name": "auto_increase_budget",
-                                    "options": {},
+                                    "name": "showcase/apps/auto_increase_budget",
+                                    "options": {
+                                        "dailyLimit": 2,
+                                        "externalAllocationFactor": 0.5
+                                    },
                                     "ifData": {
                                         "transaction.sign": "^1$"
                                     }
