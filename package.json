@@ -24,7 +24,8 @@
     "nodemailer-ses-transport": "^1.3.0",
     "q": "^1.4.1",
     "rc-kinesis": "^1.1.0",
-    "readable-stream": "^2.0.6"
+    "readable-stream": "^2.0.6",
+    "showcase-core": "^1.0.0"
   },
   "devDependencies": {
     "braintree": "^1.37.1",
