@@ -124,7 +124,8 @@ describe('(action factory) auto_increase_budget', function() {
                     }
                 };
                 options = {
-
+                    dailyLimit: 3,
+                    externalAllocationFactor: 0.5
                 };
                 event = { data: data, options: options };
 
@@ -146,7 +147,7 @@ describe('(action factory) auto_increase_budget', function() {
 
             describe('when the campaigns are fetched', function() {
                 var campaigns;
-                var putCampaignDeferreds;
+                var putCampaignDeferreds, putExternalCampaignDeferreds;
 
                 beforeEach(function(done) {
                     campaigns = [
@@ -170,6 +171,13 @@ describe('(action factory) auto_increase_budget', function() {
                                 cost: 0.01,
                                 budget: 1,
                                 dailyLimit: 2
+                            },
+                            externalCampaigns: {
+                                beeswax: {
+                                    externalId: uuid.createUuid(),
+                                    budget: 0.5,
+                                    dailyLimit: 1
+                                }
                             }
                         },
                         {
@@ -181,6 +189,13 @@ describe('(action factory) auto_increase_budget', function() {
                                 cost: 0.01,
                                 budget: 0,
                                 dailyLimit: 2
+                            },
+                            externalCampaigns: {
+                                beeswax: {
+                                    externalId: uuid.createUuid(),
+                                    budget: 0,
+                                    dailyLimit: 1
+                                }
                             }
                         },
                         {
@@ -196,9 +211,16 @@ describe('(action factory) auto_increase_budget', function() {
                         }
                     ];
 
+                    putExternalCampaignDeferreds = {};
                     putCampaignDeferreds = {};
                     spyOn(request, 'put').and.callFake(function(config) {
-                        return (putCampaignDeferreds[config.json.id] = q.defer()).promise;
+                        var id = config.url.match(/cam-[^\/]+/)[0];
+
+                        if (/beeswax$/.test(config.url)) {
+                            return (putExternalCampaignDeferreds[id] = q.defer()).promise;
+                        } else {
+                            return (putCampaignDeferreds[id] = q.defer()).promise;
+                        }
                     });
 
                     getCampaignsDeferred.fulfill([campaigns, { statusCode: 200 }]);
@@ -212,7 +234,8 @@ describe('(action factory) auto_increase_budget', function() {
                         json: ld.assign({}, campaigns[1], {
                             status: 'active',
                             pricing: ld.assign({}, campaigns[1].pricing, {
-                                budget: campaigns[1].pricing.budget + (data.transaction.amount / campaigns.length)
+                                budget: campaigns[1].pricing.budget + (data.transaction.amount / campaigns.length),
+                                dailyLimit: options.dailyLimit
                             })
                         })
                     });
@@ -221,7 +244,8 @@ describe('(action factory) auto_increase_budget', function() {
                         json: ld.assign({}, campaigns[2], {
                             status: 'active',
                             pricing: ld.assign({}, campaigns[2].pricing, {
-                                budget: campaigns[2].pricing.budget + (data.transaction.amount / campaigns.length)
+                                budget: campaigns[2].pricing.budget + (data.transaction.amount / campaigns.length),
+                                dailyLimit: options.dailyLimit
                             })
                         })
                     });
@@ -231,19 +255,73 @@ describe('(action factory) auto_increase_budget', function() {
                     beforeEach(function(done) {
                         putCampaignDeferreds[campaigns[1].id].fulfill([request.put.calls.all()[0].args[0].json, { statusCode: 200 }]);
                         putCampaignDeferreds[campaigns[2].id].fulfill([request.put.calls.all()[1].args[0].json, { statusCode: 200 }]);
+                        request.put.calls.reset();
 
                         process.nextTick(done);
                     });
 
-                    it('should fulfill with undefined', function() {
-                        expect(success).toHaveBeenCalledWith(undefined);
+                    it('should update the bob external campaign budgets', function() {
+                        expect(request.put.calls.count()).toBe(2);
+                        expect(request.put).toHaveBeenCalledWith({
+                            url: resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint + '/' + campaigns[1].id + '/external/beeswax'),
+                            json: {
+                                budget: campaigns[1].externalCampaigns.beeswax.budget + ((data.transaction.amount / campaigns.length) * options.externalAllocationFactor),
+                                dailyLimit: options.dailyLimit * options.externalAllocationFactor
+                            }
+                        });
+                        expect(request.put).toHaveBeenCalledWith({
+                            url: resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint + '/' + campaigns[2].id + '/external/beeswax'),
+                            json: {
+                                budget: campaigns[2].externalCampaigns.beeswax.budget + ((data.transaction.amount / campaigns.length) * options.externalAllocationFactor),
+                                dailyLimit: options.dailyLimit * options.externalAllocationFactor
+                            }
+                        });
+                    });
+
+                    describe('when the external campaigns have been updated', function() {
+                        beforeEach(function(done) {
+                            putExternalCampaignDeferreds[campaigns[1].id].fulfill([
+                                ld.assign({}, campaigns[1].externalCampaigns.beeswax, request.put.calls.all()[0].args[0].json),
+                                { statusCode: 200 }
+                            ]);
+                            putExternalCampaignDeferreds[campaigns[2].id].fulfill([
+                                ld.assign({}, campaigns[2].externalCampaigns.beeswax, request.put.calls.all()[1].args[0].json),
+                                { statusCode: 200 }
+                            ]);
+
+                            process.nextTick(done);
+                        });
+
+                        it('should fulfill with undefined', function() {
+                            expect(success).toHaveBeenCalledWith(undefined);
+                        });
+                    });
+
+                    describe('if an external campaign fails to udpate', function() {
+                        beforeEach(function(done) {
+                            putExternalCampaignDeferreds[campaigns[1].id].reject(new Error('Everything dies eventually.'));
+                            putExternalCampaignDeferreds[campaigns[2].id].fulfill([
+                                ld.assign({}, campaigns[2].externalCampaigns.beeswax, request.put.calls.all()[1].args[0].json),
+                                { statusCode: 200 }
+                            ]);
+
+                            process.nextTick(done);
+                        });
+
+                        it('should log an error', function() {
+                            expect(log.error).toHaveBeenCalled();
+                        });
+
+                        it('should fulfill with undefined', function() {
+                            expect(success).toHaveBeenCalledWith(undefined);
+                        });
                     });
                 });
 
                 describe('if a campaign fails to update', function() {
                     beforeEach(function(done) {
-                        putCampaignDeferreds[campaigns[1].id].fulfill([request.put.calls.all()[0].args[0].json, { statusCode: 200 }]);
-                        putCampaignDeferreds[campaigns[2].id].reject(new Error('There was a problem doing stuff!'));
+                        putCampaignDeferreds[campaigns[1].id].reject(new Error('There was a problem doing stuff!'));
+                        putCampaignDeferreds[campaigns[2].id].reject(new Error('There was a problem doing more stuff!'));
 
                         process.nextTick(done);
                     });
