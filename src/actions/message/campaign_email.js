@@ -146,6 +146,8 @@ var __private__ = {
             return campName + ' Is Now Live!';
         case 'campaignSubmitted':
             return 'We\'ve Got It! ' + campName + ' Has Been Submitted for Approval.';
+        case 'initializedShowcaseCampaign':
+            return 'New Showcase Campaign Started: ' + campName;
         default:
             return '';
         }
@@ -154,7 +156,8 @@ var __private__ = {
     /**
     * Based on the email type finds and compiles an email template.
     */
-    getHtml: function(type, data, emailConfig) {
+    getHtml: function(type, data, config) {
+        var emailConfig = config.emails;
         var template = null;
         var templateData = null;
 
@@ -361,14 +364,50 @@ var __private__ = {
                 previewLink: previewLink
             };
             break;
+        case 'initializedShowcaseCampaign':
+            template = 'initializedShowcaseCampaign.html';
+            templateData = Q.when().then(function() {
+                var advertisersEndpoint = resolveURL(
+                    config.cwrx.api.root,
+                    config.cwrx.api.advertisers.endpoint
+                );
+                var campaign = data.campaign;
+                var externalCampaignId = campaign.externalCampaigns.beeswax.externalId;
+
+                return requestUtils.makeSignedRequest(config.appCreds, 'get', {
+                    url: advertisersEndpoint + '/' + campaign.advertiserId,
+                    json: true
+                }).then(function(data) {
+                    var response = data.response;
+                    var advertiser = data.body;
+
+                    if (!/^2/.test(response.statusCode)) {
+                        throw new Error(
+                            'Failed to GET advertiser(' + campaign.advertiserId + '): ' +
+                            '[' + response.statusCode +']: ' + data.body
+                        );
+                    }
+
+                    return {
+                        beeswaxCampaignId: externalCampaignId,
+                        beeswaxCampaignURI: emailConfig.beeswax.campaignLink
+                            .replace('{{advertiserId}}', advertiser.beeswaxIds.advertiser)
+                            .replace('{{campaignId}}', externalCampaignId)
+                    };
+                });
+            });
+            break;
         default:
             return Q.reject('Could not find a template for ' + type);
         }
 
         // Load and compile the email template
-        return __private__.loadTemplate(template).then(function(fileContents) {
+        return Q.all([
+            __private__.loadTemplate(template),
+            templateData
+        ]).spread(function(fileContents, data) {
             var compiledTemplate = handlebars.compile(fileContents);
-            return compiledTemplate(templateData);
+            return compiledTemplate(data);
         });
     },
 
@@ -437,7 +476,7 @@ function factory(config) {
             from: emailConfig.sender,
             to: __private__.getRecipient(data, options, config),
             subject: __private__.getSubject(emailType, data),
-            html: __private__.getHtml(emailType, data, emailConfig),
+            html: __private__.getHtml(emailType, data, config),
             text: null,
             attachments: __private__.getAttachments(data)
         };
