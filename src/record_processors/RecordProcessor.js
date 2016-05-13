@@ -33,10 +33,11 @@ var path = require('path');
 * @param {EventProcessor} eventProcessor An event processor used to process decoded json records.
 * @constructor
 */
-function RecordProcessor(eventProcessor, pidPath) {
+function RecordProcessor(eventProcessor, pidPath, appName) {
     if(!eventProcessor) {
         throw new Error('Must provide an event processor');
     }
+    this.appName = appName;
     this.name = eventProcessor.name + ' record processor';
     this.pidPath = pidPath;
     this.processor = eventProcessor;
@@ -59,7 +60,7 @@ RecordProcessor.prototype = {
 
         // Handle pid files
         var pidFile = path.resolve(this.pidPath,
-            this.processor.name + '-' + this.shardId + '.pid');
+            this.appName + '-' + this.shardId + '.pid');
         if(fs.existsSync(pidFile)) {
             var oldPid = parseInt(fs.readFileSync(pidFile, {
                 encoding: 'utf-8'
