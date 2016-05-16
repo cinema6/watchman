@@ -5,6 +5,7 @@ var fs = require('fs');
 var handlebars = require('handlebars');
 var htmlToText = require('html-to-text');
 var logger = require('cwrx/lib/logger.js');
+var moment = require('moment');
 var nodemailer = require('nodemailer');
 var path = require('path');
 var requestUtils = require('cwrx/lib/requestUtils.js');
@@ -216,7 +217,14 @@ var __private__ = {
             };
             break;
         case 'paymentMade':
-            template = 'paymentReceipt.html';
+            template = (function() {
+                switch (data.target) {
+                case 'showcase':
+                    return 'paymentReceipt--app.html';
+                default:
+                    return 'paymentReceipt.html';
+                }
+            }());
             templateData = {
                 contact         : emailConfig.supportAddress,
                 amount          : '$' + data.payment.amount.toFixed(2),
@@ -224,6 +232,9 @@ var __private__ = {
                 method          : data.payment.method,
                 date            : new Date(data.payment.createdAt).toLocaleDateString(),
                 balance         : '$' + data.balance.toFixed(2),
+                firstName       : data.user.firstName,
+                billingEndDate  : moment(data.payment.createdAt).add(1, 'month').subtract(1, 'day')
+                                    .toDate().toLocaleDateString()
             };
             break;
         case 'activateAccount':
