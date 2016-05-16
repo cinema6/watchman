@@ -381,6 +381,7 @@ describe('cwrxStream', function() {
 
     describe('when handling a paymentMade event', function() {
         var mockPayment, msgRegexes;
+
         beforeEach(function() {
             mockPayment = {
                 amount: 123.45,
@@ -392,66 +393,136 @@ describe('cwrxStream', function() {
                     last4: '1234'
                 }
             };
-
-            msgRegexes = [
-                /Amount:\s*\$123.45/,
-                /Processed:\s*Monday,\s*April\s*04,\s*2016/,
-                /Your\s*balance\s*after\s*deposit:\s*\$9001.12/
-            ];
         });
 
-        it('should send a receipt email for payments made with a credit card', function(done) {
-            producer.produce({
-                type: 'paymentMade',
-                data: {
-                    payment: mockPayment,
-                    user: mockUser,
-                    balance: 9001.12
-                }
-            }).then(function() {
-                mailman.once('Your payment has been approved', function(msg) {
-                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
-                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                    msgRegexes.concat([
-                        /Payment\s*Method:\s*Credit\s*Card/,
-                        /Cardholder\s*Name:\s*Johnny\s*Testmonkey/,
-                        /Card\s*Type:\s*Visa/,
-                        /Last\s*4\s*Digits:\s*1234/
-                    ]).forEach(function(regex) {
-                        expect(regex.test(msg.text)).toBeTruthy('Expected text to match ' + regex);
-                        expect(regex.test(msg.html)).toBeTruthy('Expected html to match ' + regex);
+        describe('payments made by selfie users', function() {
+            beforeEach(function() {
+                msgRegexes = [
+                    /Amount:\s*\$123.45/,
+                    /Processed:\s*Monday,\s*April\s*04,\s*2016/,
+                    /Your\s*balance\s*after\s*deposit:\s*\$9001.12/
+                ];
+            });
+
+            it('should send a receipt email for payments made with a credit card', function(done) {
+                producer.produce({
+                    type: 'paymentMade',
+                    data: {
+                        payment: mockPayment,
+                        user: mockUser,
+                        balance: 9001.12
+                    }
+                }).then(function() {
+                    mailman.once('Your payment has been approved', function(msg) {
+                        expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                        expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                        msgRegexes.concat([
+                            /Payment\s*Method:\s*Credit\s*Card/,
+                            /Cardholder\s*Name:\s*Johnny\s*Testmonkey/,
+                            /Card\s*Type:\s*Visa/,
+                            /Last\s*4\s*Digits:\s*1234/
+                        ]).forEach(function(regex) {
+                            expect(regex.test(msg.text)).toBeTruthy('Expected text to match ' + regex);
+                            expect(regex.test(msg.html)).toBeTruthy('Expected html to match ' + regex);
+                        });
+                        expect((new Date() - msg.date)).toBeLessThan(30000);
+                        done();
                     });
-                    expect((new Date() - msg.date)).toBeLessThan(30000);
-                    done();
-                });
-            }).catch(done.fail);
+                }).catch(done.fail);
+            });
+
+            it('should send a receipt email for payments made with a paypal account', function(done) {
+                mockPayment.method = { type: 'paypal', email: 'johnny@testmonkey.com' };
+
+                producer.produce({
+                    type: 'paymentMade',
+                    data: {
+                        payment: mockPayment,
+                        user: mockUser,
+                        balance: 9001.12
+                    }
+                }).then(function() {
+                    mailman.once('Your payment has been approved', function(msg) {
+                        expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                        expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                        msgRegexes.concat([
+                            /Payment\s*Method:\s*PayPal/,
+                            /Email:\s*johnny@testmonkey\.com/
+                        ]).forEach(function(regex) {
+                            expect(regex.test(msg.text)).toBeTruthy('Expected text to match ' + regex);
+                            expect(regex.test(msg.html)).toBeTruthy('Expected html to match ' + regex);
+                        });
+                        expect((new Date() - msg.date)).toBeLessThan(30000);
+                        done();
+                    });
+                }).catch(done.fail);
+            });
         });
 
-        it('should send a receipt email for payments made with a paypal account', function(done) {
-            mockPayment.method = { type: 'paypal', email: 'johnny@testmonkey.com' };
+        describe('payments made by showcase users', function() {
+            beforeEach(function() {
+                msgRegexes = [
+                    /Amount :(.|\n)+\$123\.45/,
+                    /Billing Period :(.|\n)+Monday, April 04, 2016 to Tuesday, May 03, 2016/,
+                    /Payment Date:(.|\n)+Monday, April 04, 2016/
+                ];
+            });
 
-            producer.produce({
-                type: 'paymentMade',
-                data: {
-                    payment: mockPayment,
-                    user: mockUser,
-                    balance: 9001.12
-                }
-            }).then(function() {
-                mailman.once('Your payment has been approved', function(msg) {
-                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
-                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                    msgRegexes.concat([
-                        /Payment\s*Method:\s*PayPal/,
-                        /Email:\s*johnny@testmonkey\.com/
-                    ]).forEach(function(regex) {
-                        expect(regex.test(msg.text)).toBeTruthy('Expected text to match ' + regex);
-                        expect(regex.test(msg.html)).toBeTruthy('Expected html to match ' + regex);
+            it('should send a receipt email for payments made with a credit card', function(done) {
+                producer.produce({
+                    type: 'paymentMade',
+                    data: {
+                        payment: mockPayment,
+                        user: mockUser,
+                        balance: 9001.12,
+                        target: 'showcase'
+                    }
+                }).then(function() {
+                    mailman.once('Your payment has been approved', function(msg) {
+                        expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                        expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                        msgRegexes.concat([
+                            /Payment Method(.|\n)+Credit Card/,
+                            /Cardholder Name: Johnny Testmonkey/,
+                            /Card Type: Visa/,
+                            /Last 4 Digits: 1234/
+                        ]).forEach(function(regex) {
+                            expect(regex.test(msg.text)).toBeTruthy('Expected text to match ' + regex);
+                            expect(regex.test(msg.html)).toBeTruthy('Expected html to match ' + regex);
+                        });
+                        expect((new Date() - msg.date)).toBeLessThan(30000);
+                        done();
                     });
-                    expect((new Date() - msg.date)).toBeLessThan(30000);
-                    done();
-                });
-            }).catch(done.fail);
+                }).catch(done.fail);
+            });
+
+            it('should send a receipt email for payments made with a paypal account', function(done) {
+                mockPayment.method = { type: 'paypal', email: 'johnny@testmonkey.com' };
+
+                producer.produce({
+                    type: 'paymentMade',
+                    data: {
+                        payment: mockPayment,
+                        user: mockUser,
+                        balance: 9001.12,
+                        target: 'showcase'
+                    }
+                }).then(function() {
+                    mailman.once('Your payment has been approved', function(msg) {
+                        expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                        expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                        msgRegexes.concat([
+                            /Payment Method(.|\n)+PayPal/,
+                            /Email: johnny@testmonkey\.com/
+                        ]).forEach(function(regex) {
+                            expect(regex.test(msg.text)).toBeTruthy('Expected text to match ' + regex);
+                            expect(regex.test(msg.html)).toBeTruthy('Expected html to match ' + regex);
+                        });
+                        expect((new Date() - msg.date)).toBeLessThan(30000);
+                        done();
+                    });
+                }).catch(done.fail);
+            });
         });
     });
 
@@ -493,7 +564,7 @@ describe('cwrxStream', function() {
                 expect(msg.text).toMatch(regex);
                 expect(msg.html).toMatch(regex);
                 expect((new Date() - msg.date)).toBeLessThan(30000);
-                expect(msg.text).toContain('Welcome to Reelcontent Marketing!');
+                expect(msg.text.toLowerCase()).toContain('welcome to reelcontent apps');
                 done();
             });
         }).catch(done.fail);
@@ -534,10 +605,9 @@ describe('cwrxStream', function() {
                         function(msg) {
                     expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                    var regex = /account\s*is\s*now\s*active/;
+                    var regex = /Terry,\s+your\s+account\s+is\s+live/;
                     expect(msg.text).toMatch(regex);
                     expect(msg.html).toMatch(regex);
-                    expect(msg.text).toContain('ADD MY FIRST PRODUCT');
                     expect((new Date() - msg.date)).toBeLessThan(30000);
                     done();
                 });
@@ -675,42 +745,20 @@ describe('cwrxStream', function() {
         });
     });
 
-    it('should send an email notifying the user that their password has been changed',
-            function(done) {
-        producer.produce({
-            type: 'passwordChanged',
-            data: {
-                date: new Date(),
-                user: mockUser
-            }
-        }).then(function() {
-            mailman.once('Reelcontent Password Change Notice',
-                    function(msg) {
-                expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
-                expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                var regex = /password\s*was\s*changed\s*on.*at.*/;
-                expect(msg.text).toMatch(regex);
-                expect(msg.html).toMatch(regex);
-                expect((new Date() - msg.date)).toBeLessThan(30000);
-                done();
-            });
-        }).catch(done.fail);
-    });
-
-    describe('sending an email to notify of a password change', function() {
-        it('should be able to notify the old email address', function(done) {
+    describe('notifying the user that their password has been changed', function() {
+        it('should be able to send an email formatted for selfie users', function(done) {
             producer.produce({
-                type: 'emailChanged',
+                type: 'passwordChanged',
                 data: {
-                    user: mockUser,
-                    oldEmail: 'c6e2etester@gmail.com',
-                    newEmail: 'c6e2etester2@gmail.com'
+                    date: new Date(),
+                    user: mockUser
                 }
             }).then(function() {
-                mailman.once('Your Email Has Been Changed', function(msg) {
+                mailman.once('Reelcontent Password Change Notice',
+                        function(msg) {
                     expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                    var regex = /c6e2etester2@gmail.com/;
+                    var regex = /password\s*was\s*changed\s*on.*at.*/;
                     expect(msg.text).toMatch(regex);
                     expect(msg.html).toMatch(regex);
                     expect((new Date() - msg.date)).toBeLessThan(30000);
@@ -719,26 +767,22 @@ describe('cwrxStream', function() {
             }).catch(done.fail);
         });
 
-        it('should be able to notify the new email address', function(done) {
-            mockUser.email = 'c6e2etester2@gmail.com';
+        it('should be able to send an email formatted for showcase users', function(done) {
             producer.produce({
-                type: 'emailChanged',
+                type: 'passwordChanged',
                 data: {
+                    date: new Date(),
                     user: mockUser,
-                    oldEmail: 'c6e2etester@gmail.com',
-                    newEmail: 'c6e2etester2@gmail.com'
+                    target: 'showcase'
                 }
             }).then(function() {
-                mailman2.once('Your Email Has Been Changed', function(msg) {
+                mailman.once('Reelcontent Password Change Notice',
+                        function(msg) {
                     expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
-                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester2@gmail.com');
-                    [
-                        /c6e2etester@gmail.com/,
-                        /c6e2etester2@gmail.com/
-                    ].forEach(function(regex) {
-                        expect(msg.text).toMatch(regex);
-                        expect(msg.html).toMatch(regex);
-                    });
+                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                    var regex = /Terry, Just a quick note/;
+                    expect(msg.text).toMatch(regex);
+                    expect(msg.html).toMatch(regex);
                     expect((new Date() - msg.date)).toBeLessThan(30000);
                     done();
                 });
@@ -746,45 +790,195 @@ describe('cwrxStream', function() {
         });
     });
 
-    it('should be able to send an email after multiple failed password attempts', function(done) {
-        producer.produce({
-            type: 'failedLogins',
-            data: {
-                user: mockUser
-            }
-        }).then(function() {
-            mailman.once('Reelcontent: Multiple-Failed Logins', function(msg) {
-                expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
-                expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                var regex = /consecutive\s*failed\s*login\s*attempts/;
-                expect(msg.text).toMatch(regex);
-                expect(msg.html).toMatch(regex);
-                expect((new Date() - msg.date)).toBeLessThan(30000);
-                done();
+    describe('sending an email to notify of an email change', function() {
+        describe('for selfie campaigns', function() {
+            it('should be able to notify the old email address', function(done) {
+                producer.produce({
+                    type: 'emailChanged',
+                    data: {
+                        user: mockUser,
+                        oldEmail: 'c6e2etester@gmail.com',
+                        newEmail: 'c6e2etester2@gmail.com'
+                    }
+                }).then(function() {
+                    mailman.once('Your Email Has Been Changed', function(msg) {
+                        expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                        expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                        var regex = /c6e2etester2@gmail\.com/;
+                        expect(msg.text).toMatch(regex);
+                        expect(msg.html).toMatch(regex);
+                        expect((new Date() - msg.date)).toBeLessThan(30000);
+                        done();
+                    });
+                }).catch(done.fail);
             });
-        }).catch(done.fail);
+
+            it('should be able to notify the new email address', function(done) {
+                mockUser.email = 'c6e2etester2@gmail.com';
+                producer.produce({
+                    type: 'emailChanged',
+                    data: {
+                        user: mockUser,
+                        oldEmail: 'c6e2etester@gmail.com',
+                        newEmail: 'c6e2etester2@gmail.com'
+                    }
+                }).then(function() {
+                    mailman2.once('Your Email Has Been Changed', function(msg) {
+                        expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                        expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester2@gmail.com');
+                        [
+                            /c6e2etester@gmail\.com/,
+                            /c6e2etester2@gmail\.com/
+                        ].forEach(function(regex) {
+                            expect(msg.text).toMatch(regex);
+                            expect(msg.html).toMatch(regex);
+                        });
+                        expect((new Date() - msg.date)).toBeLessThan(30000);
+                        done();
+                    });
+                }).catch(done.fail);
+            });
+        });
+
+        describe('for showcase campaigns', function() {
+            it('should be able to notify the old email address', function(done) {
+                producer.produce({
+                    type: 'emailChanged',
+                    data: {
+                        user: mockUser,
+                        oldEmail: 'c6e2etester@gmail.com',
+                        newEmail: 'c6e2etester2@gmail.com',
+                        target: 'showcase'
+                    }
+                }).then(function() {
+                    mailman.once('Your Email Has Been Changed', function(msg) {
+                        expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                        expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                        [
+                            /c6e2etester@gmail\.com/,
+                            /c6e2etester2@gmail\.com/
+                        ].forEach(function(regex) {
+                            expect(msg.text).toMatch(regex);
+                            expect(msg.html).toMatch(regex);
+                        });
+                        expect((new Date() - msg.date)).toBeLessThan(30000);
+                        done();
+                    });
+                }).catch(done.fail);
+            });
+
+            it('should be able to notify the new email address', function(done) {
+                mockUser.email = 'c6e2etester2@gmail.com';
+                producer.produce({
+                    type: 'emailChanged',
+                    data: {
+                        user: mockUser,
+                        oldEmail: 'c6e2etester@gmail.com',
+                        newEmail: 'c6e2etester2@gmail.com',
+                        target: 'showcase'
+                    }
+                }).then(function() {
+                    mailman2.once('Your Email Has Been Changed', function(msg) {
+                        expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                        expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester2@gmail.com');
+                        [
+                            /c6e2etester@gmail\.com/,
+                            /c6e2etester2@gmail\.com/
+                        ].forEach(function(regex) {
+                            expect(msg.text).toMatch(regex);
+                            expect(msg.html).toMatch(regex);
+                        });
+                        expect((new Date() - msg.date)).toBeLessThan(30000);
+                        done();
+                    });
+                }).catch(done.fail);
+            });
+        });
     });
 
-    it('should be able to send an email when the user has requested a password reset',
-            function(done) {
-        producer.produce({
-            type: 'forgotPassword',
-            data: {
-                target: 'selfie',
-                token: 'secret-token',
-                user: mockUser
-            }
-        }).then(function() {
-            mailman.once('Forgot Your Password?', function(msg) {
-                expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
-                expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                var regex = /https?:\/\/.+id.+u-123.+token.+secret-token/;
-                expect(msg.text).toMatch(regex);
-                expect(msg.html).toMatch(regex);
-                expect((new Date() - msg.date)).toBeLessThan(30000);
-                done();
-            });
-        }).catch(done.fail);
+    describe('sending an email after multiple failed password attempts', function() {
+        it('should be able to send an email formatted for selfie users', function(done) {
+            producer.produce({
+                type: 'failedLogins',
+                data: {
+                    user: mockUser
+                }
+            }).then(function() {
+                mailman.once('Reelcontent: Multiple-Failed Logins', function(msg) {
+                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                    var regex = /consecutive\s*failed\s*login\s*attempts/;
+                    expect(msg.text).toMatch(regex);
+                    expect(msg.html).toMatch(regex);
+                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    done();
+                });
+            }).catch(done.fail);
+        });
+
+        it('should be able to send an email formatted for showcase users', function(done) {
+            producer.produce({
+                type: 'failedLogins',
+                data: {
+                    user: mockUser,
+                    target: 'showcase'
+                }
+            }).then(function() {
+                mailman.once('Reelcontent: Multiple-Failed Logins', function(msg) {
+                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                    var regex = /Terry,\s+Looks\s+like\s+someone\s+has\s+tried\s+to\s+log\s+into\s+your\s+account/;
+                    expect(msg.text).toMatch(regex);
+                    expect(msg.html).toMatch(regex);
+                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    done();
+                });
+            }).catch(done.fail);
+        });
+    });
+
+    describe('sending an email when the user has requested a password reset', function() {
+        it('should work for selfie users', function(done) {
+            producer.produce({
+                type: 'forgotPassword',
+                data: {
+                    target: 'selfie',
+                    token: 'secret-token',
+                    user: mockUser
+                }
+            }).then(function() {
+                mailman.once('Forgot Your Password?', function(msg) {
+                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                    var regex = /https?:\/\/.+id.+u-123.+token.+secret-token/;
+                    expect(msg.text).toMatch(regex);
+                    expect(msg.html).toMatch(regex);
+                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    done();
+                });
+            }).catch(done.fail);
+        });
+
+        it('should work for showcase users', function(done) {
+            producer.produce({
+                type: 'forgotPassword',
+                data: {
+                    target: 'showcase',
+                    token: 'secret-token',
+                    user: mockUser
+                }
+            }).then(function() {
+                mailman.once('Forgot Your Password?', function(msg) {
+                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                    var regex = /https?:\/\/.+id.+u-123.+token.+secret-token/;
+                    expect(msg.text).toMatch(regex);
+                    expect(msg.html).toMatch(regex);
+                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    done();
+                });
+            }).catch(done.fail);
+        });
     });
 
     it('should be able to resend an activation email', function(done) {

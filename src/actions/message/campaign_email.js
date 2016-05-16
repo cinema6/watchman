@@ -5,6 +5,7 @@ var fs = require('fs');
 var handlebars = require('handlebars');
 var htmlToText = require('html-to-text');
 var logger = require('cwrx/lib/logger.js');
+var moment = require('moment');
 var nodemailer = require('nodemailer');
 var path = require('path');
 var requestUtils = require('cwrx/lib/requestUtils.js');
@@ -216,7 +217,14 @@ var __private__ = {
             };
             break;
         case 'paymentMade':
-            template = 'paymentReceipt.html';
+            template = (function() {
+                switch (data.target) {
+                case 'showcase':
+                    return 'paymentReceipt--app.html';
+                default:
+                    return 'paymentReceipt.html';
+                }
+            }());
             templateData = {
                 contact         : emailConfig.supportAddress,
                 amount          : '$' + data.payment.amount.toFixed(2),
@@ -224,6 +232,9 @@ var __private__ = {
                 method          : data.payment.method,
                 date            : new Date(data.payment.createdAt).toLocaleDateString(),
                 balance         : '$' + data.balance.toFixed(2),
+                firstName       : data.user.firstName,
+                billingEndDate  : moment(data.payment.createdAt).add(1, 'month').subtract(1, 'day')
+                                    .toDate().toLocaleDateString()
             };
             break;
         case 'activateAccount':
@@ -233,7 +244,7 @@ var __private__ = {
             template = (function() {
                 switch (data.target) {
                 case 'showcase':
-                    return 'activateAccount--showcase.html';
+                    return 'activateAccount--app.html';
                 default:
                     return 'activateAccount.html';
                 }
@@ -246,38 +257,65 @@ var __private__ = {
             template = (function() {
                 switch (data.target) {
                 case 'showcase':
-                    return 'accountWasActivated--showcase.html';
+                    return 'accountWasActivated--app.html';
                 default:
                     return 'accountWasActivated.html';
                 }
             }());
             templateData = {
-                dashboardLink: emailConfig.dashboardLinks[data.target || 'selfie']
+                dashboardLink: emailConfig.dashboardLinks[data.target || 'selfie'],
+                firstName: data.user.firstName
             };
             break;
         case 'passwordChanged':
-            template = 'passwordChanged.html';
+            template = (function() {
+                switch (data.target) {
+                case 'showcase':
+                    return 'passwordChanged--app.html';
+                default:
+                    return 'passwordChanged.html';
+                }
+            }());
             templateData = {
                 contact: emailConfig.supportAddress,
+                dashboardLink: emailConfig.dashboardLinks[data.target || 'selfie'],
                 date: new Date(data.date).toLocaleDateString(),
+                firstName: data.user.firstName,
                 time: new Date(data.date).toTimeString()
             };
             break;
         case 'emailChanged':
-            template = 'emailChanged.html';
+            template = (function() {
+                switch (data.target) {
+                case 'showcase':
+                    return 'emailChanged--app.html';
+                default:
+                    return 'emailChanged.html';
+                }
+            }());
             templateData = {
                 contact: emailConfig.supportAddress,
-                newEmail: data.newEmail
+                newEmail: data.newEmail,
+                firstName: data.user.firstName
             };
-            if (data.user.email === data.newEmail) {
+            if (data.user.email === data.newEmail || data.target === 'showcase') {
                 templateData.oldEmail = data.oldEmail;
             }
             break;
         case 'failedLogins':
             var targets = emailConfig.passwordResetPages;
             var resetPasswordLink = targets[(data.user.external) ? 'selfie' : 'portal'];
-            template = 'failedLogins.html';
+            template = (function() {
+                switch (data.target) {
+                case 'showcase':
+                    return 'failedLogins--app.html';
+                default:
+                    return 'failedLogins.html';
+                }
+            }());
             templateData = {
+                contact: emailConfig.supportAddress,
+                firstName: data.user.firstName,
                 link: resetPasswordLink
             };
             break;
@@ -285,8 +323,16 @@ var __private__ = {
             var forgotTarget = emailConfig.forgotTargets[data.target];
             var resetLink = forgotTarget + ((forgotTarget.indexOf('?') === -1) ? '?' : '&') +
                 'id=' + data.user.id + '&token=' + data.token;
-            template = 'passwordReset.html';
+            template = (function() {
+                switch (data.target) {
+                case 'showcase':
+                    return 'passwordReset--app.html';
+                default:
+                    return 'passwordReset.html';
+                }
+            }());
             templateData = {
+                firstName: data.user.firstName,
                 resetLink: resetLink
             };
             break;
@@ -330,8 +376,18 @@ var __private__ = {
     /**
     * Gets attachments for the email.
     */
-    getAttachments: function(files) {
+    getAttachments: function(data) {
         var log = logger.getLog();
+
+        var files = (data.target === 'showcase') ? [
+            { filename: 'reelcontent-email-logo-white.png', cid: 'reelContentLogoWhite' },
+            { filename: 'facebook-round-icon.png', cid: 'facebookRoundIcon' },
+            { filename: 'twitter-round-icon.png', cid: 'twitterRoundIcon' },
+            { filename: 'linkedin-round-icon.png', cid: 'linkedinRoundIcon' },
+            { filename: 'website-round-icon.png', cid: 'websiteRoundIcon' }
+        ] : [
+            { filename: 'logo.png', cid: 'reelContentLogo' }
+        ];
         files.forEach(function(file) {
             file.path = path.join(__dirname, TEMPLATE_DIR + '/assets', file.filename);
         });
@@ -384,9 +440,7 @@ function factory(config) {
             subject: __private__.getSubject(emailType, data),
             html: __private__.getHtml(emailType, data, emailConfig),
             text: null,
-            attachments: __private__.getAttachments([{
-                filename: 'logo.png', cid: 'reelContentLogo'
-            }])
+            attachments: __private__.getAttachments(data)
         };
 
         // Ensure all email options have been computed

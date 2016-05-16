@@ -545,11 +545,13 @@ describe('campaign_email.js', function() {
                 supportAddress: 'support@reelcontent.com',
                 passwordResetPages: {
                     portal: 'http://localhost:9000/#/password/reset',
-                    selfie: 'http://localhost:9000/#/pass/reset?selfie=true'
+                    selfie: 'http://localhost:9000/#/pass/reset?selfie=true',
+                    showcase: 'http://localhost:9000/#/showcase/pass/reset'
                 },
                 forgotTargets: {
                     portal: 'http://localhost:9000/#/password/reset',
-                    selfie: 'http://localhost:9000/#/pass/reset?selfie=true'
+                    selfie: 'http://localhost:9000/#/pass/reset?selfie=true',
+                    showcase: 'http://localhost:9000/#/showcase/pass/reset'
                 },
                 previewLink: 'preview link for campaign :campId'
             };
@@ -740,55 +742,106 @@ describe('campaign_email.js', function() {
                 };
                 data.user = {
                     id: 'u-1',
-                    email: 'foo@test.com'
+                    email: 'foo@test.com',
+                    firstName: 'Randy'
                 };
                 data.balance = 9001.9876;
             });
 
-            it('should handle payments from credit cards', function(done) {
-                getHtml('paymentMade', data, emailConfig).then(function() {
-                    expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
-                        'paymentReceipt.html');
-                    expect(handlebars.compile).toHaveBeenCalledWith('template');
-                    expect(compileSpy).toHaveBeenCalledWith({
-                        contact: 'support@reelcontent.com',
-                        amount: '$666.66',
-                        isCreditCard: true,
-                        method: {
-                            type: 'creditCard',
-                            cardType: 'Visa',
-                            cardholderName: 'Johnny Testmonkey',
-                            last4: '1234'
-                        },
-                        date: 'Monday, April 04, 2016',
-                        balance: '$9001.99'
-                    });
-                    expect();
-                    done();
-                }).catch(done.fail);
+            describe('selfie payment receipts', function() {
+                it('should handle payments from credit cards', function(done) {
+                    getHtml('paymentMade', data, emailConfig).then(function() {
+                        expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                            'paymentReceipt.html');
+                        expect(handlebars.compile).toHaveBeenCalledWith('template');
+                        expect(compileSpy).toHaveBeenCalledWith({
+                            contact: 'support@reelcontent.com',
+                            amount: '$666.66',
+                            isCreditCard: true,
+                            method: {
+                                type: 'creditCard',
+                                cardType: 'Visa',
+                                cardholderName: 'Johnny Testmonkey',
+                                last4: '1234',
+                            },
+                            date: 'Monday, April 04, 2016',
+                            billingEndDate: 'Tuesday, May 03, 2016',
+                            balance: '$9001.99',
+                            firstName: 'Randy'
+                        });
+                    }).then(done, done.fail);
+                });
+
+                it('should handle payments from paypal accounts', function(done) {
+                    data.payment.method = { type: 'paypal', email: 'johnny@moneybags.com' };
+
+                    getHtml('paymentMade', data, emailConfig).then(function() {
+                        expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                            'paymentReceipt.html');
+                        expect(handlebars.compile).toHaveBeenCalledWith('template');
+                        expect(compileSpy).toHaveBeenCalledWith({
+                            contact: 'support@reelcontent.com',
+                            amount: '$666.66',
+                            isCreditCard: false,
+                            method: {
+                                type: 'paypal',
+                                email: 'johnny@moneybags.com'
+                            },
+                            date: 'Monday, April 04, 2016',
+                            billingEndDate: 'Tuesday, May 03, 2016',
+                            balance: '$9001.99',
+                            firstName: 'Randy'
+                        });
+                    }).then(done, done.fail);
+                });
             });
 
-            it('should handle payments from paypal accounts', function(done) {
-                data.payment.method = { type: 'paypal', email: 'johnny@moneybags.com' };
+            describe('showcase payment receipts', function() {
+                it('should handle payments from credit cards', function(done) {
+                    getHtml('paymentMade', data, emailConfig).then(function() {
+                        expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                            'paymentReceipt.html');
+                        expect(handlebars.compile).toHaveBeenCalledWith('template');
+                        expect(compileSpy).toHaveBeenCalledWith({
+                            contact: 'support@reelcontent.com',
+                            amount: '$666.66',
+                            isCreditCard: true,
+                            method: {
+                                type: 'creditCard',
+                                cardType: 'Visa',
+                                cardholderName: 'Johnny Testmonkey',
+                                last4: '1234',
+                            },
+                            date: 'Monday, April 04, 2016',
+                            billingEndDate: 'Tuesday, May 03, 2016',
+                            balance: '$9001.99',
+                            firstName: 'Randy'
+                        });
+                    }).then(done, done.fail);
+                });
 
-                getHtml('paymentMade', data, emailConfig).then(function() {
-                    expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
-                        'paymentReceipt.html');
-                    expect(handlebars.compile).toHaveBeenCalledWith('template');
-                    expect(compileSpy).toHaveBeenCalledWith({
-                        contact: 'support@reelcontent.com',
-                        amount: '$666.66',
-                        isCreditCard: false,
-                        method: {
-                            type: 'paypal',
-                            email: 'johnny@moneybags.com'
-                        },
-                        date: 'Monday, April 04, 2016',
-                        balance: '$9001.99'
-                    });
-                    expect();
-                    done();
-                }).catch(done.fail);
+                it('should handle payments from paypal accounts', function(done) {
+                    data.payment.method = { type: 'paypal', email: 'johnny@moneybags.com' };
+
+                    getHtml('paymentMade', data, emailConfig).then(function() {
+                        expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                            'paymentReceipt.html');
+                        expect(handlebars.compile).toHaveBeenCalledWith('template');
+                        expect(compileSpy).toHaveBeenCalledWith({
+                            contact: 'support@reelcontent.com',
+                            amount: '$666.66',
+                            isCreditCard: false,
+                            method: {
+                                type: 'paypal',
+                                email: 'johnny@moneybags.com'
+                            },
+                            date: 'Monday, April 04, 2016',
+                            billingEndDate: 'Tuesday, May 03, 2016',
+                            balance: '$9001.99',
+                            firstName: 'Randy'
+                        });
+                    }).then(done, done.fail);
+                });
             });
         });
 
@@ -859,7 +912,7 @@ describe('campaign_email.js', function() {
                 it('should use the showcase template and data', function(done) {
                     getHtml('activateAccount', data, emailConfig).then(function() {
                         expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
-                            'activateAccount--showcase.html');
+                            'activateAccount--app.html');
                         expect(handlebars.compile).toHaveBeenCalledWith('template');
                         expect(compileSpy).toHaveBeenCalledWith({
                             activationLink: 'http://showcase-link.com?id=u-123&token=token'
@@ -908,6 +961,9 @@ describe('campaign_email.js', function() {
                     selfie: 'dashboard link',
                     showcase: 'showcase dashboard link'
                 };
+                data.user = {
+                    firstName: 'Randy'
+                };
             });
 
             describe('without a target', function() {
@@ -917,7 +973,8 @@ describe('campaign_email.js', function() {
                             'accountWasActivated.html');
                         expect(handlebars.compile).toHaveBeenCalledWith('template');
                         expect(compileSpy).toHaveBeenCalledWith({
-                            dashboardLink: 'dashboard link'
+                            dashboardLink: 'dashboard link',
+                            firstName: 'Randy'
                         });
                         expect();
                         done();
@@ -936,7 +993,8 @@ describe('campaign_email.js', function() {
                             'accountWasActivated.html');
                         expect(handlebars.compile).toHaveBeenCalledWith('template');
                         expect(compileSpy).toHaveBeenCalledWith({
-                            dashboardLink: 'dashboard link'
+                            dashboardLink: 'dashboard link',
+                            firstName: 'Randy'
                         });
                         expect();
                         done();
@@ -952,10 +1010,11 @@ describe('campaign_email.js', function() {
                 it('should use the showcase template and data', function(done) {
                     getHtml('accountWasActivated', data, emailConfig).then(function() {
                         expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
-                            'accountWasActivated--showcase.html');
+                            'accountWasActivated--app.html');
                         expect(handlebars.compile).toHaveBeenCalledWith('template');
                         expect(compileSpy).toHaveBeenCalledWith({
-                            dashboardLink: 'showcase dashboard link'
+                            dashboardLink: 'showcase dashboard link',
+                            firstName: 'Randy'
                         });
                         expect();
                         done();
@@ -964,60 +1023,144 @@ describe('campaign_email.js', function() {
             });
         });
 
-        it('should be able to compile a passwordChanged email', function(done) {
-            data.date = 'Fri Nov 10 2000 00:00:00 GMT-0500 (EST)';
-            getHtml('passwordChanged', data, emailConfig).then(function() {
-                expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
-                    'passwordChanged.html');
-                expect(handlebars.compile).toHaveBeenCalledWith('template');
-                expect(compileSpy).toHaveBeenCalledWith({
-                    contact: 'support@reelcontent.com',
-                    date: 'Friday, November 10, 2000',
-                    time: jasmine.stringMatching(/\d{2}:\d{2}:\d{2}.+/)
-                });
-                expect();
-                done();
-            }).catch(done.fail);
+        describe('compiling a passwordChanged email', function() {
+            beforeEach(function() {
+                data.date = 'Fri Nov 10 2000 00:00:00 GMT-0500 (EST)';
+                data.user = {
+                    firstName: 'Randy'
+                };
+                emailConfig.dashboardLinks = {
+                    selfie: 'dashboard link',
+                    showcase: 'showcase dashboard link'
+                };
+            });
+
+            it('should work for selfie users', function(done) {
+                getHtml('passwordChanged', data, emailConfig).then(function() {
+                    expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                        'passwordChanged.html');
+                    expect(handlebars.compile).toHaveBeenCalledWith('template');
+                    expect(compileSpy).toHaveBeenCalledWith({
+                        contact: 'support@reelcontent.com',
+                        date: 'Friday, November 10, 2000',
+                        time: jasmine.stringMatching(/\d{2}:\d{2}:\d{2}.+/),
+                        firstName: 'Randy',
+                        dashboardLink: 'dashboard link'
+                    });
+                }).then(done, done.fail);
+            });
+
+            it('should work for showcase users', function(done) {
+                data.target = 'showcase';
+                getHtml('passwordChanged', data, emailConfig).then(function() {
+                    expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                        'passwordChanged--app.html');
+                    expect(handlebars.compile).toHaveBeenCalledWith('template');
+                    expect(compileSpy).toHaveBeenCalledWith({
+                        contact: 'support@reelcontent.com',
+                        date: 'Friday, November 10, 2000',
+                        time: jasmine.stringMatching(/\d{2}:\d{2}:\d{2}.+/),
+                        firstName: 'Randy',
+                        dashboardLink: 'showcase dashboard link'
+                    });
+                }).then(done, done.fail);
+            });
         });
 
         describe('compiling an emailChanged email', function() {
-            it('should be able to compile when sending to the new email address', function(done) {
-                data.user = {
-                    email: 'new-email@gmail.com'
-                };
-                data.newEmail = 'new-email@gmail.com';
-                data.oldEmail = 'old-email@gmail.com';
-                getHtml('emailChanged', data, emailConfig).then(function() {
-                    expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
-                        'emailChanged.html');
-                    expect(handlebars.compile).toHaveBeenCalledWith('template');
-                    expect(compileSpy).toHaveBeenCalledWith({
-                        contact: 'support@reelcontent.com',
-                        newEmail: 'new-email@gmail.com',
-                        oldEmail: 'old-email@gmail.com'
-                    });
-                    expect();
-                    done();
-                }).catch(done.fail);
+            describe('for selfie campaigns', function() {
+                it('should be able to compile when sending to the new email address', function(done) {
+                    data.user = {
+                        email: 'new-email@gmail.com',
+                        firstName: 'Randy'
+                    };
+                    data.newEmail = 'new-email@gmail.com';
+                    data.oldEmail = 'old-email@gmail.com';
+                    getHtml('emailChanged', data, emailConfig).then(function() {
+                        expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                            'emailChanged.html');
+                        expect(handlebars.compile).toHaveBeenCalledWith('template');
+                        expect(compileSpy).toHaveBeenCalledWith({
+                            contact: 'support@reelcontent.com',
+                            newEmail: 'new-email@gmail.com',
+                            oldEmail: 'old-email@gmail.com',
+                            firstName: 'Randy'
+                        });
+                        expect();
+                        done();
+                    }).catch(done.fail);
+                });
+
+                it('should be able to compile when sending to the old email address', function(done) {
+                    data.user = {
+                        email: 'old-email@gmail.com',
+                        firstName: 'Randy'
+                    };
+                    data.newEmail = 'new-email@gmail.com';
+                    data.oldEmail = 'old-email@gmail.com';
+                    getHtml('emailChanged', data, emailConfig).then(function() {
+                        expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                            'emailChanged.html');
+                        expect(handlebars.compile).toHaveBeenCalledWith('template');
+                        expect(compileSpy).toHaveBeenCalledWith({
+                            contact: 'support@reelcontent.com',
+                            newEmail: 'new-email@gmail.com',
+                            firstName: 'Randy'
+                        });
+                        expect();
+                        done();
+                    }).catch(done.fail);
+                });
             });
 
-            it('should be able to compile when sending to the old email address', function(done) {
-                data.user = {
-                    email: 'old-email@gmail.com'
-                };
-                data.newEmail = 'new-email@gmail.com';
-                data.oldEmail = 'old-email@gmail.com';
-                getHtml('emailChanged', data, emailConfig).then(function() {
-                    expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
-                        'emailChanged.html');
-                    expect(handlebars.compile).toHaveBeenCalledWith('template');
-                    expect(compileSpy).toHaveBeenCalledWith({
-                        contact: 'support@reelcontent.com',
-                        newEmail: 'new-email@gmail.com'
-                    });
-                    expect();
-                    done();
-                }).catch(done.fail);
+            describe('for showcase campaigns', function() {
+                beforeEach(function() {
+                    data.target = 'showcase';
+                });
+
+                it('should be able to compile when sending to the new email address', function(done) {
+                    data.user = {
+                        email: 'new-email@gmail.com',
+                        firstName: 'Randy'
+                    };
+                    data.newEmail = 'new-email@gmail.com';
+                    data.oldEmail = 'old-email@gmail.com';
+                    getHtml('emailChanged', data, emailConfig).then(function() {
+                        expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                            'emailChanged--app.html');
+                        expect(handlebars.compile).toHaveBeenCalledWith('template');
+                        expect(compileSpy).toHaveBeenCalledWith({
+                            contact: 'support@reelcontent.com',
+                            newEmail: 'new-email@gmail.com',
+                            oldEmail: 'old-email@gmail.com',
+                            firstName: 'Randy'
+                        });
+                        expect();
+                        done();
+                    }).catch(done.fail);
+                });
+
+                it('should be able to compile when sending to the old email address', function(done) {
+                    data.user = {
+                        email: 'old-email@gmail.com',
+                        firstName: 'Randy'
+                    };
+                    data.newEmail = 'new-email@gmail.com';
+                    data.oldEmail = 'old-email@gmail.com';
+                    getHtml('emailChanged', data, emailConfig).then(function() {
+                        expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                            'emailChanged--app.html');
+                        expect(handlebars.compile).toHaveBeenCalledWith('template');
+                        expect(compileSpy).toHaveBeenCalledWith({
+                            contact: 'support@reelcontent.com',
+                            newEmail: 'new-email@gmail.com',
+                            oldEmail: 'old-email@gmail.com',
+                            firstName: 'Randy'
+                        });
+                        expect();
+                        done();
+                    }).catch(done.fail);
+                });
             });
         });
 
@@ -1025,13 +1168,16 @@ describe('campaign_email.js', function() {
             it('should be able to work with selfie users', function(done) {
                 data.user = {
                     email: 'c6e2etester@gmail.com',
-                    external: true
+                    external: true,
+                    firstName: 'Randy'
                 };
                 getHtml('failedLogins', data, emailConfig).then(function() {
                     expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                         'failedLogins.html');
                     expect(handlebars.compile).toHaveBeenCalledWith('template');
                     expect(compileSpy).toHaveBeenCalledWith({
+                        contact: 'support@reelcontent.com',
+                        firstName: 'Randy',
                         link: 'http://localhost:9000/#/pass/reset?selfie=true'
                     });
                     expect();
@@ -1041,59 +1187,90 @@ describe('campaign_email.js', function() {
 
             it('should be able to work with non-selfie users', function(done) {
                 data.user = {
-                    email: 'c6e2etester@gmail.com'
+                    email: 'c6e2etester@gmail.com',
+                    firstName: 'Randy'
                 };
                 getHtml('failedLogins', data, emailConfig).then(function() {
                     expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                         'failedLogins.html');
                     expect(handlebars.compile).toHaveBeenCalledWith('template');
                     expect(compileSpy).toHaveBeenCalledWith({
+                        contact: 'support@reelcontent.com',
+                        firstName: 'Randy',
                         link: 'http://localhost:9000/#/password/reset'
                     });
                     expect();
                     done();
                 }).catch(done.fail);
             });
+
+            it('should be able to work with showcase users', function(done) {
+                data.user = {
+                    email: 'c6e2etester@gmail.com',
+                    firstName: 'Randy'
+                };
+                data.target = 'showcase';
+                getHtml('failedLogins', data, emailConfig).then(function() {
+                    expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                        'failedLogins--app.html');
+                    expect(handlebars.compile).toHaveBeenCalledWith('template');
+                    expect(compileSpy).toHaveBeenCalledWith({
+                        contact: 'support@reelcontent.com',
+                        firstName: 'Randy',
+                        link: 'http://localhost:9000/#/password/reset'
+                    });
+                    expect();
+                }).then(done, done.fail);
+            });
         });
 
         describe('compiling a forgotPassword email', function() {
-            it('should work for targets that have query params', function(done) {
+            beforeEach(function() {
                 data.user = {
                     email: 'c6e2etester@gmail.com',
-                    id: 'u-123'
+                    id: 'u-123',
+                    firstName: 'Randy'
                 };
-                data.target = 'selfie';
                 data.token = 'token';
+            });
+
+            it('should work for targets that have query params', function(done) {
+                data.target = 'selfie';
                 getHtml('forgotPassword', data, emailConfig).then(function() {
                     expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                         'passwordReset.html');
                     expect(handlebars.compile).toHaveBeenCalledWith('template');
                     expect(compileSpy).toHaveBeenCalledWith({
-                        resetLink: 'http://localhost:9000/#/pass/reset?selfie=true' +
-                            '&id=u-123&token=token'
+                        firstName: 'Randy',
+                        resetLink: 'http://localhost:9000/#/pass/reset?selfie=true&id=u-123&token=token'
                     });
-                    expect();
-                    done();
-                }).catch(done.fail);
+                }).then(done, done.fail);
             });
 
             it('should work for targets without query params', function(done) {
-                data.user = {
-                    email: 'c6e2etester@gmail.com',
-                    id: 'u-123'
-                };
                 data.target = 'portal';
-                data.token = 'token';
                 getHtml('forgotPassword', data, emailConfig).then(function() {
                     expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                         'passwordReset.html');
                     expect(handlebars.compile).toHaveBeenCalledWith('template');
                     expect(compileSpy).toHaveBeenCalledWith({
+                        firstName: 'Randy',
                         resetLink: 'http://localhost:9000/#/password/reset?id=u-123&token=token'
                     });
-                    expect();
-                    done();
-                }).catch(done.fail);
+                }).then(done, done.fail);
+            });
+
+            it('should work for showcase users', function(done) {
+                data.target = 'showcase';
+                getHtml('forgotPassword', data, emailConfig).then(function() {
+                    expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                        'passwordReset--app.html');
+                    expect(handlebars.compile).toHaveBeenCalledWith('template');
+                    expect(compileSpy).toHaveBeenCalledWith({
+                        firstName: 'Randy',
+                        resetLink: 'http://localhost:9000/#/showcase/pass/reset?id=u-123&token=token'
+                    });
+                }).then(done, done.fail);
             });
         });
 
@@ -1125,8 +1302,6 @@ describe('campaign_email.js', function() {
     });
 
     describe('getAttachments', function() {
-        var files;
-
         beforeEach(function() {
             emailFactory.__private__.getAttachments.and.callThrough();
             fs.stat.and.callFake(function(path, callback) {
@@ -1136,24 +1311,39 @@ describe('campaign_email.js', function() {
                     }
                 });
             });
-            files = [
-                { filename: 'pic1.jpg', cid: 'picNumbah1' },
-                { filename: 'pic2.png', cid: 'picNumbah2' }
-            ];
         });
 
-        it('should be able to return attachments', function(done) {
-            emailFactory.__private__.getAttachments(files).then(function(attachments) {
-                expect(fs.stat).toHaveBeenCalledWith(path.join(__dirname,
-                    '../../templates/assets/pic1.jpg'), jasmine.any(Function));
-                expect(fs.stat).toHaveBeenCalledWith(path.join(__dirname,
-                    '../../templates/assets/pic2.png'), jasmine.any(Function));
+        it('should be able to return attachments for selfie emails', function(done) {
+            emailFactory.__private__.getAttachments(data).then(function(attachments) {
+                expect(fs.stat).toHaveBeenCalledWith(path.join(__dirname, '../../templates/assets/logo.png'), jasmine.any(Function));
                 expect(attachments).toEqual([
-                    { filename: 'pic1.jpg', cid: 'picNumbah1', path: path.join(__dirname,
-                        '../../templates/assets/pic1.jpg') },
-                    { filename: 'pic2.png', cid: 'picNumbah2', path: path.join(__dirname,
-                        '../../templates/assets/pic2.png') }
+                    {
+                        filename: 'logo.png',
+                        cid: 'reelContentLogo',
+                        path: path.join(__dirname, '../../templates/assets/logo.png')
+                    }
                 ]);
+                done();
+            }).catch(done.fail);
+        });
+
+        it('should be able to return attachments for showcase emails', function(done) {
+            data.target = 'showcase';
+            emailFactory.__private__.getAttachments(data).then(function(attachments) {
+                [
+                    { filename: 'reelcontent-email-logo-white.png', cid: 'reelContentLogoWhite' },
+                    { filename: 'facebook-round-icon.png', cid: 'facebookRoundIcon' },
+                    { filename: 'twitter-round-icon.png', cid: 'twitterRoundIcon' },
+                    { filename: 'linkedin-round-icon.png', cid: 'linkedinRoundIcon' },
+                    { filename: 'website-round-icon.png', cid: 'websiteRoundIcon' }
+                ].forEach(function(file) {
+                    expect(fs.stat).toHaveBeenCalledWith(path.join(__dirname, '../../templates/assets/' + file.filename), jasmine.any(Function));
+                    expect(attachments).toContain({
+                        filename: file.filename,
+                        cid: file.cid,
+                        path: path.join(__dirname, '../../templates/assets/' + file.filename)
+                    });
+                });
                 done();
             }).catch(done.fail);
         });
@@ -1162,19 +1352,13 @@ describe('campaign_email.js', function() {
             fs.stat.and.callFake(function(path, callback) {
                 callback(null, {
                     isFile: function() {
-                        return !(/pic1/.test(path));
+                        return !(/logo/.test(path));
                     }
                 });
             });
-            emailFactory.__private__.getAttachments(files).then(function(attachments) {
-                expect(fs.stat).toHaveBeenCalledWith(path.join(__dirname,
-                    '../../templates/assets/pic1.jpg'), jasmine.any(Function));
-                expect(fs.stat).toHaveBeenCalledWith(path.join(__dirname,
-                    '../../templates/assets/pic2.png'), jasmine.any(Function));
-                expect(attachments).toEqual([
-                    { filename: 'pic2.png', cid: 'picNumbah2', path: path.join(__dirname,
-                        '../../templates/assets/pic2.png') }
-                ]);
+            emailFactory.__private__.getAttachments(data).then(function(attachments) {
+                expect(fs.stat).toHaveBeenCalledWith(path.join(__dirname, '../../templates/assets/logo.png'), jasmine.any(Function));
+                expect(attachments).toEqual([ ]);
                 expect(mockLog.warn).toHaveBeenCalled();
                 done();
             }).catch(done.fail);
@@ -1182,22 +1366,16 @@ describe('campaign_email.js', function() {
 
         it('should log a warning if there is an error checking if the file exists', function(done) {
             fs.stat.and.callFake(function(path, callback) {
-                var error = (/pic1/.test(path)) ? 'epic fail' : null;
+                var error = (/logo/.test(path)) ? 'epic fail' : null;
                 callback(error, {
                     isFile: function() {
                         return true;
                     }
                 });
             });
-            emailFactory.__private__.getAttachments(files).then(function(attachments) {
-                expect(fs.stat).toHaveBeenCalledWith(path.join(__dirname,
-                    '../../templates/assets/pic1.jpg'), jasmine.any(Function));
-                expect(fs.stat).toHaveBeenCalledWith(path.join(__dirname,
-                    '../../templates/assets/pic2.png'), jasmine.any(Function));
-                expect(attachments).toEqual([
-                    { filename: 'pic2.png', cid: 'picNumbah2', path: path.join(__dirname,
-                        '../../templates/assets/pic2.png') }
-                ]);
+            emailFactory.__private__.getAttachments(data).then(function(attachments) {
+                expect(fs.stat).toHaveBeenCalledWith(path.join(__dirname, '../../templates/assets/logo.png'), jasmine.any(Function));
+                expect(attachments).toEqual([ ]);
                 expect(mockLog.warn).toHaveBeenCalled();
                 done();
             }).catch(done.fail);
@@ -1236,8 +1414,7 @@ describe('campaign_email.js', function() {
                 expect(emailFactory.__private__.getSubject).toHaveBeenCalledWith('emailType', data);
                 expect(emailFactory.__private__.getHtml).toHaveBeenCalledWith('emailType', data,
                     config.emails);
-                expect(emailFactory.__private__.getAttachments).toHaveBeenCalledWith(
-                    [{ filename: 'logo.png', cid: 'reelContentLogo' }]);
+                expect(emailFactory.__private__.getAttachments).toHaveBeenCalledWith(data);
                 expect(mockTransport).toHaveBeenCalled();
                 expect(nodemailer.createTransport).toHaveBeenCalledWith('transport');
                 expect(sendMailSpy).toHaveBeenCalledWith({
