@@ -1,13 +1,15 @@
 # Watchman
 
 * *[v0.5.0-rc1]*
+  * [FEATURE]: Add email templates for showcase
   * [FIX]: Fix for an issue that prevented configuration from being dynamically reloaded
   * [FIX]: Fix for an issue that prevented the expiration of campaigns with a pending update request
   * [FEATURE]: Increase the budget of showcase campaigns when their org
     gets more funds
   * **Extra Deployment Steps**:
     * Update watchman app privileges to allow rejecting update requests
-  * [FEATURE]: Add email templates for showcase
+    * Update watchman environments to include showcase targets for emailing
+    * Ensure Cwrx passes target for showcase emails
 
 ## v0.4.0 (April 27, 2016)
 * *[v0.4.0-rc2]*
