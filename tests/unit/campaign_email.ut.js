@@ -908,6 +908,9 @@ describe('campaign_email.js', function() {
                     selfie: 'dashboard link',
                     showcase: 'showcase dashboard link'
                 };
+                data.user = {
+                    firstName: 'Randy'
+                };
             });
 
             describe('without a target', function() {
@@ -917,7 +920,8 @@ describe('campaign_email.js', function() {
                             'accountWasActivated.html');
                         expect(handlebars.compile).toHaveBeenCalledWith('template');
                         expect(compileSpy).toHaveBeenCalledWith({
-                            dashboardLink: 'dashboard link'
+                            dashboardLink: 'dashboard link',
+                            firstName: 'Randy'
                         });
                         expect();
                         done();
@@ -936,7 +940,8 @@ describe('campaign_email.js', function() {
                             'accountWasActivated.html');
                         expect(handlebars.compile).toHaveBeenCalledWith('template');
                         expect(compileSpy).toHaveBeenCalledWith({
-                            dashboardLink: 'dashboard link'
+                            dashboardLink: 'dashboard link',
+                            firstName: 'Randy'
                         });
                         expect();
                         done();
@@ -952,10 +957,11 @@ describe('campaign_email.js', function() {
                 it('should use the showcase template and data', function(done) {
                     getHtml('accountWasActivated', data, emailConfig).then(function() {
                         expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
-                            'accountWasActivated--showcase.html');
+                            'accountWasActivated--app.html');
                         expect(handlebars.compile).toHaveBeenCalledWith('template');
                         expect(compileSpy).toHaveBeenCalledWith({
-                            dashboardLink: 'showcase dashboard link'
+                            dashboardLink: 'showcase dashboard link',
+                            firstName: 'Randy'
                         });
                         expect();
                         done();
@@ -1125,8 +1131,6 @@ describe('campaign_email.js', function() {
     });
 
     describe('getAttachments', function() {
-        var files;
-
         beforeEach(function() {
             emailFactory.__private__.getAttachments.and.callThrough();
             fs.stat.and.callFake(function(path, callback) {
@@ -1136,24 +1140,39 @@ describe('campaign_email.js', function() {
                     }
                 });
             });
-            files = [
-                { filename: 'pic1.jpg', cid: 'picNumbah1' },
-                { filename: 'pic2.png', cid: 'picNumbah2' }
-            ];
         });
 
-        it('should be able to return attachments', function(done) {
-            emailFactory.__private__.getAttachments(files).then(function(attachments) {
-                expect(fs.stat).toHaveBeenCalledWith(path.join(__dirname,
-                    '../../templates/assets/pic1.jpg'), jasmine.any(Function));
-                expect(fs.stat).toHaveBeenCalledWith(path.join(__dirname,
-                    '../../templates/assets/pic2.png'), jasmine.any(Function));
+        it('should be able to return attachments for selfie emails', function(done) {
+            emailFactory.__private__.getAttachments(data).then(function(attachments) {
+                expect(fs.stat).toHaveBeenCalledWith(path.join(__dirname, '../../templates/assets/logo.png'), jasmine.any(Function));
                 expect(attachments).toEqual([
-                    { filename: 'pic1.jpg', cid: 'picNumbah1', path: path.join(__dirname,
-                        '../../templates/assets/pic1.jpg') },
-                    { filename: 'pic2.png', cid: 'picNumbah2', path: path.join(__dirname,
-                        '../../templates/assets/pic2.png') }
+                    {
+                        filename: 'logo.png',
+                        cid: 'reelContentLogo',
+                        path: path.join(__dirname, '../../templates/assets/logo.png')
+                    }
                 ]);
+                done();
+            }).catch(done.fail);
+        });
+
+        it('should be able to return attachments for showcase emails', function(done) {
+            data.target = 'showcase';
+            emailFactory.__private__.getAttachments(data).then(function(attachments) {
+                [
+                    { filename: 'reelcontent-email-logo-white.png', cid: 'reelContentLogoWhite' },
+                    { filename: 'facebook-round-icon.png', cid: 'facebookRoundIcon' },
+                    { filename: 'twitter-round-icon.png', cid: 'twitterRoundIcon' },
+                    { filename: 'linkedin-round-icon.png', cid: 'linkedinRoundIcon' },
+                    { filename: 'website-round-icon.png', cid: 'websiteRoundIcon' }
+                ].forEach(function(file) {
+                    expect(fs.stat).toHaveBeenCalledWith(path.join(__dirname, '../../templates/assets/' + file.filename), jasmine.any(Function));
+                    expect(attachments).toContain({
+                        filename: file.filename,
+                        cid: file.cid,
+                        path: path.join(__dirname, '../../templates/assets/' + file.filename)
+                    });
+                });
                 done();
             }).catch(done.fail);
         });
@@ -1162,19 +1181,13 @@ describe('campaign_email.js', function() {
             fs.stat.and.callFake(function(path, callback) {
                 callback(null, {
                     isFile: function() {
-                        return !(/pic1/.test(path));
+                        return !(/logo/.test(path));
                     }
                 });
             });
-            emailFactory.__private__.getAttachments(files).then(function(attachments) {
-                expect(fs.stat).toHaveBeenCalledWith(path.join(__dirname,
-                    '../../templates/assets/pic1.jpg'), jasmine.any(Function));
-                expect(fs.stat).toHaveBeenCalledWith(path.join(__dirname,
-                    '../../templates/assets/pic2.png'), jasmine.any(Function));
-                expect(attachments).toEqual([
-                    { filename: 'pic2.png', cid: 'picNumbah2', path: path.join(__dirname,
-                        '../../templates/assets/pic2.png') }
-                ]);
+            emailFactory.__private__.getAttachments(data).then(function(attachments) {
+                expect(fs.stat).toHaveBeenCalledWith(path.join(__dirname, '../../templates/assets/logo.png'), jasmine.any(Function));
+                expect(attachments).toEqual([ ]);
                 expect(mockLog.warn).toHaveBeenCalled();
                 done();
             }).catch(done.fail);
@@ -1182,22 +1195,16 @@ describe('campaign_email.js', function() {
 
         it('should log a warning if there is an error checking if the file exists', function(done) {
             fs.stat.and.callFake(function(path, callback) {
-                var error = (/pic1/.test(path)) ? 'epic fail' : null;
+                var error = (/logo/.test(path)) ? 'epic fail' : null;
                 callback(error, {
                     isFile: function() {
                         return true;
                     }
                 });
             });
-            emailFactory.__private__.getAttachments(files).then(function(attachments) {
-                expect(fs.stat).toHaveBeenCalledWith(path.join(__dirname,
-                    '../../templates/assets/pic1.jpg'), jasmine.any(Function));
-                expect(fs.stat).toHaveBeenCalledWith(path.join(__dirname,
-                    '../../templates/assets/pic2.png'), jasmine.any(Function));
-                expect(attachments).toEqual([
-                    { filename: 'pic2.png', cid: 'picNumbah2', path: path.join(__dirname,
-                        '../../templates/assets/pic2.png') }
-                ]);
+            emailFactory.__private__.getAttachments(data).then(function(attachments) {
+                expect(fs.stat).toHaveBeenCalledWith(path.join(__dirname, '../../templates/assets/logo.png'), jasmine.any(Function));
+                expect(attachments).toEqual([ ]);
                 expect(mockLog.warn).toHaveBeenCalled();
                 done();
             }).catch(done.fail);
@@ -1236,8 +1243,7 @@ describe('campaign_email.js', function() {
                 expect(emailFactory.__private__.getSubject).toHaveBeenCalledWith('emailType', data);
                 expect(emailFactory.__private__.getHtml).toHaveBeenCalledWith('emailType', data,
                     config.emails);
-                expect(emailFactory.__private__.getAttachments).toHaveBeenCalledWith(
-                    [{ filename: 'logo.png', cid: 'reelContentLogo' }]);
+                expect(emailFactory.__private__.getAttachments).toHaveBeenCalledWith(data);
                 expect(mockTransport).toHaveBeenCalled();
                 expect(nodemailer.createTransport).toHaveBeenCalledWith('transport');
                 expect(sendMailSpy).toHaveBeenCalledWith({

@@ -246,13 +246,14 @@ var __private__ = {
             template = (function() {
                 switch (data.target) {
                 case 'showcase':
-                    return 'accountWasActivated--showcase.html';
+                    return 'accountWasActivated--app.html';
                 default:
                     return 'accountWasActivated.html';
                 }
             }());
             templateData = {
-                dashboardLink: emailConfig.dashboardLinks[data.target || 'selfie']
+                dashboardLink: emailConfig.dashboardLinks[data.target || 'selfie'],
+                firstName: data.user.firstName
             };
             break;
         case 'passwordChanged':
@@ -330,8 +331,18 @@ var __private__ = {
     /**
     * Gets attachments for the email.
     */
-    getAttachments: function(files) {
+    getAttachments: function(data) {
         var log = logger.getLog();
+
+        var files = (data.target === 'showcase') ? [
+            { filename: 'reelcontent-email-logo-white.png', cid: 'reelContentLogoWhite' },
+            { filename: 'facebook-round-icon.png', cid: 'facebookRoundIcon' },
+            { filename: 'twitter-round-icon.png', cid: 'twitterRoundIcon' },
+            { filename: 'linkedin-round-icon.png', cid: 'linkedinRoundIcon' },
+            { filename: 'website-round-icon.png', cid: 'websiteRoundIcon' }
+        ] : [
+            { filename: 'logo.png', cid: 'reelContentLogo' }
+        ];
         files.forEach(function(file) {
             file.path = path.join(__dirname, TEMPLATE_DIR + '/assets', file.filename);
         });
@@ -384,9 +395,7 @@ function factory(config) {
             subject: __private__.getSubject(emailType, data),
             html: __private__.getHtml(emailType, data, emailConfig),
             text: null,
-            attachments: __private__.getAttachments([{
-                filename: 'logo.png', cid: 'reelContentLogo'
-            }])
+            attachments: __private__.getAttachments(data)
         };
 
         // Ensure all email options have been computed

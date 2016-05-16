@@ -534,10 +534,9 @@ describe('cwrxStream', function() {
                         function(msg) {
                     expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                    var regex = /account\s*is\s*now\s*active/;
+                    var regex = /Terry,\s+your\s+account\s+is\s+live/;
                     expect(msg.text).toMatch(regex);
                     expect(msg.html).toMatch(regex);
-                    expect(msg.text).toContain('ADD MY FIRST PRODUCT');
                     expect((new Date() - msg.date)).toBeLessThan(30000);
                     done();
                 });
