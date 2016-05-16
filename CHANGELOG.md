@@ -7,6 +7,7 @@
     gets more funds
   * **Extra Deployment Steps**:
     * Update watchman app privileges to allow rejecting update requests
+  * [FEATURE]: Add email templates for showcase
 
 ## v0.4.0 (April 27, 2016)
 * *[v0.4.0-rc2]*
