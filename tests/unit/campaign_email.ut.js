@@ -742,55 +742,106 @@ describe('campaign_email.js', function() {
                 };
                 data.user = {
                     id: 'u-1',
-                    email: 'foo@test.com'
+                    email: 'foo@test.com',
+                    firstName: 'Randy'
                 };
                 data.balance = 9001.9876;
             });
 
-            it('should handle payments from credit cards', function(done) {
-                getHtml('paymentMade', data, emailConfig).then(function() {
-                    expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
-                        'paymentReceipt.html');
-                    expect(handlebars.compile).toHaveBeenCalledWith('template');
-                    expect(compileSpy).toHaveBeenCalledWith({
-                        contact: 'support@reelcontent.com',
-                        amount: '$666.66',
-                        isCreditCard: true,
-                        method: {
-                            type: 'creditCard',
-                            cardType: 'Visa',
-                            cardholderName: 'Johnny Testmonkey',
-                            last4: '1234'
-                        },
-                        date: 'Monday, April 04, 2016',
-                        balance: '$9001.99'
-                    });
-                    expect();
-                    done();
-                }).catch(done.fail);
+            describe('selfie payment receipts', function() {
+                it('should handle payments from credit cards', function(done) {
+                    getHtml('paymentMade', data, emailConfig).then(function() {
+                        expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                            'paymentReceipt.html');
+                        expect(handlebars.compile).toHaveBeenCalledWith('template');
+                        expect(compileSpy).toHaveBeenCalledWith({
+                            contact: 'support@reelcontent.com',
+                            amount: '$666.66',
+                            isCreditCard: true,
+                            method: {
+                                type: 'creditCard',
+                                cardType: 'Visa',
+                                cardholderName: 'Johnny Testmonkey',
+                                last4: '1234',
+                            },
+                            date: 'Monday, April 04, 2016',
+                            billingEndDate: 'Tuesday, May 03, 2016',
+                            balance: '$9001.99',
+                            firstName: 'Randy'
+                        });
+                    }).then(done, done.fail);
+                });
+
+                it('should handle payments from paypal accounts', function(done) {
+                    data.payment.method = { type: 'paypal', email: 'johnny@moneybags.com' };
+
+                    getHtml('paymentMade', data, emailConfig).then(function() {
+                        expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                            'paymentReceipt.html');
+                        expect(handlebars.compile).toHaveBeenCalledWith('template');
+                        expect(compileSpy).toHaveBeenCalledWith({
+                            contact: 'support@reelcontent.com',
+                            amount: '$666.66',
+                            isCreditCard: false,
+                            method: {
+                                type: 'paypal',
+                                email: 'johnny@moneybags.com'
+                            },
+                            date: 'Monday, April 04, 2016',
+                            billingEndDate: 'Tuesday, May 03, 2016',
+                            balance: '$9001.99',
+                            firstName: 'Randy'
+                        });
+                    }).then(done, done.fail);
+                });
             });
 
-            it('should handle payments from paypal accounts', function(done) {
-                data.payment.method = { type: 'paypal', email: 'johnny@moneybags.com' };
+            describe('showcase payment receipts', function() {
+                it('should handle payments from credit cards', function(done) {
+                    getHtml('paymentMade', data, emailConfig).then(function() {
+                        expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                            'paymentReceipt.html');
+                        expect(handlebars.compile).toHaveBeenCalledWith('template');
+                        expect(compileSpy).toHaveBeenCalledWith({
+                            contact: 'support@reelcontent.com',
+                            amount: '$666.66',
+                            isCreditCard: true,
+                            method: {
+                                type: 'creditCard',
+                                cardType: 'Visa',
+                                cardholderName: 'Johnny Testmonkey',
+                                last4: '1234',
+                            },
+                            date: 'Monday, April 04, 2016',
+                            billingEndDate: 'Tuesday, May 03, 2016',
+                            balance: '$9001.99',
+                            firstName: 'Randy'
+                        });
+                    }).then(done, done.fail);
+                });
 
-                getHtml('paymentMade', data, emailConfig).then(function() {
-                    expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
-                        'paymentReceipt.html');
-                    expect(handlebars.compile).toHaveBeenCalledWith('template');
-                    expect(compileSpy).toHaveBeenCalledWith({
-                        contact: 'support@reelcontent.com',
-                        amount: '$666.66',
-                        isCreditCard: false,
-                        method: {
-                            type: 'paypal',
-                            email: 'johnny@moneybags.com'
-                        },
-                        date: 'Monday, April 04, 2016',
-                        balance: '$9001.99'
-                    });
-                    expect();
-                    done();
-                }).catch(done.fail);
+                it('should handle payments from paypal accounts', function(done) {
+                    data.payment.method = { type: 'paypal', email: 'johnny@moneybags.com' };
+
+                    getHtml('paymentMade', data, emailConfig).then(function() {
+                        expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                            'paymentReceipt.html');
+                        expect(handlebars.compile).toHaveBeenCalledWith('template');
+                        expect(compileSpy).toHaveBeenCalledWith({
+                            contact: 'support@reelcontent.com',
+                            amount: '$666.66',
+                            isCreditCard: false,
+                            method: {
+                                type: 'paypal',
+                                email: 'johnny@moneybags.com'
+                            },
+                            date: 'Monday, April 04, 2016',
+                            billingEndDate: 'Tuesday, May 03, 2016',
+                            balance: '$9001.99',
+                            firstName: 'Randy'
+                        });
+                    }).then(done, done.fail);
+                });
             });
         });
 
