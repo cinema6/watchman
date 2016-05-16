@@ -312,8 +312,16 @@ var __private__ = {
             var forgotTarget = emailConfig.forgotTargets[data.target];
             var resetLink = forgotTarget + ((forgotTarget.indexOf('?') === -1) ? '?' : '&') +
                 'id=' + data.user.id + '&token=' + data.token;
-            template = 'passwordReset.html';
+            template = (function() {
+                switch (data.target) {
+                case 'showcase':
+                    return 'passwordReset--app.html';
+                default:
+                    return 'passwordReset.html';
+                }
+            }());
             templateData = {
+                firstName: data.user.firstName,
                 resetLink: resetLink
             };
             break;

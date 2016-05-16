@@ -866,26 +866,48 @@ describe('cwrxStream', function() {
         });
     });
 
-    it('should be able to send an email when the user has requested a password reset',
-            function(done) {
-        producer.produce({
-            type: 'forgotPassword',
-            data: {
-                target: 'selfie',
-                token: 'secret-token',
-                user: mockUser
-            }
-        }).then(function() {
-            mailman.once('Forgot Your Password?', function(msg) {
-                expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
-                expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                var regex = /https?:\/\/.+id.+u-123.+token.+secret-token/;
-                expect(msg.text).toMatch(regex);
-                expect(msg.html).toMatch(regex);
-                expect((new Date() - msg.date)).toBeLessThan(30000);
-                done();
-            });
-        }).catch(done.fail);
+    describe('sending an email when the user has requested a password reset', function() {
+        it('should work for selfie users', function(done) {
+            producer.produce({
+                type: 'forgotPassword',
+                data: {
+                    target: 'selfie',
+                    token: 'secret-token',
+                    user: mockUser
+                }
+            }).then(function() {
+                mailman.once('Forgot Your Password?', function(msg) {
+                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                    var regex = /https?:\/\/.+id.+u-123.+token.+secret-token/;
+                    expect(msg.text).toMatch(regex);
+                    expect(msg.html).toMatch(regex);
+                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    done();
+                });
+            }).catch(done.fail);
+        });
+
+        it('should work for showcase users', function(done) {
+            producer.produce({
+                type: 'forgotPassword',
+                data: {
+                    target: 'showcase',
+                    token: 'secret-token',
+                    user: mockUser
+                }
+            }).then(function() {
+                mailman.once('Forgot Your Password?', function(msg) {
+                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                    var regex = /https?:\/\/.+id.+u-123.+token.+secret-token/;
+                    expect(msg.text).toMatch(regex);
+                    expect(msg.html).toMatch(regex);
+                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    done();
+                });
+            }).catch(done.fail);
+        });
     });
 
     it('should be able to resend an activation email', function(done) {

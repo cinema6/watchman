@@ -92,11 +92,13 @@
                         "supportAddress": "c6e2etester@gmail.com",
                         "passwordResetPages": {
                             "portal": "http://localhost:9000/#/password/forgot",
-                            "selfie": "http://localhost:9000/#/pass/forgot?selfie=true"
+                            "selfie": "http://localhost:9000/#/pass/forgot?selfie=true",
+                            "showcase": "http://localhost:9000/#/showcase/pass/forgot"
                         },
                         "forgotTargets": {
                             "portal": "http://localhost:9000/#/password/reset",
-                            "selfie": "http://localhost:9000/#/pass/reset?selfie=true"
+                            "selfie": "http://localhost:9000/#/pass/reset?selfie=true",
+                            "showcase": "http://localhost:9000/#/showcase/pass/reset"
                         },
                         "previewLink": "https://reelcontent.com/preview/?previewSource=platform&campaign=:campId"
                     },

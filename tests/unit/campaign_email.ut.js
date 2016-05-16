@@ -545,11 +545,13 @@ describe('campaign_email.js', function() {
                 supportAddress: 'support@reelcontent.com',
                 passwordResetPages: {
                     portal: 'http://localhost:9000/#/password/reset',
-                    selfie: 'http://localhost:9000/#/pass/reset?selfie=true'
+                    selfie: 'http://localhost:9000/#/pass/reset?selfie=true',
+                    showcase: 'http://localhost:9000/#/showcase/pass/reset'
                 },
                 forgotTargets: {
                     portal: 'http://localhost:9000/#/password/reset',
-                    selfie: 'http://localhost:9000/#/pass/reset?selfie=true'
+                    selfie: 'http://localhost:9000/#/pass/reset?selfie=true',
+                    showcase: 'http://localhost:9000/#/showcase/pass/reset'
                 },
                 previewLink: 'preview link for campaign :campId'
             };
@@ -1172,43 +1174,52 @@ describe('campaign_email.js', function() {
         });
 
         describe('compiling a forgotPassword email', function() {
-            it('should work for targets that have query params', function(done) {
+            beforeEach(function() {
                 data.user = {
                     email: 'c6e2etester@gmail.com',
-                    id: 'u-123'
+                    id: 'u-123',
+                    firstName: 'Randy'
                 };
-                data.target = 'selfie';
                 data.token = 'token';
+            });
+
+            it('should work for targets that have query params', function(done) {
+                data.target = 'selfie';
                 getHtml('forgotPassword', data, emailConfig).then(function() {
                     expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                         'passwordReset.html');
                     expect(handlebars.compile).toHaveBeenCalledWith('template');
                     expect(compileSpy).toHaveBeenCalledWith({
-                        resetLink: 'http://localhost:9000/#/pass/reset?selfie=true' +
-                            '&id=u-123&token=token'
+                        firstName: 'Randy',
+                        resetLink: 'http://localhost:9000/#/pass/reset?selfie=true&id=u-123&token=token'
                     });
-                    expect();
-                    done();
-                }).catch(done.fail);
+                }).then(done, done.fail);
             });
 
             it('should work for targets without query params', function(done) {
-                data.user = {
-                    email: 'c6e2etester@gmail.com',
-                    id: 'u-123'
-                };
                 data.target = 'portal';
-                data.token = 'token';
                 getHtml('forgotPassword', data, emailConfig).then(function() {
                     expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                         'passwordReset.html');
                     expect(handlebars.compile).toHaveBeenCalledWith('template');
                     expect(compileSpy).toHaveBeenCalledWith({
+                        firstName: 'Randy',
                         resetLink: 'http://localhost:9000/#/password/reset?id=u-123&token=token'
                     });
-                    expect();
-                    done();
-                }).catch(done.fail);
+                }).then(done, done.fail);
+            });
+
+            it('should work for showcase users', function(done) {
+                data.target = 'showcase';
+                getHtml('forgotPassword', data, emailConfig).then(function() {
+                    expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                        'passwordReset--app.html');
+                    expect(handlebars.compile).toHaveBeenCalledWith('template');
+                    expect(compileSpy).toHaveBeenCalledWith({
+                        firstName: 'Randy',
+                        resetLink: 'http://localhost:9000/#/showcase/pass/reset?id=u-123&token=token'
+                    });
+                }).then(done, done.fail);
             });
         });
 
