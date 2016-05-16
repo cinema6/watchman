@@ -279,7 +279,8 @@
                                     },
                                     "ifData": {
                                         "previousState": "active|paused",
-                                        "currentState": "expired"
+                                        "currentState": "expired",
+                                        "campaign.application": "^(studio|selfie)$"
                                     }
                                 },
                                 {
@@ -288,7 +289,8 @@
                                         "type": "campaignReachedBudget"
                                     },
                                     "ifData": {
-                                        "currentState": "outOfBudget"
+                                        "currentState": "outOfBudget",
+                                        "campaign.application": "^(studio|selfie)$"
                                     }
                                 },
                                 {
@@ -298,7 +300,8 @@
                                     },
                                     "ifData": {
                                         "previousState": "pending",
-                                        "currentState": "active"
+                                        "currentState": "active",
+                                        "campaign.application": "^(studio|selfie)$"
                                     }
                                 }
                             ]
