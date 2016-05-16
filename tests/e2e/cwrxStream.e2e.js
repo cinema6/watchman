@@ -674,26 +674,49 @@ describe('cwrxStream', function() {
         });
     });
 
-    it('should send an email notifying the user that their password has been changed',
-            function(done) {
-        producer.produce({
-            type: 'passwordChanged',
-            data: {
-                date: new Date(),
-                user: mockUser
-            }
-        }).then(function() {
-            mailman.once('Reelcontent Password Change Notice',
-                    function(msg) {
-                expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
-                expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                var regex = /password\s*was\s*changed\s*on.*at.*/;
-                expect(msg.text).toMatch(regex);
-                expect(msg.html).toMatch(regex);
-                expect((new Date() - msg.date)).toBeLessThan(30000);
-                done();
-            });
-        }).catch(done.fail);
+    describe('notifying the user that their password has been changed', function() {
+        it('should be able to send an email formatted for selfie users', function(done) {
+            producer.produce({
+                type: 'passwordChanged',
+                data: {
+                    date: new Date(),
+                    user: mockUser
+                }
+            }).then(function() {
+                mailman.once('Reelcontent Password Change Notice',
+                        function(msg) {
+                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                    var regex = /password\s*was\s*changed\s*on.*at.*/;
+                    expect(msg.text).toMatch(regex);
+                    expect(msg.html).toMatch(regex);
+                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    done();
+                });
+            }).catch(done.fail);
+        });
+
+        it('should be able to send an email formatted for showcase users', function(done) {
+            producer.produce({
+                type: 'passwordChanged',
+                data: {
+                    date: new Date(),
+                    user: mockUser,
+                    target: 'showcase'
+                }
+            }).then(function() {
+                mailman.once('Reelcontent Password Change Notice',
+                        function(msg) {
+                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                    var regex = /Terry, Just a quick note/;
+                    expect(msg.text).toMatch(regex);
+                    expect(msg.html).toMatch(regex);
+                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    done();
+                });
+            }).catch(done.fail);
+        });
     });
 
     describe('sending an email to notify of an email change', function() {

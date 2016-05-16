@@ -14,7 +14,7 @@ var requestUtils = require('cwrx/lib/requestUtils.js');
 var uuid = require('rc-uuid');
 var resolveURL = require('url').resolve;
 
-fdescribe('campaign_email.js', function() {
+describe('campaign_email.js', function() {
     var emailFactory;
     var email;
     var data;
@@ -970,20 +970,48 @@ fdescribe('campaign_email.js', function() {
             });
         });
 
-        it('should be able to compile a passwordChanged email', function(done) {
-            data.date = 'Fri Nov 10 2000 00:00:00 GMT-0500 (EST)';
-            getHtml('passwordChanged', data, emailConfig).then(function() {
-                expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
-                    'passwordChanged.html');
-                expect(handlebars.compile).toHaveBeenCalledWith('template');
-                expect(compileSpy).toHaveBeenCalledWith({
-                    contact: 'support@reelcontent.com',
-                    date: 'Friday, November 10, 2000',
-                    time: jasmine.stringMatching(/\d{2}:\d{2}:\d{2}.+/)
-                });
-                expect();
-                done();
-            }).catch(done.fail);
+        describe('compiling a passwordChanged email', function() {
+            beforeEach(function() {
+                data.date = 'Fri Nov 10 2000 00:00:00 GMT-0500 (EST)';
+                data.user = {
+                    firstName: 'Randy'
+                };
+                emailConfig.dashboardLinks = {
+                    selfie: 'dashboard link',
+                    showcase: 'showcase dashboard link'
+                };
+            });
+
+            it('should work for selfie users', function(done) {
+                getHtml('passwordChanged', data, emailConfig).then(function() {
+                    expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                        'passwordChanged.html');
+                    expect(handlebars.compile).toHaveBeenCalledWith('template');
+                    expect(compileSpy).toHaveBeenCalledWith({
+                        contact: 'support@reelcontent.com',
+                        date: 'Friday, November 10, 2000',
+                        time: jasmine.stringMatching(/\d{2}:\d{2}:\d{2}.+/),
+                        firstName: 'Randy',
+                        dashboardLink: 'dashboard link'
+                    });
+                }).then(done, done.fail);
+            });
+
+            it('should work for showcase users', function(done) {
+                data.target = 'showcase';
+                getHtml('passwordChanged', data, emailConfig).then(function() {
+                    expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                        'passwordChanged--app.html');
+                    expect(handlebars.compile).toHaveBeenCalledWith('template');
+                    expect(compileSpy).toHaveBeenCalledWith({
+                        contact: 'support@reelcontent.com',
+                        date: 'Friday, November 10, 2000',
+                        time: jasmine.stringMatching(/\d{2}:\d{2}:\d{2}.+/),
+                        firstName: 'Randy',
+                        dashboardLink: 'showcase dashboard link'
+                    });
+                }).then(done, done.fail);
+            });
         });
 
         describe('compiling an emailChanged email', function() {

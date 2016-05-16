@@ -257,10 +257,19 @@ var __private__ = {
             };
             break;
         case 'passwordChanged':
-            template = 'passwordChanged.html';
+            template = (function() {
+                switch (data.target) {
+                case 'showcase':
+                    return 'passwordChanged--app.html';
+                default:
+                    return 'passwordChanged.html';
+                }
+            }());
             templateData = {
                 contact: emailConfig.supportAddress,
+                dashboardLink: emailConfig.dashboardLinks[data.target || 'selfie'],
                 date: new Date(data.date).toLocaleDateString(),
+                firstName: data.user.firstName,
                 time: new Date(data.date).toTimeString()
             };
             break;
