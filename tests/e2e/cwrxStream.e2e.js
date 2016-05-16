@@ -696,52 +696,109 @@ describe('cwrxStream', function() {
         }).catch(done.fail);
     });
 
-    describe('sending an email to notify of a password change', function() {
-        it('should be able to notify the old email address', function(done) {
-            producer.produce({
-                type: 'emailChanged',
-                data: {
-                    user: mockUser,
-                    oldEmail: 'c6e2etester@gmail.com',
-                    newEmail: 'c6e2etester2@gmail.com'
-                }
-            }).then(function() {
-                mailman.once('Your Email Has Been Changed', function(msg) {
-                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
-                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                    var regex = /c6e2etester2@gmail.com/;
-                    expect(msg.text).toMatch(regex);
-                    expect(msg.html).toMatch(regex);
-                    expect((new Date() - msg.date)).toBeLessThan(30000);
-                    done();
-                });
-            }).catch(done.fail);
-        });
-
-        it('should be able to notify the new email address', function(done) {
-            mockUser.email = 'c6e2etester2@gmail.com';
-            producer.produce({
-                type: 'emailChanged',
-                data: {
-                    user: mockUser,
-                    oldEmail: 'c6e2etester@gmail.com',
-                    newEmail: 'c6e2etester2@gmail.com'
-                }
-            }).then(function() {
-                mailman2.once('Your Email Has Been Changed', function(msg) {
-                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
-                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester2@gmail.com');
-                    [
-                        /c6e2etester@gmail.com/,
-                        /c6e2etester2@gmail.com/
-                    ].forEach(function(regex) {
+    describe('sending an email to notify of an email change', function() {
+        describe('for selfie campaigns', function() {
+            it('should be able to notify the old email address', function(done) {
+                producer.produce({
+                    type: 'emailChanged',
+                    data: {
+                        user: mockUser,
+                        oldEmail: 'c6e2etester@gmail.com',
+                        newEmail: 'c6e2etester2@gmail.com'
+                    }
+                }).then(function() {
+                    mailman.once('Your Email Has Been Changed', function(msg) {
+                        expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                        expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                        var regex = /c6e2etester2@gmail\.com/;
                         expect(msg.text).toMatch(regex);
                         expect(msg.html).toMatch(regex);
+                        expect((new Date() - msg.date)).toBeLessThan(30000);
+                        done();
                     });
-                    expect((new Date() - msg.date)).toBeLessThan(30000);
-                    done();
-                });
-            }).catch(done.fail);
+                }).catch(done.fail);
+            });
+
+            it('should be able to notify the new email address', function(done) {
+                mockUser.email = 'c6e2etester2@gmail.com';
+                producer.produce({
+                    type: 'emailChanged',
+                    data: {
+                        user: mockUser,
+                        oldEmail: 'c6e2etester@gmail.com',
+                        newEmail: 'c6e2etester2@gmail.com'
+                    }
+                }).then(function() {
+                    mailman2.once('Your Email Has Been Changed', function(msg) {
+                        expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                        expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester2@gmail.com');
+                        [
+                            /c6e2etester@gmail\.com/,
+                            /c6e2etester2@gmail\.com/
+                        ].forEach(function(regex) {
+                            expect(msg.text).toMatch(regex);
+                            expect(msg.html).toMatch(regex);
+                        });
+                        expect((new Date() - msg.date)).toBeLessThan(30000);
+                        done();
+                    });
+                }).catch(done.fail);
+            });
+        });
+
+        describe('for showcase campaigns', function() {
+            it('should be able to notify the old email address', function(done) {
+                producer.produce({
+                    type: 'emailChanged',
+                    data: {
+                        user: mockUser,
+                        oldEmail: 'c6e2etester@gmail.com',
+                        newEmail: 'c6e2etester2@gmail.com',
+                        target: 'showcase'
+                    }
+                }).then(function() {
+                    mailman.once('Your Email Has Been Changed', function(msg) {
+                        expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                        expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                        [
+                            /c6e2etester@gmail\.com/,
+                            /c6e2etester2@gmail\.com/
+                        ].forEach(function(regex) {
+                            expect(msg.text).toMatch(regex);
+                            expect(msg.html).toMatch(regex);
+                        });
+                        expect((new Date() - msg.date)).toBeLessThan(30000);
+                        done();
+                    });
+                }).catch(done.fail);
+            });
+
+            it('should be able to notify the new email address', function(done) {
+                mockUser.email = 'c6e2etester2@gmail.com';
+                producer.produce({
+                    type: 'emailChanged',
+                    data: {
+                        user: mockUser,
+                        oldEmail: 'c6e2etester@gmail.com',
+                        newEmail: 'c6e2etester2@gmail.com',
+                        target: 'showcase'
+                    }
+                }).then(function() {
+                    mailman2.once('Your Email Has Been Changed', function(msg) {
+                        expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                        expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester2@gmail.com');
+                        [
+                            /c6e2etester@gmail\.com/,
+                            /c6e2etester2@gmail\.com/
+                        ].forEach(function(regex) {
+                            expect(msg.text).toMatch(regex);
+                            expect(msg.html).toMatch(regex);
+                        });
+                        expect((new Date() - msg.date)).toBeLessThan(30000);
+                        done();
+                    });
+                }).catch(done.fail);
+            });
         });
     });
 

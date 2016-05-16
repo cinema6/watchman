@@ -987,43 +987,99 @@ describe('campaign_email.js', function() {
         });
 
         describe('compiling an emailChanged email', function() {
-            it('should be able to compile when sending to the new email address', function(done) {
-                data.user = {
-                    email: 'new-email@gmail.com'
-                };
-                data.newEmail = 'new-email@gmail.com';
-                data.oldEmail = 'old-email@gmail.com';
-                getHtml('emailChanged', data, emailConfig).then(function() {
-                    expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
-                        'emailChanged.html');
-                    expect(handlebars.compile).toHaveBeenCalledWith('template');
-                    expect(compileSpy).toHaveBeenCalledWith({
-                        contact: 'support@reelcontent.com',
-                        newEmail: 'new-email@gmail.com',
-                        oldEmail: 'old-email@gmail.com'
-                    });
-                    expect();
-                    done();
-                }).catch(done.fail);
+            describe('for selfie campaigns', function() {
+                it('should be able to compile when sending to the new email address', function(done) {
+                    data.user = {
+                        email: 'new-email@gmail.com',
+                        firstName: 'Randy'
+                    };
+                    data.newEmail = 'new-email@gmail.com';
+                    data.oldEmail = 'old-email@gmail.com';
+                    getHtml('emailChanged', data, emailConfig).then(function() {
+                        expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                            'emailChanged.html');
+                        expect(handlebars.compile).toHaveBeenCalledWith('template');
+                        expect(compileSpy).toHaveBeenCalledWith({
+                            contact: 'support@reelcontent.com',
+                            newEmail: 'new-email@gmail.com',
+                            oldEmail: 'old-email@gmail.com',
+                            firstName: 'Randy'
+                        });
+                        expect();
+                        done();
+                    }).catch(done.fail);
+                });
+
+                it('should be able to compile when sending to the old email address', function(done) {
+                    data.user = {
+                        email: 'old-email@gmail.com',
+                        firstName: 'Randy'
+                    };
+                    data.newEmail = 'new-email@gmail.com';
+                    data.oldEmail = 'old-email@gmail.com';
+                    getHtml('emailChanged', data, emailConfig).then(function() {
+                        expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                            'emailChanged.html');
+                        expect(handlebars.compile).toHaveBeenCalledWith('template');
+                        expect(compileSpy).toHaveBeenCalledWith({
+                            contact: 'support@reelcontent.com',
+                            newEmail: 'new-email@gmail.com',
+                            firstName: 'Randy'
+                        });
+                        expect();
+                        done();
+                    }).catch(done.fail);
+                });
             });
 
-            it('should be able to compile when sending to the old email address', function(done) {
-                data.user = {
-                    email: 'old-email@gmail.com'
-                };
-                data.newEmail = 'new-email@gmail.com';
-                data.oldEmail = 'old-email@gmail.com';
-                getHtml('emailChanged', data, emailConfig).then(function() {
-                    expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
-                        'emailChanged.html');
-                    expect(handlebars.compile).toHaveBeenCalledWith('template');
-                    expect(compileSpy).toHaveBeenCalledWith({
-                        contact: 'support@reelcontent.com',
-                        newEmail: 'new-email@gmail.com'
-                    });
-                    expect();
-                    done();
-                }).catch(done.fail);
+            describe('for showcase campaigns', function() {
+                beforeEach(function() {
+                    data.target = 'showcase';
+                });
+
+                it('should be able to compile when sending to the new email address', function(done) {
+                    data.user = {
+                        email: 'new-email@gmail.com',
+                        firstName: 'Randy'
+                    };
+                    data.newEmail = 'new-email@gmail.com';
+                    data.oldEmail = 'old-email@gmail.com';
+                    getHtml('emailChanged', data, emailConfig).then(function() {
+                        expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                            'emailChanged--app.html');
+                        expect(handlebars.compile).toHaveBeenCalledWith('template');
+                        expect(compileSpy).toHaveBeenCalledWith({
+                            contact: 'support@reelcontent.com',
+                            newEmail: 'new-email@gmail.com',
+                            oldEmail: 'old-email@gmail.com',
+                            firstName: 'Randy'
+                        });
+                        expect();
+                        done();
+                    }).catch(done.fail);
+                });
+
+                it('should be able to compile when sending to the old email address', function(done) {
+                    data.user = {
+                        email: 'old-email@gmail.com',
+                        firstName: 'Randy'
+                    };
+                    data.newEmail = 'new-email@gmail.com';
+                    data.oldEmail = 'old-email@gmail.com';
+                    getHtml('emailChanged', data, emailConfig).then(function() {
+                        expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                            'emailChanged--app.html');
+                        expect(handlebars.compile).toHaveBeenCalledWith('template');
+                        expect(compileSpy).toHaveBeenCalledWith({
+                            contact: 'support@reelcontent.com',
+                            newEmail: 'new-email@gmail.com',
+                            oldEmail: 'old-email@gmail.com',
+                            firstName: 'Randy'
+                        });
+                        expect();
+                        done();
+                    }).catch(done.fail);
+                });
             });
         });
 

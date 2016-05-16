@@ -265,12 +265,20 @@ var __private__ = {
             };
             break;
         case 'emailChanged':
-            template = 'emailChanged.html';
+            template = (function() {
+                switch (data.target) {
+                case 'showcase':
+                    return 'emailChanged--app.html';
+                default:
+                    return 'emailChanged.html';
+                }
+            }());
             templateData = {
                 contact: emailConfig.supportAddress,
-                newEmail: data.newEmail
+                newEmail: data.newEmail,
+                firstName: data.user.firstName
             };
-            if (data.user.email === data.newEmail) {
+            if (data.user.email === data.newEmail || data.target === 'showcase') {
                 templateData.oldEmail = data.oldEmail;
             }
             break;
