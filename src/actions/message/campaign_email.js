@@ -285,8 +285,17 @@ var __private__ = {
         case 'failedLogins':
             var targets = emailConfig.passwordResetPages;
             var resetPasswordLink = targets[(data.user.external) ? 'selfie' : 'portal'];
-            template = 'failedLogins.html';
+            template = (function() {
+                switch (data.target) {
+                case 'showcase':
+                    return 'failedLogins--app.html';
+                default:
+                    return 'failedLogins.html';
+                }
+            }());
             templateData = {
+                contact: emailConfig.supportAddress,
+                firstName: data.user.firstName,
                 link: resetPasswordLink
             };
             break;

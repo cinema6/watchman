@@ -14,7 +14,7 @@ var requestUtils = require('cwrx/lib/requestUtils.js');
 var uuid = require('rc-uuid');
 var resolveURL = require('url').resolve;
 
-describe('campaign_email.js', function() {
+fdescribe('campaign_email.js', function() {
     var emailFactory;
     var email;
     var data;
@@ -1087,13 +1087,16 @@ describe('campaign_email.js', function() {
             it('should be able to work with selfie users', function(done) {
                 data.user = {
                     email: 'c6e2etester@gmail.com',
-                    external: true
+                    external: true,
+                    firstName: 'Randy'
                 };
                 getHtml('failedLogins', data, emailConfig).then(function() {
                     expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                         'failedLogins.html');
                     expect(handlebars.compile).toHaveBeenCalledWith('template');
                     expect(compileSpy).toHaveBeenCalledWith({
+                        contact: 'support@reelcontent.com',
+                        firstName: 'Randy',
                         link: 'http://localhost:9000/#/pass/reset?selfie=true'
                     });
                     expect();
@@ -1103,18 +1106,40 @@ describe('campaign_email.js', function() {
 
             it('should be able to work with non-selfie users', function(done) {
                 data.user = {
-                    email: 'c6e2etester@gmail.com'
+                    email: 'c6e2etester@gmail.com',
+                    firstName: 'Randy'
                 };
                 getHtml('failedLogins', data, emailConfig).then(function() {
                     expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                         'failedLogins.html');
                     expect(handlebars.compile).toHaveBeenCalledWith('template');
                     expect(compileSpy).toHaveBeenCalledWith({
+                        contact: 'support@reelcontent.com',
+                        firstName: 'Randy',
                         link: 'http://localhost:9000/#/password/reset'
                     });
                     expect();
                     done();
                 }).catch(done.fail);
+            });
+
+            it('should be able to work with showcase users', function(done) {
+                data.user = {
+                    email: 'c6e2etester@gmail.com',
+                    firstName: 'Randy'
+                };
+                data.target = 'showcase';
+                getHtml('failedLogins', data, emailConfig).then(function() {
+                    expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
+                        'failedLogins--app.html');
+                    expect(handlebars.compile).toHaveBeenCalledWith('template');
+                    expect(compileSpy).toHaveBeenCalledWith({
+                        contact: 'support@reelcontent.com',
+                        firstName: 'Randy',
+                        link: 'http://localhost:9000/#/password/reset'
+                    });
+                    expect();
+                }).then(done, done.fail);
             });
         });
 

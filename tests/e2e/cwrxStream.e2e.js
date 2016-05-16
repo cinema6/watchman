@@ -802,23 +802,45 @@ describe('cwrxStream', function() {
         });
     });
 
-    it('should be able to send an email after multiple failed password attempts', function(done) {
-        producer.produce({
-            type: 'failedLogins',
-            data: {
-                user: mockUser
-            }
-        }).then(function() {
-            mailman.once('Reelcontent: Multiple-Failed Logins', function(msg) {
-                expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
-                expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                var regex = /consecutive\s*failed\s*login\s*attempts/;
-                expect(msg.text).toMatch(regex);
-                expect(msg.html).toMatch(regex);
-                expect((new Date() - msg.date)).toBeLessThan(30000);
-                done();
-            });
-        }).catch(done.fail);
+    describe('sending an email after multiple failed password attempts', function() {
+        it('should be able to send an email formatted for selfie users', function(done) {
+            producer.produce({
+                type: 'failedLogins',
+                data: {
+                    user: mockUser
+                }
+            }).then(function() {
+                mailman.once('Reelcontent: Multiple-Failed Logins', function(msg) {
+                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                    var regex = /consecutive\s*failed\s*login\s*attempts/;
+                    expect(msg.text).toMatch(regex);
+                    expect(msg.html).toMatch(regex);
+                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    done();
+                });
+            }).catch(done.fail);
+        });
+
+        it('should be able to send an email formatted for showcase users', function(done) {
+            producer.produce({
+                type: 'failedLogins',
+                data: {
+                    user: mockUser,
+                    target: 'showcase'
+                }
+            }).then(function() {
+                mailman.once('Reelcontent: Multiple-Failed Logins', function(msg) {
+                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                    var regex = /Terry,\s+Looks\s+like\s+someone\s+has\s+tried\s+to\s+log\s+into\s+your\s+account/;
+                    expect(msg.text).toMatch(regex);
+                    expect(msg.html).toMatch(regex);
+                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    done();
+                });
+            }).catch(done.fail);
+        });
     });
 
     it('should be able to send an email when the user has requested a password reset',
