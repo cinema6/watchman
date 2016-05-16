@@ -493,7 +493,7 @@ describe('cwrxStream', function() {
                 expect(msg.text).toMatch(regex);
                 expect(msg.html).toMatch(regex);
                 expect((new Date() - msg.date)).toBeLessThan(30000);
-                expect(msg.text).toContain('Welcome to Reelcontent Marketing!');
+                expect(msg.text.toLowerCase()).toContain('welcome to reelcontent apps');
                 done();
             });
         }).catch(done.fail);

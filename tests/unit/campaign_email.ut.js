@@ -859,7 +859,7 @@ describe('campaign_email.js', function() {
                 it('should use the showcase template and data', function(done) {
                     getHtml('activateAccount', data, emailConfig).then(function() {
                         expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
-                            'activateAccount--showcase.html');
+                            'activateAccount--app.html');
                         expect(handlebars.compile).toHaveBeenCalledWith('template');
                         expect(compileSpy).toHaveBeenCalledWith({
                             activationLink: 'http://showcase-link.com?id=u-123&token=token'

@@ -233,7 +233,7 @@ var __private__ = {
             template = (function() {
                 switch (data.target) {
                 case 'showcase':
-                    return 'activateAccount--showcase.html';
+                    return 'activateAccount--app.html';
                 default:
                     return 'activateAccount.html';
                 }
