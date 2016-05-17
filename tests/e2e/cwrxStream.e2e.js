@@ -39,7 +39,8 @@ describe('cwrxStream', function() {
         producer = new JsonProducer(CWRX_STREAM, awsConfig);
         mockCampaign = {
             id: 'c-123',
-            name: 'Cooltastic Campaign'
+            name: 'Cooltastic Campaign',
+            application: 'selfie'
         };
         mockUser = {
             company: 'Evil Corp',
