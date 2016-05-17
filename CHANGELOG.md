@@ -1,5 +1,6 @@
 # Watchman
 
+## v0.5.0 (May 17, 2016)
 * *[v0.5.0-rc1]*
   * [FEATURE]: Add email templates for showcase
   * [FIX]: Fix for an issue that prevented configuration from being dynamically reloaded
@@ -10,6 +11,7 @@
     * Update watchman app privileges to allow rejecting update requests
     * Update watchman environments to include showcase targets for emailing
     * Ensure Cwrx passes target for showcase emails
+* *[/v0.5.0-rc1]*
 
 ## v0.4.0 (April 27, 2016)
 * *[v0.4.0-rc2]*
