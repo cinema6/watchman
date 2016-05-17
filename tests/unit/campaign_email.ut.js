@@ -1171,6 +1171,7 @@ describe('campaign_email.js', function() {
                     external: true,
                     firstName: 'Randy'
                 };
+                data.target = 'selfie';
                 getHtml('failedLogins', data, emailConfig).then(function() {
                     expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                         'failedLogins.html');
@@ -1185,11 +1186,12 @@ describe('campaign_email.js', function() {
                 }).catch(done.fail);
             });
 
-            it('should be able to work with non-selfie users', function(done) {
+            it('should be able to work with portal users', function(done) {
                 data.user = {
                     email: 'c6e2etester@gmail.com',
                     firstName: 'Randy'
                 };
+                data.target = 'portal';
                 getHtml('failedLogins', data, emailConfig).then(function() {
                     expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                         'failedLogins.html');
@@ -1217,7 +1219,7 @@ describe('campaign_email.js', function() {
                     expect(compileSpy).toHaveBeenCalledWith({
                         contact: 'support@reelcontent.com',
                         firstName: 'Randy',
-                        link: 'http://localhost:9000/#/password/reset'
+                        link: 'http://localhost:9000/#/showcase/pass/reset'
                     });
                     expect();
                 }).then(done, done.fail);

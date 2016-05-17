@@ -1,6 +1,10 @@
 # Watchman
 
 ## v0.5.0 (May 17, 2016)
+* *[v0.5.0-rc2]*
+  * [FIX]: Fix for an issue that prevented showcase failed logins emails from using the proper showcase link
+* *[/v0.5.0-rc2]*
+
 * *[v0.5.0-rc1]*
   * [FEATURE]: Add email templates for showcase
   * [FIX]: Fix for an issue that prevented configuration from being dynamically reloaded

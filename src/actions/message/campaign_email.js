@@ -303,8 +303,7 @@ var __private__ = {
             }
             break;
         case 'failedLogins':
-            var targets = emailConfig.passwordResetPages;
-            var resetPasswordLink = targets[(data.user.external) ? 'selfie' : 'portal'];
+            var resetPasswordLink = emailConfig.passwordResetPages[data.target];
             template = (function() {
                 switch (data.target) {
                 case 'showcase':
