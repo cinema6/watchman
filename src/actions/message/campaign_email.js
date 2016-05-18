@@ -125,7 +125,7 @@ var __private__ = {
         case 'activateAccount':
             switch (data.target) {
             case 'showcase':
-                return prefix + 'Welcome to Reelcontent Marketing!';
+                return prefix + 'Welcome to Reelcontent Apps';
             default:
                 return prefix + 'Welcome to Reelcontent';
             }

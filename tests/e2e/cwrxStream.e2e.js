@@ -557,7 +557,7 @@ describe('cwrxStream', function() {
                 target: 'showcase'
             }
         }).then(function() {
-            mailman.once('Terry, Welcome to Reelcontent Marketing!',
+            mailman.once('Terry, Welcome to Reelcontent Apps',
                     function(msg) {
                 expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
                 expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');

@@ -467,14 +467,14 @@ describe('campaign_email.js', function() {
                 });
 
                 it('should be a subject for showcase', function() {
-                    expect(getSubject(type, data)).toBe('Emma, Welcome to Reelcontent Marketing!');
+                    expect(getSubject(type, data)).toBe('Emma, Welcome to Reelcontent Apps');
                 });
 
                 it('should be a different subject if the user has no first name', function() {
                     delete data.user.firstName;
-                    expect(getSubject(type, data)).toBe('Welcome to Reelcontent Marketing!');
+                    expect(getSubject(type, data)).toBe('Welcome to Reelcontent Apps');
                     delete data.user;
-                    expect(getSubject(type, data)).toBe('Welcome to Reelcontent Marketing!');
+                    expect(getSubject(type, data)).toBe('Welcome to Reelcontent Apps');
                 });
             });
         });
