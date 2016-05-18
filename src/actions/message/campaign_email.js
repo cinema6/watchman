@@ -125,7 +125,7 @@ var __private__ = {
         case 'activateAccount':
             switch (data.target) {
             case 'showcase':
-                return prefix + 'Welcome to Reelcontent Marketing!';
+                return prefix + 'Welcome to Reelcontent Apps';
             default:
                 return prefix + 'Welcome to Reelcontent';
             }
@@ -303,8 +303,7 @@ var __private__ = {
             }
             break;
         case 'failedLogins':
-            var targets = emailConfig.passwordResetPages;
-            var resetPasswordLink = targets[(data.user.external) ? 'selfie' : 'portal'];
+            var resetPasswordLink = emailConfig.passwordResetPages[data.target];
             template = (function() {
                 switch (data.target) {
                 case 'showcase':
