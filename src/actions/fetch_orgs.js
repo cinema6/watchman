@@ -19,7 +19,7 @@ module.exports = function fetchOrgsFactory(config) {
             var watchmanStream = new JsonProducer(watchmanStreamConfig.stream, watchmanStreamConfig)
                 .createWriteStream();
 
-            return hl(orgs)
+            return hl(orgs.on('error', reject))
                 .map(function createStreamData(org) {
                     return {
                         type: prefix + 'orgPulse',
