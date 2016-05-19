@@ -1,6 +1,7 @@
 'use strict';
 
 var EventProcessor = require('./EventProcessor.js');
+var util = require('util');
 
 /**
 * An EventProcessor used to process watchman messages.
@@ -11,6 +12,9 @@ var EventProcessor = require('./EventProcessor.js');
 function WatchmanEventProcessor(config) {
     EventProcessor.apply(this, ['watchman', config]);
 }
+
+util.inherits(WatchmanEventProcessor, EventProcessor);
+
 WatchmanEventProcessor.prototype = Object.create(EventProcessor.prototype, {
     recordToEvent: {
         value: function(message) {
@@ -21,6 +25,5 @@ WatchmanEventProcessor.prototype = Object.create(EventProcessor.prototype, {
         }
     }
 });
-WatchmanEventProcessor.prototype.constructor = WatchmanEventProcessor;
 
 module.exports = WatchmanEventProcessor;

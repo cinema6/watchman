@@ -1,6 +1,7 @@
 'use strict';
 
 var EventProcessor = require('./EventProcessor.js');
+var util = require('util');
 
 /**
 * An EventProcessor used to process time messages.
@@ -11,6 +12,9 @@ var EventProcessor = require('./EventProcessor.js');
 function TimeEventProcessor(config) {
     EventProcessor.apply(this, ['time', config]);
 }
+
+util.inherits(TimeEventProcessor, EventProcessor);
+
 TimeEventProcessor.prototype = Object.create(EventProcessor.prototype, {
     recordToEvent: {
         value: function(message) {
@@ -21,6 +25,5 @@ TimeEventProcessor.prototype = Object.create(EventProcessor.prototype, {
         }
     }
 });
-TimeEventProcessor.prototype.constructor = TimeEventProcessor;
 
 module.exports = TimeEventProcessor;
