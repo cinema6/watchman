@@ -1,5 +1,8 @@
 # Watchman
 
+* *[v0.5.1-rc1]*
+  * [FIX]: Fix for an issue where an error from within an action could unnecessarily propagate
+
 ## v0.5.0 (May 17, 2016)
 * *[v0.5.0-rc2]*
   * [FIX]: Fix for an issue that prevented showcase failed logins emails from using the proper showcase link

@@ -91,7 +91,10 @@ EventProcessor.prototype = {
             var actionModule = self.actions[actionName];
             var actionOptions = action.options || { };
             var start = Date.now();
-            return actionModule({ data: event.data, options: actionOptions }).then(function() {
+
+            return Q.resolve().then(function() {
+                return actionModule({ data: event.data, options: actionOptions });
+            }).then(function() {
                 log.trace('[%1 event processor] Successfully performed action %2',
                     self.name, actionNames[index]);
                 self.reporter.pushMetricForAction(actionName, Date.now() - start);
