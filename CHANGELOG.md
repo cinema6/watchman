@@ -1,7 +1,15 @@
 # Watchman
 
-* *[v0.5.1-rc1]*
+* *[v0.6.0-rc1]*
   * [FIX]: Fix for an issue where an error from within an action could unnecessarily propagate
+  * [FEATURE]: Add the action to generate creatives and placements for a
+    showcase user
+  * Increase the budget of beeswax campaigns when showcase users' credit
+    cards are charged
+  * ** Extra Deployment Steps**:
+    * Update watchman app priveleges to allow it to create placements
+      and get all advertisers
+    * Update environments with new configuration
 
 ## v0.5.0 (May 17, 2016)
 * *[v0.5.0-rc2]*
