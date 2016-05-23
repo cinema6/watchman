@@ -26,7 +26,23 @@ describe('campaign_email.js', function() {
     beforeEach(function() {
         data = { };
         options = { };
-        config = { };
+        config = {
+            appCreds: {
+                key: 'watchman-dev',
+                secret: 'dwei9fhj3489ghr7834909r'
+            },
+            cwrx: {
+                api: {
+                    root: 'http://33.33.33.10/',
+                    users: {
+                        endpoint: '/api/account/users'
+                    },
+                    advertisers: {
+                        endpoint: '/api/account/advertisers'
+                    }
+                }
+            }
+        };
         mockLog = {
             warn: jasmine.createSpy('warn()')
         };
@@ -254,6 +270,9 @@ describe('campaign_email.js', function() {
                             root: 'http://33.33.33.10/',
                             users: {
                                 endpoint: '/api/account/users'
+                            },
+                            advertisers: {
+                                endpoint: '/api/account/advertisers'
                             }
                         }
                     }
@@ -522,6 +541,11 @@ describe('campaign_email.js', function() {
             expect(getSubject('campaignSubmitted', data)).toBe('We\'ve Got It! Amazing Campaign Has Been Submitted for Approval.');
         });
 
+        it('should get the subject for initializedShowcaseCampaign', function() {
+            var data = { campaign: { name: 'My Awesome App' } };
+            expect(getSubject('initializedShowcaseCampaign', data)).toBe('New Showcase Campaign Started: ' + data.campaign.name);
+        });
+
         it('should return an empty string for an unknown email type', function() {
             expect(getSubject('unknown email type')).toBe('');
         });
@@ -530,7 +554,6 @@ describe('campaign_email.js', function() {
     describe('getHtml', function() {
         var getHtml;
         var compileSpy;
-        var emailConfig;
 
         beforeEach(function() {
             emailFactory.__private__.getHtml.and.callThrough();
@@ -538,27 +561,47 @@ describe('campaign_email.js', function() {
             compileSpy = jasmine.createSpy('compileSpy()');
             handlebars.compile.and.returnValue(compileSpy);
             emailFactory.__private__.loadTemplate.and.returnValue(Q.resolve('template'));
-            emailConfig = {
-                dashboardLink: 'dashboard link',
-                manageLink: 'manage link for campaign :campId',
-                reviewLink: 'review link for campaign :campId',
-                supportAddress: 'support@reelcontent.com',
-                passwordResetPages: {
-                    portal: 'http://localhost:9000/#/password/reset',
-                    selfie: 'http://localhost:9000/#/pass/reset?selfie=true',
-                    showcase: 'http://localhost:9000/#/showcase/pass/reset'
+            config = {
+                appCreds: {
+                    key: 'watchman-dev',
+                    secret: 'dwei9fhj3489ghr7834909r'
                 },
-                forgotTargets: {
-                    portal: 'http://localhost:9000/#/password/reset',
-                    selfie: 'http://localhost:9000/#/pass/reset?selfie=true',
-                    showcase: 'http://localhost:9000/#/showcase/pass/reset'
+                cwrx: {
+                    api: {
+                        root: 'http://33.33.33.10/',
+                        users: {
+                            endpoint: '/api/account/users'
+                        },
+                        advertisers: {
+                            endpoint: '/api/account/advertisers'
+                        }
+                    }
                 },
-                previewLink: 'preview link for campaign :campId'
+                emails: {
+                    dashboardLink: 'dashboard link',
+                    manageLink: 'manage link for campaign :campId',
+                    reviewLink: 'review link for campaign :campId',
+                    supportAddress: 'support@reelcontent.com',
+                    passwordResetPages: {
+                        portal: 'http://localhost:9000/#/password/reset',
+                        selfie: 'http://localhost:9000/#/pass/reset?selfie=true',
+                        showcase: 'http://localhost:9000/#/showcase/pass/reset'
+                    },
+                    forgotTargets: {
+                        portal: 'http://localhost:9000/#/password/reset',
+                        selfie: 'http://localhost:9000/#/pass/reset?selfie=true',
+                        showcase: 'http://localhost:9000/#/showcase/pass/reset'
+                    },
+                    previewLink: 'preview link for campaign :campId',
+                    beeswax: {
+                        campaignLink: 'http://stingersbx.beeswax.com/advertisers/{{advertiserId}}/campaigns/{{campaignId}}/line_items'
+                    }
+                }
             };
         });
 
         it('should reject for an unknown email type', function(done) {
-            getHtml('unknown email type').then(done.fail).catch(function(error) {
+            getHtml('unknown email type', null, {}).then(done.fail).catch(function(error) {
                 expect(error).toBeDefined();
                 done();
             });
@@ -570,7 +613,7 @@ describe('campaign_email.js', function() {
                 name: 'Nombre'
             };
             data.date = 'Fri Nov 10 2000 00:00:00 GMT-0500 (EST)';
-            getHtml('campaignExpired', data, emailConfig).then(function() {
+            getHtml('campaignExpired', data, config).then(function() {
                 expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith('campaignExpired.html');
                 expect(handlebars.compile).toHaveBeenCalledWith('template');
                 expect(compileSpy).toHaveBeenCalledWith({
@@ -590,7 +633,7 @@ describe('campaign_email.js', function() {
                 name: 'Nombre'
             };
             data.date = 'Fri Nov 10 2000 00:00:00 GMT-0500 (EST)';
-            getHtml('campaignReachedBudget', data, emailConfig).then(function() {
+            getHtml('campaignReachedBudget', data, config).then(function() {
                 expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                     'campaignOutOfBudget.html');
                 expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -609,7 +652,7 @@ describe('campaign_email.js', function() {
             data.campaign = {
                 name: 'Nombre'
             };
-            getHtml('campaignApproved', data, emailConfig).then(function() {
+            getHtml('campaignApproved', data, config).then(function() {
                 expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                     'campaignApproved.html');
                 expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -626,7 +669,7 @@ describe('campaign_email.js', function() {
             data.campaign = {
                 name: 'Nombre'
             };
-            getHtml('campaignUpdateApproved', data, emailConfig).then(function() {
+            getHtml('campaignUpdateApproved', data, config).then(function() {
                 expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                     'campaignUpdateApproved.html');
                 expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -646,7 +689,7 @@ describe('campaign_email.js', function() {
             data.updateRequest = {
                 rejectionReason: 'rejected'
             };
-            getHtml('campaignRejected', data, emailConfig).then(function() {
+            getHtml('campaignRejected', data, config).then(function() {
                 expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                     'campaignRejected.html');
                 expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -667,7 +710,7 @@ describe('campaign_email.js', function() {
             data.updateRequest = {
                 rejectionReason: 'rejected'
             };
-            getHtml('campaignUpdateRejected', data, emailConfig).then(function() {
+            getHtml('campaignUpdateRejected', data, config).then(function() {
                 expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                     'campaignUpdateRejected.html');
                 expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -690,7 +733,7 @@ describe('campaign_email.js', function() {
                     id: 'c-123',
                     name: 'Nombre'
                 };
-                getHtml('newUpdateRequest', data, emailConfig).then(function() {
+                getHtml('newUpdateRequest', data, config).then(function() {
                     expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                         'newUpdateRequest.html');
                     expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -712,7 +755,7 @@ describe('campaign_email.js', function() {
                     id: 'c-123',
                     name: 'Nombre'
                 };
-                getHtml('newUpdateRequest', data, emailConfig).then(function() {
+                getHtml('newUpdateRequest', data, config).then(function() {
                     expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                         'newUpdateRequest.html');
                     expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -750,7 +793,7 @@ describe('campaign_email.js', function() {
 
             describe('selfie payment receipts', function() {
                 it('should handle payments from credit cards', function(done) {
-                    getHtml('paymentMade', data, emailConfig).then(function() {
+                    getHtml('paymentMade', data, config).then(function() {
                         expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                             'paymentReceipt.html');
                         expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -775,7 +818,7 @@ describe('campaign_email.js', function() {
                 it('should handle payments from paypal accounts', function(done) {
                     data.payment.method = { type: 'paypal', email: 'johnny@moneybags.com' };
 
-                    getHtml('paymentMade', data, emailConfig).then(function() {
+                    getHtml('paymentMade', data, config).then(function() {
                         expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                             'paymentReceipt.html');
                         expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -798,7 +841,7 @@ describe('campaign_email.js', function() {
 
             describe('showcase payment receipts', function() {
                 it('should handle payments from credit cards', function(done) {
-                    getHtml('paymentMade', data, emailConfig).then(function() {
+                    getHtml('paymentMade', data, config).then(function() {
                         expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                             'paymentReceipt.html');
                         expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -823,7 +866,7 @@ describe('campaign_email.js', function() {
                 it('should handle payments from paypal accounts', function(done) {
                     data.payment.method = { type: 'paypal', email: 'johnny@moneybags.com' };
 
-                    getHtml('paymentMade', data, emailConfig).then(function() {
+                    getHtml('paymentMade', data, config).then(function() {
                         expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                             'paymentReceipt.html');
                         expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -847,7 +890,7 @@ describe('campaign_email.js', function() {
 
         describe('compiling an activateAccount email', function() {
             beforeEach(function() {
-                emailConfig.activationTargets = {
+                config.emails.activationTargets = {
                     selfie: 'http://link.com',
                     showcase: 'http://showcase-link.com'
                 };
@@ -858,7 +901,7 @@ describe('campaign_email.js', function() {
             });
 
             it('should handle the possibility of a url without query params', function(done) {
-                getHtml('activateAccount', data, emailConfig).then(function() {
+                getHtml('activateAccount', data, config).then(function() {
                     expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                         'activateAccount.html');
                     expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -871,9 +914,9 @@ describe('campaign_email.js', function() {
             });
 
             it('should handle the possibility of a url with query params', function(done) {
-                emailConfig.activationTargets.selfie = 'http://link.com?query=param';
+                config.emails.activationTargets.selfie = 'http://link.com?query=param';
 
-                getHtml('activateAccount', data, emailConfig).then(function() {
+                getHtml('activateAccount', data, config).then(function() {
                     expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                         'activateAccount.html');
                     expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -891,7 +934,7 @@ describe('campaign_email.js', function() {
                 });
 
                 it('should use the selfie template and data', function(done) {
-                    getHtml('activateAccount', data, emailConfig).then(function() {
+                    getHtml('activateAccount', data, config).then(function() {
                         expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                             'activateAccount.html');
                         expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -910,7 +953,7 @@ describe('campaign_email.js', function() {
                 });
 
                 it('should use the showcase template and data', function(done) {
-                    getHtml('activateAccount', data, emailConfig).then(function() {
+                    getHtml('activateAccount', data, config).then(function() {
                         expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                             'activateAccount--app.html');
                         expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -939,11 +982,11 @@ describe('campaign_email.js', function() {
                     email: 'a.user@gmail.com'
                 }
             };
-            getHtml('chargePaymentPlanFailure', data, emailConfig).then(function() {
+            getHtml('chargePaymentPlanFailure', data, config).then(function() {
                 expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith('chargePaymentPlanFailure.html');
                 expect(handlebars.compile).toHaveBeenCalledWith('template');
                 expect(compileSpy).toHaveBeenCalledWith({
-                    contact: emailConfig.supportAddress,
+                    contact: config.emails.supportAddress,
                     amount: '$' + data.paymentPlan.price.toString(),
                     cardType: data.paymentMethod.cardType,
                     cardLast4: data.paymentMethod.last4,
@@ -957,7 +1000,7 @@ describe('campaign_email.js', function() {
 
             beforeEach(function() {
                 type = 'accountWasActivated';
-                emailConfig.dashboardLinks = {
+                config.emails.dashboardLinks = {
                     selfie: 'dashboard link',
                     showcase: 'showcase dashboard link'
                 };
@@ -968,7 +1011,7 @@ describe('campaign_email.js', function() {
 
             describe('without a target', function() {
                 it('should use the selfie template and data', function(done) {
-                    getHtml('accountWasActivated', data, emailConfig).then(function() {
+                    getHtml('accountWasActivated', data, config).then(function() {
                         expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                             'accountWasActivated.html');
                         expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -988,7 +1031,7 @@ describe('campaign_email.js', function() {
                 });
 
                 it('should use the selfie template and data', function(done) {
-                    getHtml('accountWasActivated', data, emailConfig).then(function() {
+                    getHtml('accountWasActivated', data, config).then(function() {
                         expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                             'accountWasActivated.html');
                         expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -1008,7 +1051,7 @@ describe('campaign_email.js', function() {
                 });
 
                 it('should use the showcase template and data', function(done) {
-                    getHtml('accountWasActivated', data, emailConfig).then(function() {
+                    getHtml('accountWasActivated', data, config).then(function() {
                         expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                             'accountWasActivated--app.html');
                         expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -1029,14 +1072,14 @@ describe('campaign_email.js', function() {
                 data.user = {
                     firstName: 'Randy'
                 };
-                emailConfig.dashboardLinks = {
+                config.emails.dashboardLinks = {
                     selfie: 'dashboard link',
                     showcase: 'showcase dashboard link'
                 };
             });
 
             it('should work for selfie users', function(done) {
-                getHtml('passwordChanged', data, emailConfig).then(function() {
+                getHtml('passwordChanged', data, config).then(function() {
                     expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                         'passwordChanged.html');
                     expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -1052,7 +1095,7 @@ describe('campaign_email.js', function() {
 
             it('should work for showcase users', function(done) {
                 data.target = 'showcase';
-                getHtml('passwordChanged', data, emailConfig).then(function() {
+                getHtml('passwordChanged', data, config).then(function() {
                     expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                         'passwordChanged--app.html');
                     expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -1076,7 +1119,7 @@ describe('campaign_email.js', function() {
                     };
                     data.newEmail = 'new-email@gmail.com';
                     data.oldEmail = 'old-email@gmail.com';
-                    getHtml('emailChanged', data, emailConfig).then(function() {
+                    getHtml('emailChanged', data, config).then(function() {
                         expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                             'emailChanged.html');
                         expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -1098,7 +1141,7 @@ describe('campaign_email.js', function() {
                     };
                     data.newEmail = 'new-email@gmail.com';
                     data.oldEmail = 'old-email@gmail.com';
-                    getHtml('emailChanged', data, emailConfig).then(function() {
+                    getHtml('emailChanged', data, config).then(function() {
                         expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                             'emailChanged.html');
                         expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -1125,7 +1168,7 @@ describe('campaign_email.js', function() {
                     };
                     data.newEmail = 'new-email@gmail.com';
                     data.oldEmail = 'old-email@gmail.com';
-                    getHtml('emailChanged', data, emailConfig).then(function() {
+                    getHtml('emailChanged', data, config).then(function() {
                         expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                             'emailChanged--app.html');
                         expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -1147,7 +1190,7 @@ describe('campaign_email.js', function() {
                     };
                     data.newEmail = 'new-email@gmail.com';
                     data.oldEmail = 'old-email@gmail.com';
-                    getHtml('emailChanged', data, emailConfig).then(function() {
+                    getHtml('emailChanged', data, config).then(function() {
                         expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                             'emailChanged--app.html');
                         expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -1172,7 +1215,7 @@ describe('campaign_email.js', function() {
                     firstName: 'Randy'
                 };
                 data.target = 'selfie';
-                getHtml('failedLogins', data, emailConfig).then(function() {
+                getHtml('failedLogins', data, config).then(function() {
                     expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                         'failedLogins.html');
                     expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -1192,7 +1235,7 @@ describe('campaign_email.js', function() {
                     firstName: 'Randy'
                 };
                 data.target = 'portal';
-                getHtml('failedLogins', data, emailConfig).then(function() {
+                getHtml('failedLogins', data, config).then(function() {
                     expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                         'failedLogins.html');
                     expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -1212,7 +1255,7 @@ describe('campaign_email.js', function() {
                     firstName: 'Randy'
                 };
                 data.target = 'showcase';
-                getHtml('failedLogins', data, emailConfig).then(function() {
+                getHtml('failedLogins', data, config).then(function() {
                     expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                         'failedLogins--app.html');
                     expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -1238,7 +1281,7 @@ describe('campaign_email.js', function() {
 
             it('should work for targets that have query params', function(done) {
                 data.target = 'selfie';
-                getHtml('forgotPassword', data, emailConfig).then(function() {
+                getHtml('forgotPassword', data, config).then(function() {
                     expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                         'passwordReset.html');
                     expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -1251,7 +1294,7 @@ describe('campaign_email.js', function() {
 
             it('should work for targets without query params', function(done) {
                 data.target = 'portal';
-                getHtml('forgotPassword', data, emailConfig).then(function() {
+                getHtml('forgotPassword', data, config).then(function() {
                     expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                         'passwordReset.html');
                     expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -1264,7 +1307,7 @@ describe('campaign_email.js', function() {
 
             it('should work for showcase users', function(done) {
                 data.target = 'showcase';
-                getHtml('forgotPassword', data, emailConfig).then(function() {
+                getHtml('forgotPassword', data, config).then(function() {
                     expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith(
                         'passwordReset--app.html');
                     expect(handlebars.compile).toHaveBeenCalledWith('template');
@@ -1278,7 +1321,7 @@ describe('campaign_email.js', function() {
 
         it('should be able to compile campaignActive emails', function(done) {
             data.campaign = { name: 'Amazing Campaign' };
-            getHtml('campaignActive', data, emailConfig).then(function() {
+            getHtml('campaignActive', data, config).then(function() {
                 expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith('campaignActive.html');
                 expect(handlebars.compile).toHaveBeenCalledWith('template');
                 expect(compileSpy).toHaveBeenCalledWith({
@@ -1291,7 +1334,7 @@ describe('campaign_email.js', function() {
         it('should be able to compile campaignSubmitted emails', function(done) {
             data.campaign = { id: 'c-123', name: 'Amazing Campaign' };
             data.user = { firstName: 'Emma' };
-            getHtml('campaignSubmitted', data, emailConfig).then(function() {
+            getHtml('campaignSubmitted', data, config).then(function() {
                 expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith('campaignSubmitted.html');
                 expect(handlebars.compile).toHaveBeenCalledWith('template');
                 expect(compileSpy).toHaveBeenCalledWith({
@@ -1300,6 +1343,60 @@ describe('campaign_email.js', function() {
                     previewLink: 'preview link for campaign c-123'
                 });
             }).then(done, done.fail);
+        });
+
+        describe('compiling an initializedShowcaseCampaign email', function() {
+            beforeEach(function() {
+                data.campaign = {
+                    id: 'cam-hduiewhdueiwd',
+                    advertiserId: 'a-diowhduiwer',
+                    externalCampaigns: {
+                        beeswax: {
+                            externalId: 83473895
+                        }
+                    }
+                };
+
+                requestUtils.makeSignedRequest.and.returnValue(Q.when({
+                    response: { statusCode: 200 },
+                    body: {
+                        id: data.campaign.advertiserId,
+                        beeswaxIds: {
+                            advertiser: 8542
+                        }
+                    }
+                }));
+            });
+
+            it('should compile', function(done) {
+                getHtml('initializedShowcaseCampaign', data, config).then(function() {
+                    expect(requestUtils.makeSignedRequest).toHaveBeenCalledWith(config.appCreds, 'get', {
+                        url: resolveURL(config.cwrx.api.root, config.cwrx.api.advertisers.endpoint + '/' + data.campaign.advertiserId),
+                        json: true
+                    });
+                    expect(emailFactory.__private__.loadTemplate).toHaveBeenCalledWith('initializedShowcaseCampaign.html');
+                    expect(handlebars.compile).toHaveBeenCalledWith('template');
+                    expect(compileSpy).toHaveBeenCalledWith({
+                        beeswaxCampaignId: data.campaign.externalCampaigns.beeswax.externalId,
+                        beeswaxCampaignURI: 'http://stingersbx.beeswax.com/advertisers/8542/campaigns/83473895/line_items'
+                    });
+                }).then(done, done.fail);
+            });
+
+            describe('if the request for the advertiser fails', function() {
+                beforeEach(function() {
+                    requestUtils.makeSignedRequest.and.returnValue(Q.when({
+                        response: { statusCode: 404 },
+                        body: 'NOT FOUND!'
+                    }));
+                });
+
+                it('should fail', function(done) {
+                    getHtml('initializedShowcaseCampaign', data, config).then(done.fail).catch(function(reason) {
+                        expect(reason).toEqual(new Error('Failed to GET advertiser(' + data.campaign.advertiserId + '): [404]: NOT FOUND!'));
+                    }).then(done, done.fail);
+                });
+            });
         });
     });
 
@@ -1415,7 +1512,7 @@ describe('campaign_email.js', function() {
                 expect(emailFactory.__private__.getRecipient).toHaveBeenCalledWith(data, options, config);
                 expect(emailFactory.__private__.getSubject).toHaveBeenCalledWith('emailType', data);
                 expect(emailFactory.__private__.getHtml).toHaveBeenCalledWith('emailType', data,
-                    config.emails);
+                    config);
                 expect(emailFactory.__private__.getAttachments).toHaveBeenCalledWith(data);
                 expect(mockTransport).toHaveBeenCalled();
                 expect(nodemailer.createTransport).toHaveBeenCalledWith('transport');

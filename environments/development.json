@@ -62,6 +62,12 @@
                             },
                             "accounting": {
                                 "endpoint": "/api/accounting"
+                            },
+                            "placements": {
+                                "endpoint": "/api/placements"
+                            },
+                            "advertisers": {
+                                "endpoint": "/api/account/advertisers"
                             }
                         }
                     },
@@ -100,7 +106,10 @@
                             "selfie": "http://localhost:9000/#/pass/reset?selfie=true",
                             "showcase": "http://localhost:9000/#/showcase/pass/reset"
                         },
-                        "previewLink": "https://reelcontent.com/preview/?previewSource=platform&campaign=:campId"
+                        "previewLink": "https://reelcontent.com/preview/?previewSource=platform&campaign=:campId",
+                        "beeswax": {
+                            "campaignLink": "http://stingersbx.beeswax.com/advertisers/{{advertiserId}}/campaigns/{{campaignId}}/line_items"
+                        }
                     },
                     "paymentPlans": {
                         "pp-0Ek5Na02vCohpPgw": {
@@ -256,6 +265,20 @@
                                     "name": "create_promotion_credit"
                                 }
                             ]
+                        },
+                        "initializedShowcaseCampaign": {
+                            "actions": [
+                                {
+                                    "name": "activate_payment_plan"
+                                },
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "initializedShowcaseCampaign",
+                                        "toSupport": true
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -311,9 +334,38 @@
                         "campaignCreated": {
                             "actions": [
                                 {
-                                    "name": "activate_payment_plan",
+                                    "name": "showcase/apps/init_campaign",
                                     "ifData": {
-                                        "campaign.application": "^showcase$"
+                                        "campaign.application": "^showcase$",
+                                        "campaign.product.type": "^app$"
+                                    },
+                                    "options": {
+                                        "card": {
+                                            "interstitial": {
+                                                "cardType": "showcase-app"
+                                            },
+                                            "threeHundredByTwoFifty": {
+                                                "cardType": "showcase-app"
+                                            }
+                                        },
+                                        "placement": {
+                                            "interstitial": {
+                                                "tagType": "mraid",
+                                                "tagParams": {
+                                                    "container": { "value": "beeswax" },
+                                                    "type": { "value": "mobile-card" },
+                                                    "branding": { "value": "showcase-app--interstitial" }
+                                                }
+                                            },
+                                            "threeHundredByTwoFifty": {
+                                                "tagType": "display",
+                                                "tagParams": {
+                                                    "container": { "value": "beeswax" },
+                                                    "type": { "value": "mobile-card" },
+                                                    "branding": { "value": "showcase-app--300x250" }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             ]
@@ -381,8 +433,11 @@
                         "transactionCreated": {
                             "actions": [
                                 {
-                                    "name": "auto_increase_budget",
-                                    "options": {},
+                                    "name": "showcase/apps/auto_increase_budget",
+                                    "options": {
+                                        "dailyLimit": 2,
+                                        "externalAllocationFactor": 0.5
+                                    },
                                     "ifData": {
                                         "transaction.sign": "^1$"
                                     }

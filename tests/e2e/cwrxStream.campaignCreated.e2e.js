@@ -10,6 +10,7 @@ var CwrxRequest = require('../../lib/CwrxRequest');
 var resolveURL = require('url').resolve;
 var uuid = require('rc-uuid');
 var moment = require('moment');
+var BeeswaxClient = require('beeswax-client');
 
 var API_ROOT = process.env.apiRoot;
 var APP_CREDS = JSON.parse(process.env.appCreds);
@@ -40,8 +41,8 @@ function wait(time) {
 }
 
 describe('cwrxStream campaignCreated', function() {
-    var producer, request;
-    var user, org, promotions, campaign, paymentPlan;
+    var producer, request, beeswax, mailman;
+    var user, org, advertiser, promotions, containers, campaign, paymentPlan;
 
     function api(endpoint) {
         return resolveURL(API_ROOT, endpoint);
@@ -126,6 +127,16 @@ describe('cwrxStream campaignCreated', function() {
                 },
                 jar: true
             });
+        }).then(function makeAdvertiser() {
+            return request.post({
+                url: api('/api/account/advertisers'),
+                json: {
+                    name: 'e2e-advertiser--' + uuid.createUuid(),
+                    defaultLinks: {},
+                    defaultLogos: {}
+                },
+                jar: true
+            }).then(ld.property(0));
         }).then(function fetchEntities() {
             return q.all([
                 request.get({
@@ -133,14 +144,26 @@ describe('cwrxStream campaignCreated', function() {
                 }).then(ld.property(0)),
                 request.get({
                     url: api('/api/account/orgs/' + orgId)
-                }).then(ld.property(0))
+                }).then(ld.property(0)),
+                request.get({
+                    url: api('/api/account/advertisers?org=' + orgId)
+                }).then(ld.property('0.0'))
             ]);
         });
     }
 
     function deleteUser(user) {
-        return request.delete({
-            url: api('/api/account/users/' + user.id)
+        return request.get({
+            url: api('/api/account/advertisers?org=' + user.org),
+            jar: true
+        }).spread(function(advertisers) {
+            return q.all(advertisers.map(function(advertiser) {
+                return beeswax.advertisers.delete(advertiser.beeswaxIds.advertiser);
+            }));
+        }).then(function() {
+            return request.delete({
+                url: api('/api/account/users/' + user.id)
+            });
         }).then(function deleteOrg() {
             return request.delete({
                 url: api('/api/account/orgs/' + user.org)
@@ -148,13 +171,48 @@ describe('cwrxStream campaignCreated', function() {
         }).thenResolve(null);
     }
 
-    beforeAll(function() {
+    function deleteCampaign(campaign) {
+        return q().then(function() {
+            return request.get({
+                url: api('/api/campaigns/' + campaign.id),
+                json: true
+            });
+        }).spread(function(campaign) {
+            if (!campaign.externalCampaigns.beeswax) { return; }
+
+            return beeswax.campaigns.delete(campaign.externalCampaigns.beeswax.externalId);
+        }).then(function() {
+            return request.get({
+                url: api('/api/placements?tagParams.campaign=' + campaign.id),
+                json: true
+            });
+        }).spread(function(placements) {
+            return q.all(placements.map(function(placement) {
+                return request.delete({
+                    url: api('/api/placements/' + placement.id)
+                });
+            }));
+        });
+    }
+
+    beforeAll(function(done) {
         var awsConfig = ld.assign({ region: 'us-east-1' }, AWS_CREDS || {});
 
         jasmine.DEFAULT_TIMEOUT_INTERVAL = 120000;
 
         producer = new JsonProducer(CWRX_STREAM, awsConfig);
         request = new CwrxRequest(APP_CREDS);
+        beeswax = new BeeswaxClient({
+            creds: {
+                email: 'ops@cinema6.com',
+                password: '07743763902206f2b511bead2d2bf12292e2af82'
+            }
+        });
+        mailman = new testUtils.Mailman();
+
+        q.all([
+            mailman.start()
+        ]).then(done, done.fail);
     });
 
     beforeEach(function(done) {
@@ -193,6 +251,8 @@ describe('cwrxStream campaignCreated', function() {
                 cards: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
                 users: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
                 orgs: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
+                placements: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
+                advertisers: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
                 promotions: { read: 'all' },
                 transactions: { create: 'all' }
             },
@@ -204,6 +264,9 @@ describe('cwrxStream campaignCreated', function() {
                 campaigns: {
                     status: {
                         __allowed: true
+                    },
+                    cards: {
+                        __length: Infinity
                     }
                 },
                 orgs: {
@@ -250,17 +313,50 @@ describe('cwrxStream campaignCreated', function() {
             }
         ];
 
+        containers = [
+            {
+                created: '2016-03-24T19:18:49.696Z',
+                defaultTagParams: {
+                    mraid: {
+                        apiRoot: 'https://platform.reelcontent.com/',
+                        container: 'beeswax',
+                        hostApp: '{{APP_BUNDLE}}',
+                        network: '{{INVENTORY_SOURCE}}',
+                        uuid: '{{IOS_ID}}',
+                        clickUrls: [
+                            '{{CLICK_URL}}'
+                        ],
+                        prebuffer: true,
+                        forceOrientation: 'none'
+                    },
+                    vpaid: {
+                        apiRoot: 'https://platform.reelcontent.com/',
+                        container: 'beeswax',
+                        network: '{{INVENTORY_SOURCE}}',
+                        uuid: '{{USER_ID}}'
+                    }
+                },
+                id: 'con-0gW0lk01YbKAgFOb',
+                label: 'Beeswax',
+                lastUpdated: '2016-04-26T17:56:06.582Z',
+                name: 'beeswax',
+                status: 'active'
+            }
+        ];
+
         q.all([
             testUtils.resetCollection('applications', [watchmanApp, cwrxApp]),
             testUtils.resetCollection('policies', []),
             testUtils.resetCollection('orgs', []),
             testUtils.resetCollection('users', []),
-            testUtils.resetCollection('promotions', promotions)
+            testUtils.resetCollection('promotions', promotions),
+            testUtils.resetCollection('containers', containers)
         ]).then(function() {
             return createUser();
-        }).spread(function(/*user, org*/) {
+        }).spread(function(/*user, org, advertiser*/) {
             user = arguments[0];
             org = arguments[1];
+            advertiser = arguments[2];
 
             paymentPlan = paymentPlans[org.paymentPlanId];
 
@@ -268,17 +364,256 @@ describe('cwrxStream campaignCreated', function() {
                 id: createId('cam'),
                 user: user.id,
                 org: org.id,
+                created: moment().format(),
+                lastUpdated: moment().format(),
+                advertiserId: advertiser.id,
                 application: 'showcase',
                 cards: [],
-                created: moment().format()
+                name: 'Count Coins',
+                product: {
+                    type: 'app',
+                    platform: 'iOS',
+                    name: 'Count Coins',
+                    description: 'Reinforce basic counting skills by counting coins.  This app is a valuable tool for elementary school aged children building fundamental counting skills.  It can also be a useful training assistant for those seeking work as cashiers, where making change accurately is important.',
+                    developer: 'Howard Engelhart',
+                    uri: 'https://itunes.apple.com/us/app/count-coins/id595124272?mt=8&uo=4',
+                    categories: [
+                        'Education',
+                        'Games',
+                        'Educational'
+                    ],
+                    price: 'Free',
+                    extID: 595124272,
+                    images: [
+                        {
+                            uri: 'http://a1.mzstatic.com/us/r30/Purple/v4/c2/ec/6b/c2ec6b9a-d47b-20e4-d1f7-2f42fffcb58f/screen1136x1136.jpeg',
+                            type: 'screenshot',
+                            device: 'phone'
+                        },
+                        {
+                            uri: 'http://a5.mzstatic.com/us/r30/Purple/v4/fc/4b/e3/fc4be397-6865-7011-361b-59f78c789e62/screen1136x1136.jpeg',
+                            type: 'screenshot',
+                            device: 'phone'
+                        },
+                        {
+                            uri: 'http://a5.mzstatic.com/us/r30/Purple/v4/f9/02/63/f902630c-3969-ab9f-07b4-2c91bd629fd0/screen1136x1136.jpeg',
+                            type: 'screenshot',
+                            device: 'phone'
+                        },
+                        {
+                            uri: 'http://a3.mzstatic.com/us/r30/Purple/v4/f8/21/0e/f8210e8f-a75a-33c0-9e86-e8c65c9faa54/screen1136x1136.jpeg',
+                            type: 'screenshot',
+                            device: 'phone'
+                        },
+                        {
+                            uri: 'http://is5.mzstatic.com/image/thumb/Purple/v4/ef/a0/f3/efa0f340-225e-e512-1616-8f223c6202ea/source/512x512bb.jpg',
+                            type: 'thumbnail'
+                        }
+                    ]
+                },
+                status: 'draft',
+                statusHistory: [
+                    {
+                        date: moment().format(),
+                        status: 'draft',
+                        userId: user.id,
+                        user: 'e2e@reelcontent.com'
+                    }
+                ],
+                targeting: {
+                    demographics: {
+                        age: [],
+                        gender: []
+                    },
+                    appStoreCategory: [
+                        'Education',
+                        'Games',
+                        'Educational'
+                    ]
+                }
             };
+
+            testUtils.resetCollection('campaigns', [campaign]);
         }).then(done, done.fail);
     });
 
     afterEach(function(done) {
+        mailman.removeAllListeners();
+
         q.all([
-            deleteUser(user)
+            deleteCampaign(campaign).then(function() {
+                return deleteUser(user);
+            })
         ]).then(done, done.fail);
+    });
+
+    afterAll(function(done) {
+        q.all([
+            mailman.stop()
+        ]).then(done, done.fail);
+    });
+
+    describe('when produced', function() {
+        var placements, emails, email;
+
+        beforeEach(function(done) {
+            emails = [];
+            mailman.on('New Showcase Campaign Started: ' + campaign.name, function(message) {
+                emails.push(message);
+            });
+
+            campaignCreatedEvent().then(function() {
+                return waitUntil(function() {
+                    return request.get({
+                        url: api('/api/campaigns/' + campaign.id),
+                        json: true
+                    }).spread(function(campaign) {
+                        return campaign.cards.length > 0 && campaign;
+                    });
+                });
+            }).then(function(/*campaign*/) {
+                campaign = arguments[0];
+
+                return waitUntil(function() {
+                    return request.get({
+                        url: api('/api/placements?tagParams.campaign=' + campaign.id),
+                        json: true
+                    }).spread(function(placements) {
+                        return placements.length === campaign.cards.length && placements;
+                    });
+                });
+            }).then(function(/*placements*/) {
+                placements = arguments[0];
+
+                return waitUntil(function() {
+                    return ld.find(emails, function(email) {
+                        return email.text.indexOf(campaign.externalCampaigns.beeswax.externalId) > -1;
+                    });
+                });
+            }).then(function(/*email*/) {
+                email = arguments[0];
+            }).then(done, done.fail);
+        });
+
+        it('should create a campaign in beeswax', function() {
+            expect(campaign.externalCampaigns.beeswax).toEqual(jasmine.objectContaining({
+                externalId: jasmine.any(Number)
+            }));
+        });
+
+        it('should create two cards', function() {
+            expect(campaign.cards[0]).toEqual(jasmine.objectContaining({
+                advertiserId: advertiser.id,
+                campaign: {
+                    minViewTime: jasmine.any(Number),
+                    reportingId: 'Count Coins'
+                },
+                collateral: jasmine.any(Object),
+                data: jasmine.objectContaining({
+                    advanceInterval: jasmine.any(Number),
+                    moat: jasmine.any(Object),
+                    slides: jasmine.any(Array)
+                }),
+                id: jasmine.any(String),
+                links: jasmine.objectContaining({
+                    Action: jasmine.any(Object)
+                }),
+                modules: [],
+                note: jasmine.any(String),
+                params: {
+                    action: {
+                        label: jasmine.any(String),
+                        type: 'button'
+                    },
+                    sponsor: 'Howard Engelhart'
+                },
+                shareLinks: jasmine.any(Object),
+                sponsored: true,
+                status: 'active',
+                thumbs: {
+                    small: jasmine.any(String),
+                    large: jasmine.any(String)
+                },
+                title: jasmine.any(String),
+                type: 'showcase-app'
+            }));
+            expect(campaign.cards[1]).toEqual(jasmine.objectContaining({
+                advertiserId: advertiser.id,
+                campaign: {
+                    minViewTime: jasmine.any(Number),
+                    reportingId: 'Count Coins'
+                },
+                collateral: jasmine.any(Object),
+                data: jasmine.objectContaining({
+                    advanceInterval: jasmine.any(Number),
+                    moat: jasmine.any(Object),
+                    slides: jasmine.any(Array)
+                }),
+                id: jasmine.any(String),
+                links: jasmine.objectContaining({
+                    Action: jasmine.any(Object)
+                }),
+                modules: [],
+                note: jasmine.any(String),
+                params: {
+                    action: {
+                        label: jasmine.any(String),
+                        type: 'button'
+                    },
+                    sponsor: 'Howard Engelhart'
+                },
+                shareLinks: jasmine.any(Object),
+                sponsored: true,
+                status: 'active',
+                thumbs: {
+                    small: jasmine.any(String),
+                    large: jasmine.any(String)
+                },
+                title: jasmine.any(String),
+                type: 'showcase-app'
+            }));
+        });
+
+        it('should create two placements', function() {
+            expect(ld.find(placements, { tagType: 'mraid' })).toEqual({
+                label: 'Showcase--Interstitial for App: "Count Coins"',
+                tagType: 'mraid',
+                tagParams: {
+                    container: 'beeswax',
+                    type: 'mobile-card',
+                    branding: 'showcase-app--interstitial',
+                    card: campaign.cards[0].id,
+                    campaign: campaign.id
+                },
+                showInTag: {},
+                id: jasmine.any(String),
+                created: jasmine.any(String),
+                lastUpdated: jasmine.any(String),
+                status: 'active'
+            });
+            expect(ld.find(placements, { tagType: 'display' })).toEqual({
+                label: 'Showcase--300x250 for App: "Count Coins"',
+                tagType: 'display',
+                tagParams: {
+                    container: 'beeswax',
+                    type: 'mobile-card',
+                    branding: 'showcase-app--300x250',
+                    card: campaign.cards[1].id,
+                    campaign: campaign.id
+                },
+                showInTag: {},
+                id: jasmine.any(String),
+                created: jasmine.any(String),
+                lastUpdated: jasmine.any(String),
+                status: 'active'
+            });
+        });
+
+        it('should send an email to support', function() {
+            expect(email.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+            expect(email.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+            expect(email.text).toContain('http://stingersbx.beeswax.com/advertisers/' + advertiser.beeswaxIds.advertiser + '/campaigns/' + campaign.externalCampaigns.beeswax.externalId + '/line_items');
+        });
     });
 
     describe('if the org has a paymentPlanStart', function() {

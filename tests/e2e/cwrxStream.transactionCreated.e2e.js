@@ -11,6 +11,8 @@ var resolveURL = require('url').resolve;
 var uuid = require('rc-uuid');
 var moment = require('moment');
 var Status = require('cwrx/lib/enums').Status;
+var BeeswaxClient = require('beeswax-client');
+
 
 var API_ROOT = process.env.apiRoot;
 var APP_CREDS = JSON.parse(process.env.appCreds);
@@ -40,12 +42,44 @@ function waitUntil(predicate) {
 }*/
 
 describe('cwrxStream transactionCreated', function() {
-    var producer, request;
-    var campaigns, targetCampaignIds, otherCampaignIds;
+    var producer, request, beeswax;
+    var advertiser, campaigns, targetCampaignIds, otherCampaignIds, ourCampaignIds;
     var targetOrg, transaction;
 
     function api(endpoint) {
         return resolveURL(API_ROOT, endpoint);
+    }
+
+    function createAdvertiser() {
+        return request.post({
+            url: api('/api/account/advertisers'),
+            json: {
+                name: 'e2e-advertiser--' + uuid.createUuid(),
+                defaultLinks: {},
+                defaultLogos: {}
+            },
+            jar: true
+        }).then(ld.property(0));
+    }
+
+    function deleteAdvertiser(advertiser) {
+        return beeswax.advertisers.delete(advertiser.beeswaxIds.advertiser);
+    }
+
+    function setupCampaign(campaign) {
+        return request.post({
+            url: api('/api/campaigns/' + campaign.id + '/external/beeswax'),
+            json: {}
+        }).then(function() {
+            return request.get({
+                url: api('/api/campaigns/' + campaign.id),
+                json: true
+            }).then(ld.property(0));
+        });
+    }
+
+    function cleanupCampaign(campaign) {
+        return beeswax.campaigns.delete(campaign.externalCampaigns.beeswax.externalId, true);
     }
 
     function transactionCreatedEvent(time) {
@@ -65,6 +99,12 @@ describe('cwrxStream transactionCreated', function() {
 
         producer = new JsonProducer(CWRX_STREAM, awsConfig);
         request = new CwrxRequest(APP_CREDS);
+        beeswax = new BeeswaxClient({
+            creds: {
+                email: 'ops@cinema6.com',
+                password: '07743763902206f2b511bead2d2bf12292e2af82'
+            }
+        });
     });
 
     beforeEach(function(done) {
@@ -103,6 +143,7 @@ describe('cwrxStream transactionCreated', function() {
                 cards: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
                 users: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
                 orgs: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
+                advertisers: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
                 promotions: { read: 'all' },
                 transactions: { create: 'all' }
             },
@@ -129,98 +170,166 @@ describe('cwrxStream transactionCreated', function() {
                 }
             }
         };
-
-        targetOrg = createId('o');
-
-        targetCampaignIds = [createId('cam'), createId('cam')];
-        campaigns = [
-            // Another org's selfie campaign
-            {
-                id: createId('cam'),
-                application: 'selfie',
-                status: Status.Paused,
-                created: moment().subtract(1, 'year').toDate(),
-                lastUpdated: moment().subtract(1, 'month').toDate(),
-                pricing: {
-                    model: 'cpv',
-                    cost: 0.06,
-                    budget: 250,
-                    dailyLimit: 50
-                },
-                org: createId('o'),
-                advertiserId: createId('a')
-            },
-            // Another org's showcase campaign
-            {
-                id: createId('cam'),
-                status: Status.Active,
-                application: 'showcase',
-                created: moment().subtract(1, 'year').toDate(),
-                lastUpdated: moment().subtract(1, 'month').toDate(),
-                pricing: {
-                    model: 'cpv',
-                    cost: 0.01,
-                    budget: 33,
-                    dailyLimit: 2
-                },
-                org: createId('o'),
-                advertiserId: createId('a')
-            },
-            // Our org's showcase campaign
-            {
-                id: targetCampaignIds[0],
-                status: Status.OutOfBudget,
-                application: 'showcase',
-                created: moment().subtract(1, 'year').toDate(),
-                lastUpdated: moment().subtract(1, 'month').toDate(),
-                pricing: {
-                    model: 'cpv',
-                    cost: 0.01,
-                    budget: 3.50,
-                    dailyLimit: 2
-                },
-                org: targetOrg,
-                advertiserId: createId('a')
-            },
-            // Another org's selfie campaign
-            {
-                id: createId('cam'),
-                status: Status.Rejected,
-                application: 'selfie',
-                created: moment().subtract(1, 'year').toDate(),
-                lastUpdated: moment().subtract(1, 'month').toDate(),
-                pricing: {
-                    model: 'cpv',
-                    cost: 0.06,
-                    budget: 1000,
-                    dailyLimit: 100
-                },
-                org: createId('o'),
-                advertiserId: createId('a')
-            },
-            // Our org's showcase campaign
-            {
-                id: targetCampaignIds[1],
-                status: Status.OutOfBudget,
-                application: 'showcase',
-                created: moment().subtract(1, 'year').toDate(),
-                lastUpdated: moment().subtract(1, 'month').toDate(),
-                pricing: {
-                    model: 'cpv',
-                    cost: 0.01,
-                    budget: 1.25,
-                    dailyLimit: 2
-                },
-                org: targetOrg,
-                advertiserId: createId('a')
-            }
-        ];
-        otherCampaignIds = campaigns.map(function(campaign) { return campaign.id; })
-            .filter(function(id) { return targetCampaignIds.indexOf(id) < 0; });
-
         q.all([
-            testUtils.resetCollection('applications', [watchmanApp, cwrxApp]),
-            testUtils.resetCollection('campaigns', campaigns)
+            testUtils.resetCollection('applications', [watchmanApp, cwrxApp])
+        ]).then(function() {
+            return createAdvertiser();
+        }).then(function(/*advertiser*/) {
+            advertiser = arguments[0];
+            targetOrg = createId('o');
+
+            targetCampaignIds = [createId('cam'), createId('cam')];
+            campaigns = [
+                // Another org's selfie campaign
+                {
+                    id: createId('cam'),
+                    application: 'selfie',
+                    status: Status.Paused,
+                    created: moment().subtract(1, 'year').toDate(),
+                    lastUpdated: moment().subtract(1, 'month').toDate(),
+                    pricing: {
+                        model: 'cpv',
+                        cost: 0.06,
+                        budget: 250,
+                        dailyLimit: 50
+                    },
+                    org: createId('o'),
+                    advertiserId: advertiser.id
+                },
+                // Another org's showcase campaign
+                {
+                    id: createId('cam'),
+                    status: Status.Active,
+                    application: 'showcase',
+                    created: moment().subtract(1, 'year').toDate(),
+                    lastUpdated: moment().subtract(1, 'month').toDate(),
+                    pricing: {
+                        model: 'cpv',
+                        cost: 0.01,
+                        budget: 33,
+                        dailyLimit: 2
+                    },
+                    org: createId('o'),
+                    advertiserId: advertiser.id,
+                    product: {
+                        type: 'app'
+                    }
+                },
+                // Our org's showcase campaign
+                {
+                    id: targetCampaignIds[0],
+                    status: Status.OutOfBudget,
+                    application: 'showcase',
+                    created: moment().subtract(1, 'year').toDate(),
+                    lastUpdated: moment().subtract(1, 'month').toDate(),
+                    pricing: {
+                        model: 'cpv',
+                        cost: 0.01,
+                        budget: 3.50,
+                        dailyLimit: 2
+                    },
+                    org: targetOrg,
+                    advertiserId: advertiser.id,
+                    product: {
+                        type: 'app'
+                    }
+                },
+                // Another org's selfie campaign
+                {
+                    id: createId('cam'),
+                    status: Status.Rejected,
+                    application: 'selfie',
+                    created: moment().subtract(1, 'year').toDate(),
+                    lastUpdated: moment().subtract(1, 'month').toDate(),
+                    pricing: {
+                        model: 'cpv',
+                        cost: 0.06,
+                        budget: 1000,
+                        dailyLimit: 100
+                    },
+                    org: createId('o'),
+                    advertiserId: advertiser.id
+                },
+                // Our org's showcase campaign
+                {
+                    id: targetCampaignIds[1],
+                    status: Status.OutOfBudget,
+                    application: 'showcase',
+                    created: moment().subtract(1, 'year').toDate(),
+                    lastUpdated: moment().subtract(1, 'month').toDate(),
+                    pricing: {
+                        model: 'cpv',
+                        cost: 0.01,
+                        budget: 1.25,
+                        dailyLimit: 2
+                    },
+                    org: targetOrg,
+                    advertiserId: advertiser.id,
+                    product: {
+                        type: 'app'
+                    }
+                },
+                // Our org's showcase (non-app) campaign
+                {
+                    id: createId('cam'),
+                    status: Status.Active,
+                    application: 'showcase',
+                    created: moment().subtract(1, 'year').toDate(),
+                    lastUpdated: moment().subtract(1, 'month').toDate(),
+                    pricing: {
+                        model: 'cpv',
+                        cost: 0.01,
+                        budget: 1.25,
+                        dailyLimit: 2
+                    },
+                    org: targetOrg,
+                    advertiserId: advertiser.id,
+                    product: {
+                        type: 'ecommerce'
+                    }
+                }
+            ].map(function(campaign) {
+                return ld.assign({}, campaign, {
+                    name: 'My Awesome Campaign (' + uuid.createUuid() + ')'
+                });
+            });
+            otherCampaignIds = campaigns.map(function(campaign) { return campaign.id; })
+                .filter(function(id) { return targetCampaignIds.indexOf(id) < 0; });
+            ourCampaignIds = campaigns.filter(function(campaign) {
+                return campaign.org === targetOrg;
+            }).map(function(campaign) {
+                return campaign.id;
+            });
+
+            return testUtils.resetCollection('campaigns', campaigns);
+        }).then(function() {
+            return q.all(campaigns.map(function(campaign) {
+                return setupCampaign(campaign);
+            }));
+        }).then(function(/*campaigns*/) {
+            campaigns = arguments[0];
+
+            campaigns = campaigns.map(function(campaign) {
+                var isOurs = ourCampaignIds.indexOf(campaign.id) > -1;
+
+                return ld.assign({}, campaign, {
+                    created: moment().subtract(1, 'year').toDate(),
+                    lastUpdated: moment().subtract(1, 'month').toDate(),
+                    org: isOurs ? targetOrg : campaign.org
+                });
+            });
+
+            return testUtils.resetCollection('campaigns', campaigns);
+        }).then(done, done.fail);
+    });
+
+    afterEach(function(done) {
+        q.all([
+            q.all(campaigns.map(function(campaign) {
+                return cleanupCampaign(campaign);
+            })).then(function() {
+                return deleteAdvertiser(advertiser);
+            })
         ]).then(done, done.fail);
     });
 
@@ -249,7 +358,9 @@ describe('cwrxStream transactionCreated', function() {
                             url: api('/api/campaigns/' + id),
                             json: true
                         }).spread(function(campaign) {
-                            return moment(campaign.lastUpdated).isAfter(moment().subtract(1, 'day')) && campaign;
+                            return moment(campaign.lastUpdated).isAfter(moment().subtract(1, 'day')) &&
+                                campaign.externalCampaigns.beeswax.budget !== ld.find(campaigns, { id: campaign.id }).externalCampaigns.beeswax.budget &&
+                                campaign;
                         });
                     })).then(function(results) {
                         return results.every(function(result) {
@@ -273,7 +384,27 @@ describe('cwrxStream transactionCreated', function() {
             updatedCampaigns.forEach(function(campaign) {
                 var oldCampaign = ld.find(campaigns, { id: campaign.id });
 
-                expect(campaign.pricing.budget).toBe(oldCampaign.pricing.budget + (transaction.amount / targetCampaignIds.length));
+                expect(campaign.pricing.budget).toBe(oldCampaign.pricing.budget + (transaction.amount / ourCampaignIds.length));
+            });
+        });
+
+        it('should set each campaign\'s dailyLimit', function() {
+            updatedCampaigns.forEach(function(campaign) {
+                expect(campaign.pricing.dailyLimit).toBe(2);
+            });
+        });
+
+        it('should increase the budget of every externalCampaign', function() {
+            updatedCampaigns.forEach(function(campaign) {
+                var oldCampaign = ld.find(campaigns, { id: campaign.id });
+
+                expect(campaign.externalCampaigns.beeswax.budget).toBe(ld.ceil(oldCampaign.externalCampaigns.beeswax.budget + ((transaction.amount / ourCampaignIds.length) * 0.5), 2));
+            });
+        });
+
+        it('should set the dailyLimit on the externalCampaign', function() {
+            updatedCampaigns.forEach(function(campaign) {
+                expect(campaign.externalCampaigns.beeswax.dailyLimit).toBe(1);
             });
         });
 
