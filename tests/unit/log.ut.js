@@ -5,20 +5,18 @@ var log = require('../../src/actions/message/log.js');
 var logger = require('cwrx/lib/logger.js');
 
 describe('log action', function() {
-    var mockConfig, mockLog;
-
     beforeEach(function() {
-        mockConfig = {
+        this.mockConfig = {
 
         };
-        mockLog = {
+        this.mockLog = {
             trace: jasmine.createSpy('trace()'),
             info: jasmine.createSpy('info()'),
             warn: jasmine.createSpy('warn()'),
             error: jasmine.createSpy('error()')
         };
-        spyOn(logger, 'getLog').and.returnValue(mockLog);
-        action = log(mockConfig);
+        spyOn(logger, 'getLog').and.returnValue(this.mockLog);
+        action = log(this.mockConfig);
     });
 
     it('should exist', function() {
@@ -35,14 +33,16 @@ describe('log action', function() {
     });
 
     it('should default the text and log level', function(done) {
+        var self = this;
         action({ data: { }, options: { } }).then(function() {
-            expect(mockLog.trace).toHaveBeenCalledWith('');
+            expect(self.mockLog.trace).toHaveBeenCalledWith('');
         }).then(done, done.fail);
     });
 
     it('should support setting the text and level options', function(done) {
+        var self = this;
         action({ data: { }, options: { text: 'Hello World!', level: 'info' } }).then(function() {
-            expect(mockLog.info).toHaveBeenCalledWith('Hello World!');
+            expect(self.mockLog.info).toHaveBeenCalledWith('Hello World!');
         }).then(done, done.fail);
     });
 
@@ -63,8 +63,10 @@ describe('log action', function() {
                 level: 'error'
             }
         };
+        var self = this;
+
         action(event).then(function() {
-            expect(mockLog.error).toHaveBeenCalledWith('Hello Bruce Wayne, are you Batman?');
+            expect(self.mockLog.error).toHaveBeenCalledWith('Hello Bruce Wayne, are you Batman?');
         }).then(done, done.fail);
     });
 });
