@@ -57,8 +57,7 @@ describe('cwrxStream transactionCreated', function() {
                 name: 'e2e-advertiser--' + uuid.createUuid(),
                 defaultLinks: {},
                 defaultLogos: {}
-            },
-            jar: true
+            }
         }).then(ld.property(0));
     }
 
