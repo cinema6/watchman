@@ -3,7 +3,7 @@
 describe('(action) fetch_orgs', function() {
     var fetchOrgsFactory, fetchOrgs;
     var CwrxEntities, JsonProducer;
-    var resolveURL, uuid, MockObjectStream, MockObjectStore;
+    var resolveURL, uuid, MockObjectStream, MockObjectStore, ld;
     var config;
 
     beforeEach(function() {
@@ -36,8 +36,8 @@ describe('(action) fetch_orgs', function() {
         require.cache[require.resolve('rc-kinesis')].exports.JsonProducer = JsonProducer;
 
         resolveURL = require('url').resolve;
-
         uuid = require('rc-uuid');
+        ld = require('lodash');
 
         fetchOrgsFactory = require('../../src/actions/fetch_orgs');
 
@@ -113,7 +113,7 @@ describe('(action) fetch_orgs', function() {
             beforeEach(function() {
                 items = Array.apply([], new Array(10)).map(function() { return { id: uuid.createUuid() }; });
 
-                orgs.source.add(items, true);
+                orgs.source.add(ld.chunk(items, 3), true);
             });
 
             describe('and there is no problem writing them', function() {
@@ -183,7 +183,7 @@ describe('(action) fetch_orgs', function() {
                 watchmanStream = watchmanProducer.createWriteStream.calls.mostRecent().returnValue;
 
                 data = Array.apply([], new Array(10)).map(function() { return { id: uuid.createUuid() }; });
-                orgs.source.add(data, true);
+                orgs.source.add(ld.chunk(data, 5), true);
 
                 watchmanStream.once('finish', function() { process.nextTick(done); });
             });

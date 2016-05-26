@@ -9,6 +9,7 @@ var Q = require('q');
 var factory;
 var proxyquire = require('proxyquire');
 var url = require('url');
+var ld = require('lodash');
 
 describe('check_available_funds', function() {
     var mockConfig, action, mockObjectStream, mockObjectStore;
@@ -140,14 +141,14 @@ describe('check_available_funds', function() {
                     });
 
                     it('should fetch the campaigns in the org', function(done) {
-                        mockObjectStream.source.add(campaigns, true);
+                        mockObjectStream.source.add(ld.chunk(campaigns, 1), true);
                         action({ data: { org: { id: 'o-123' } }, options: { } }).then(function() {
                             expect(CwrxEntities).toHaveBeenCalledWith('https://apiroot.com/api/campaigns', 'appCreds', { org: 'o-123', statuses: 'active' });
                         }).then(done, done.fail);
                     });
 
                     it('should produce campaigns with a budget greater than zero', function(done) {
-                        mockObjectStream.source.add(campaigns, true);
+                        mockObjectStream.source.add(ld.chunk(campaigns, 1), true);
                         action({ data: { org: { id: 'o-123' } }, options: { } }).then(function() {
                             expect(JsonProducer.prototype.createWriteStream).toHaveBeenCalledWith();
                             expect(mockObjectStore.items).toEqual([{
@@ -167,7 +168,7 @@ describe('check_available_funds', function() {
                     });
 
                     it('should reject if there is a problem producing the campaigns', function(done) {
-                        mockObjectStream.source.add(campaigns, true);
+                        mockObjectStream.source.add(ld.chunk(campaigns, 1), true);
                         mockObjectStore.fail(new Error('epic fail'));
                         action({ data: { org: { id: 'o-123' } }, options: { } }).then(done.fail).catch(function(error) {
                             expect(error).toBeDefined();

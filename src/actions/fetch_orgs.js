@@ -20,6 +20,7 @@ module.exports = function fetchOrgsFactory(config) {
                 .createWriteStream();
 
             return hl(orgs.on('error', reject))
+                .flatten()
                 .map(function createStreamData(org) {
                     return {
                         type: prefix + 'orgPulse',
