@@ -1,6 +1,12 @@
 # Watchman
 
 ## v0.6.0 (May 25, 2016)
+* *[v0.6.0-rc2]*
+  * [FIX]: Make sure the `fetch_orgs` action completes and does not
+    block further actions
+  * [FIX]: Handle showcase campaigns without a pricing hash
+* *[/v0.6.0-rc2]*
+
 * *[v0.6.0-rc1]*
   * [FIX]: Fix for an issue where an error from within an action could unnecessarily propagate
   * [FEATURE]: Add the action to generate creatives and placements for a
