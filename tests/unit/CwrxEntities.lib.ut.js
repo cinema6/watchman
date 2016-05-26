@@ -41,56 +41,6 @@ describe('CwrxEntities(endpoint, appCreds)', function() {
         });
 
         describe('methods:', function() {
-            describe('emit(event, ...args)', function() {
-                var args;
-
-                beforeEach(function() {
-                    spyOn(DuplexStream.prototype, 'emit').and.callThrough();
-
-                    args = ['hello', 'world'];
-                });
-
-                ['foo', 'bar', 'hello'].forEach(function(event) {
-                    describe('if the event is "' + event + '"', function() {
-                        beforeEach(function() {
-                            entities.emit.apply(entities, [event].concat(args));
-                        });
-
-                        it('should call super()', function() {
-                            var expectSuper = expect(DuplexStream.prototype.emit);
-
-                            expectSuper.toHaveBeenCalledWith.apply(expectSuper, [event].concat(args));
-                        });
-                    });
-                });
-
-                describe('if the event is "data"', function() {
-                    var event;
-                    var items;
-
-                    beforeEach(function() {
-                        items = Array.apply([], new Array(50)).map(function() {
-                            return { id: 'o-' + uuid.createUuid() };
-                        });
-
-                        event = 'data';
-                        args = [items];
-
-                        entities.emit.apply(entities, [event].concat(args));
-                    });
-
-                    it('should call super() with each piece of data', function() {
-                        expect(DuplexStream.prototype.emit.calls.count()).toBe(items.length, 'super() not called the correct amount.');
-                        items.forEach(function(item) {
-                            expect(DuplexStream.prototype.emit).toHaveBeenCalledWith(event, item);
-                        });
-                        expect(DuplexStream.prototype.emit.calls.all().every(function(call) {
-                            return call.object === entities;
-                        })).toBe(true, 'emit() context is not correct.');
-                    });
-                });
-            });
-
             describe('_read(size)', function() {
                 var size;
                 var getDeferred;

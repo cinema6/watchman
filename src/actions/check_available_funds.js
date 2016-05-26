@@ -42,7 +42,7 @@ module.exports = function checkAvailableFundsFactory(config) {
                     var watchmanStream = producer.createWriteStream();
 
                     return new Q.Promise(function(resolve, reject) {
-                        hl(orgCampaigns).filter(function(campaign) {
+                        hl(orgCampaigns).flatten().filter(function(campaign) {
                             return (campaign.pricing &&
                                 campaign.pricing.budget &&
                                 campaign.pricing.budget > 0);

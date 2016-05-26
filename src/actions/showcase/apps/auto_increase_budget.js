@@ -5,6 +5,7 @@ var resolveURL = require('url').resolve;
 var ld = require('lodash');
 var filter = ld.filter;
 var assign = ld.assign;
+var get = ld.get;
 var q = require('q');
 var Status = require('cwrx/lib/enums').Status;
 var logger = require('cwrx/lib/logger');
@@ -32,7 +33,7 @@ module.exports = function autoIncreaseBudgetFactory(config) {
             });
 
             return q.all(showcaseCampaigns.map(function increaseBudget(campaign) {
-                var externalCampaign = campaign.externalCampaigns.beeswax;
+                var externalCampaign = get(campaign, 'externalCampaigns.beeswax', {});
                 // Split this transaction between ALL campaigns (even though we will only increase
                 // the budgets of showcase campaigns.)
                 var portion = (transaction.amount / campaigns.length);
@@ -42,7 +43,7 @@ module.exports = function autoIncreaseBudgetFactory(config) {
                     json: assign({}, campaign, {
                         status: Status.Active,
                         pricing: assign({}, campaign.pricing, {
-                            budget: campaign.pricing.budget + portion,
+                            budget: get(campaign, 'pricing.budget', 0) + portion,
                             dailyLimit: dailyLimit
                         })
                     })
@@ -64,10 +65,10 @@ module.exports = function autoIncreaseBudgetFactory(config) {
                             externalCampaign.budget, newExternalCampaign.budget
                         );
                     });
-                }).catch(function logError(reason) {
-                    return log.error('Failed to increase campaign budget: %1', inspect(reason));
                 });
-            }));
+            })).catch(function logError(reason) {
+                return log.error('Failed to increase campaign budget: %1', inspect(reason));
+            });
         }).thenResolve(undefined);
     };
 };

@@ -140,7 +140,15 @@ describe('timeStream payment plan billing', function() {
             name: 'The Best Org',
             paymentPlanId: getPaymentPlanId(),
             paymentPlanStart: moment().format(),
-        }]).then(function makePolicy() {
+        }].concat(Array.apply([], new Array(50)).map(function() {
+            var id = uuid.createUuid();
+
+            return {
+                id: id,
+                status: 'active',
+                name: 'The Best Org -- ' + id
+            };
+        }))).then(function makePolicy() {
             return testUtils.resetCollection('policies', [{
                 id: policyId,
                 name: 'manageAllOrgs',
