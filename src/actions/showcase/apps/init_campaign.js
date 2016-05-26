@@ -35,13 +35,20 @@ module.exports = function initCampaignFactory(config) {
             options.card.threeHundredByTwoFifty
         );
 
+        function setupCard(card) {
+            return assign(card, {
+                user: campaign.user,
+                org: campaign.org
+            });
+        }
+
         log.trace('Creating external campaign for showcase (app) campaign(%1).', campaign.id);
         return request.post({
             url: campaignsEndpoint + '/' + campaign.id + '/external/beeswax',
             json: {}
         }).spread(function createCards(externalCampaign) {
-            var interstitial = createInterstitial(campaign.product);
-            var threeHundredByTwoFifty = createThreeHundredByTwoFifty(campaign.product);
+            var interstitial = setupCard(createInterstitial(campaign.product));
+            var threeHundredByTwoFifty = setupCard(createThreeHundredByTwoFifty(campaign.product));
 
             log.trace(
                 'Created externalCampaign(%1) for showcase (app) campaign(%2).',

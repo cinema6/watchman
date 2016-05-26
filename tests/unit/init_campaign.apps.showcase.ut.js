@@ -330,8 +330,14 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                         url: resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint + '/' + data.campaign.id),
                         json: ld.assign({}, data.campaign, {
                             cards: data.campaign.cards.concat([
-                                showcaseFactories.app.createInterstitialFactory(options.card.interstitial)(data.campaign.product),
-                                showcaseFactories.app.createThreeHundredByTwoFiftyFactory(options.card.threeHundredByTwoFifty)(data.campaign.product)
+                                ld.assign(showcaseFactories.app.createInterstitialFactory(options.card.interstitial)(data.campaign.product), {
+                                    user: data.campaign.user,
+                                    org: data.campaign.org
+                                }),
+                                ld.assign(showcaseFactories.app.createThreeHundredByTwoFiftyFactory(options.card.threeHundredByTwoFifty)(data.campaign.product), {
+                                    user: data.campaign.user,
+                                    org: data.campaign.org
+                                })
                             ])
                         })
                     });

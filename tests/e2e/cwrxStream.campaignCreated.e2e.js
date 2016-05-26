@@ -273,6 +273,14 @@ describe('cwrxStream campaignCreated', function() {
                     paymentPlanStart: { __allowed: true },
                     paymentPlanId: { __allowed: true },
                     promotions: { __allowed: true }
+                },
+                cards: {
+                    user: {
+                        __allowed: true
+                    },
+                    org: {
+                        __allowed: true
+                    }
                 }
             }
         };
