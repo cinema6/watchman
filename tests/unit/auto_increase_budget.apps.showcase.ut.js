@@ -187,12 +187,6 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                             id: 'cam-' + uuid.createUuid(),
                             status: 'outOfBudget',
                             application: 'showcase',
-                            pricing: {
-                                model: 'cpv',
-                                cost: 0.01,
-                                budget: 0,
-                                dailyLimit: 2
-                            },
                             externalCampaigns: {
                                 beeswax: {
                                     externalId: uuid.createUuid(),
@@ -270,10 +264,10 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                         url: resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint + '/' + campaigns[2].id),
                         json: ld.assign({}, campaigns[2], {
                             status: 'active',
-                            pricing: ld.assign({}, campaigns[2].pricing, {
-                                budget: campaigns[2].pricing.budget + (data.transaction.amount / campaigns.length),
+                            pricing: {
+                                budget: (data.transaction.amount / campaigns.length),
                                 dailyLimit: options.dailyLimit
-                            })
+                            }
                         })
                     });
                 });
