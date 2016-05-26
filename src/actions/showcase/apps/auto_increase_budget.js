@@ -57,7 +57,8 @@ module.exports = function autoIncreaseBudgetFactory(config) {
                     }).spread(function logSuccess(newExternalCampaign) {
                         log.info(
                             'Increased budget of campaign(%1): %2 => %3.',
-                            campaign.id, campaign.pricing.budget, newCampaign.pricing.budget
+                            campaign.id, get(campaign, 'pricing.budget', 0),
+                            get(newCampaign, 'pricing.budget', 0)
                         );
                         log.info(
                             'Increased budget of externalCampaign(%1): %2 => %3.',

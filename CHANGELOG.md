@@ -1,6 +1,11 @@
 # Watchman
 
 ## v0.6.0 (May 25, 2016)
+* *[v0.6.0-rc4]*
+  * [FIX]: Handle showcase campaigns without a pricing hash, but really
+    this time
+* *[/v0.6.0-rc4]*
+
 * *[v0.6.0-rc3]*
   * [FIX]: Ensure showcase users can edit their campaigns after their
     cards have been created

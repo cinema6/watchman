@@ -313,6 +313,10 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                             process.nextTick(done);
                         });
 
+                        it('should not log an error', function() {
+                            expect(log.error).not.toHaveBeenCalled();
+                        });
+
                         it('should fulfill with undefined', function() {
                             expect(success).toHaveBeenCalledWith(undefined);
                         });
