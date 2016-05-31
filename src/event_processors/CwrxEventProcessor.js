@@ -1,6 +1,7 @@
 'use strict';
 
 var EventProcessor = require('./EventProcessor.js');
+var util = require('util');
 
 /**
 * An EventProcessor used to process cwrx messages.
@@ -11,6 +12,9 @@ var EventProcessor = require('./EventProcessor.js');
 function CwrxEventProcessor(config) {
     EventProcessor.apply(this, ['cwrx', config]);
 }
+
+util.inherits(CwrxEventProcessor, EventProcessor);
+
 CwrxEventProcessor.prototype = Object.create(EventProcessor.prototype, {
     recordToEvent: {
         value: function(message) {
@@ -21,6 +25,5 @@ CwrxEventProcessor.prototype = Object.create(EventProcessor.prototype, {
         }
     }
 });
-CwrxEventProcessor.prototype.constructor = CwrxEventProcessor;
 
 module.exports = CwrxEventProcessor;

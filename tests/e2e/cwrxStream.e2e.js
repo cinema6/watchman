@@ -135,11 +135,9 @@ describe('cwrxStream', function() {
 
             it('should send a campaign expired email', function(done) {
                 mailman.once('Your Campaign Has Ended', function(msg) {
-                    expect(msg.from[0].address.toLowerCase()).toBe(
-                        'no-reply@reelcontent.com');
+                    expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                    var regex = new RegExp('Your\\s*campaign.*Cooltastic Campaign' +
-                        '.*\\s*reached\\s*its\\s*end\\s*date');
+                    var regex = new RegExp('Your\\s*campaign.*Cooltastic Campaign.*\\s*reached\\s*its\\s*end\\s*date');
                     expect(msg.text).toMatch(regex);
                     expect(msg.html).toMatch(regex);
                     expect((new Date() - msg.date)).toBeLessThan(30000);
@@ -164,11 +162,9 @@ describe('cwrxStream', function() {
 
             it('should send a campaign expired email', function(done) {
                 mailman.once('Your Campaign Has Ended', function(msg) {
-                    expect(msg.from[0].address.toLowerCase()).toBe(
-                        'no-reply@reelcontent.com');
+                    expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                    var regex = new RegExp('Your\\s*campaign.*Cooltastic Campaign' +
-                        '.*\\s*reached\\s*its\\s*end\\s*date');
+                    var regex = new RegExp('Your\\s*campaign.*Cooltastic Campaign.*\\s*reached\\s*its\\s*end\\s*date');
                     expect(msg.text).toMatch(regex);
                     expect(msg.html).toMatch(regex);
                     expect((new Date() - msg.date)).toBeLessThan(30000);
@@ -218,7 +214,7 @@ describe('cwrxStream', function() {
             it('should send a campaign reached budget email', function(done) {
                 mailman.once('Your Campaign is Out of Budget', function(msg) {
                     expect(msg.from[0].address.toLowerCase()).toBe(
-                        'no-reply@reelcontent.com');
+                        'support@cinema6.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                     var regex = new RegExp('Your\\s*campaign.*Cooltastic Campaign' +
                         '.*is\\s*out\\s*of\\s*budget');
@@ -246,9 +242,9 @@ describe('cwrxStream', function() {
 
             it('should send a campaign active email', function(done) {
                 mailman.once('Cooltastic Campaign Is Now Live!', function(msg) {
-                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                    var regex = new RegExp('.*"Cooltastic Campaign" is live! Sit back and relax\..*');
+                    var regex = new RegExp('.*Cooltastic Campaign.* is live! Sit back and relax\..*');
                     expect(msg.text).toMatch(regex);
                     expect(msg.html).toMatch(regex);
                     expect((new Date() - msg.date)).toBeLessThan(30000);
@@ -267,7 +263,7 @@ describe('cwrxStream', function() {
             }
         }).then(function() {
             mailman.once('Your Campaign Change Request Has Been Approved', function(msg) {
-                expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                 expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                 var regex = new RegExp('Your\\s*change\\s*request\\s*to\\s*campaign.*' +
                     'Cooltastic Campaign.*has\\s*been\\s*approved');
@@ -289,7 +285,7 @@ describe('cwrxStream', function() {
             }
         }).then(function() {
             mailman.once('Reelcontent Campaign Rejected', function(msg) {
-                expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                 expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                 [
                     new RegExp('Your\\s*campaign.*Cooltastic Campaign.*has\\s*been\\s*rejected'),
@@ -314,7 +310,7 @@ describe('cwrxStream', function() {
             }
         }).then(function() {
             mailman.once('Your Campaign Change Request Has Been Rejected', function(msg) {
-                expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                 expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                 [
                     new RegExp('Your\\s*change\\s*request\\s*to\\s*campaign.*' +
@@ -350,7 +346,7 @@ describe('cwrxStream', function() {
                 'We\'ve Got It! Cooltastic Campaign Has Been Submitted for Approval.'
             ]).then(function(messages) {
                 var msg = messages[0];
-                expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                 expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                 [
                     new RegExp('created\\s*by\\s*c6e2etester@gmail.com\\s*for\\s*campaign.*' +
@@ -370,9 +366,9 @@ describe('cwrxStream', function() {
                 'We\'ve Got It! Cooltastic Campaign Has Been Submitted for Approval.'
             ]).then(function(messages) {
                 var msg = messages[1];
-                expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                 expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                var regex = new RegExp('.*Terry[\\s\\S]*You’ve submitted Cooltastic Campaign - high five!.*');
+                var regex = new RegExp('.*Terry[\\s\\S]*You.*ve submitted Cooltastic Campaign - high five!.*');
                 expect(msg.text).toMatch(regex);
                 expect(msg.html).toMatch(regex);
                 expect((new Date() - msg.date)).toBeLessThan(30000);
@@ -415,7 +411,7 @@ describe('cwrxStream', function() {
                     }
                 }).then(function() {
                     mailman.once('Your payment has been approved', function(msg) {
-                        expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                        expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                         expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                         msgRegexes.concat([
                             /Payment\s*Method:\s*Credit\s*Card/,
@@ -444,7 +440,7 @@ describe('cwrxStream', function() {
                     }
                 }).then(function() {
                     mailman.once('Your payment has been approved', function(msg) {
-                        expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                        expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                         expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                         msgRegexes.concat([
                             /Payment\s*Method:\s*PayPal/,
@@ -480,10 +476,10 @@ describe('cwrxStream', function() {
                     }
                 }).then(function() {
                     mailman.once('Your payment has been approved', function(msg) {
-                        expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                        expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                         expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                         msgRegexes.concat([
-                            /Payment Method(.|\n)+Credit Card/,
+                            /Payment Method[\s\S]+Credit Card/,
                             /Cardholder Name: Johnny Testmonkey/,
                             /Card Type: Visa/,
                             /Last 4 Digits: 1234/
@@ -510,10 +506,10 @@ describe('cwrxStream', function() {
                     }
                 }).then(function() {
                     mailman.once('Your payment has been approved', function(msg) {
-                        expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                        expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                         expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                         msgRegexes.concat([
-                            /Payment Method(.|\n)+PayPal/,
+                            /Payment Method[\s\S]+PayPal/,
                             /Email: johnny@testmonkey\.com/
                         ]).forEach(function(regex) {
                             expect(regex.test(msg.text)).toBeTruthy('Expected text to match ' + regex);
@@ -537,7 +533,7 @@ describe('cwrxStream', function() {
         }).then(function() {
             mailman.once('Terry, Welcome to Reelcontent',
                     function(msg) {
-                expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                 expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                 var regex = /https?:\/\/.+id.+u-123.+token.+secret-token/;
                 expect(msg.text).toMatch(regex);
@@ -559,7 +555,7 @@ describe('cwrxStream', function() {
         }).then(function() {
             mailman.once('Terry, Welcome to Reelcontent Apps',
                     function(msg) {
-                expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                 expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                 var regex = /https?:\/\/.+id.+u-123.+token.+secret-token/;
                 expect(msg.text).toMatch(regex);
@@ -582,7 +578,7 @@ describe('cwrxStream', function() {
             }).then(function() {
                 mailman.once('Terry, Your Reelcontent Account Is Ready To Go',
                         function(msg) {
-                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                     var regex = /account\s*is\s*now\s*active/;
                     expect(msg.text).toMatch(regex);
@@ -604,7 +600,7 @@ describe('cwrxStream', function() {
             }).then(function() {
                 mailman.once('Terry, Your Reelcontent Account Is Ready To Go',
                         function(msg) {
-                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                     var regex = /Terry,\s+your\s+account\s+is\s+live/;
                     expect(msg.text).toMatch(regex);
@@ -757,7 +753,7 @@ describe('cwrxStream', function() {
             }).then(function() {
                 mailman.once('Reelcontent Password Change Notice',
                         function(msg) {
-                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                     var regex = /password\s*was\s*changed\s*on.*at.*/;
                     expect(msg.text).toMatch(regex);
@@ -779,7 +775,7 @@ describe('cwrxStream', function() {
             }).then(function() {
                 mailman.once('Reelcontent Password Change Notice',
                         function(msg) {
-                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                     var regex = /Terry, Just a quick note/;
                     expect(msg.text).toMatch(regex);
@@ -803,7 +799,7 @@ describe('cwrxStream', function() {
                     }
                 }).then(function() {
                     mailman.once('Your Email Has Been Changed', function(msg) {
-                        expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                        expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                         expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                         var regex = /c6e2etester2@gmail\.com/;
                         expect(msg.text).toMatch(regex);
@@ -825,7 +821,7 @@ describe('cwrxStream', function() {
                     }
                 }).then(function() {
                     mailman2.once('Your Email Has Been Changed', function(msg) {
-                        expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                        expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                         expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester2@gmail.com');
                         [
                             /c6e2etester@gmail\.com/,
@@ -853,7 +849,7 @@ describe('cwrxStream', function() {
                     }
                 }).then(function() {
                     mailman.once('Your Email Has Been Changed', function(msg) {
-                        expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                        expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                         expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                         [
                             /c6e2etester@gmail\.com/,
@@ -880,7 +876,7 @@ describe('cwrxStream', function() {
                     }
                 }).then(function() {
                     mailman2.once('Your Email Has Been Changed', function(msg) {
-                        expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                        expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                         expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester2@gmail.com');
                         [
                             /c6e2etester@gmail\.com/,
@@ -906,7 +902,7 @@ describe('cwrxStream', function() {
                 }
             }).then(function() {
                 mailman.once('Reelcontent: Multiple-Failed Logins', function(msg) {
-                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                     var regex = /consecutive\s*failed\s*login\s*attempts/;
                     expect(msg.text).toMatch(regex);
@@ -926,7 +922,7 @@ describe('cwrxStream', function() {
                 }
             }).then(function() {
                 mailman.once('Reelcontent: Multiple-Failed Logins', function(msg) {
-                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                     var regex = /Terry,\s+Looks\s+like\s+someone\s+has\s+tried\s+to\s+log\s+into\s+your\s+account/;
                     expect(msg.text).toMatch(regex);
@@ -949,7 +945,7 @@ describe('cwrxStream', function() {
                 }
             }).then(function() {
                 mailman.once('Forgot Your Password?', function(msg) {
-                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                     var regex = /https?:\/\/.+id.+u-123.+token.+secret-token/;
                     expect(msg.text).toMatch(regex);
@@ -970,7 +966,7 @@ describe('cwrxStream', function() {
                 }
             }).then(function() {
                 mailman.once('Forgot Your Password?', function(msg) {
-                    expect(msg.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+                    expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                     var regex = /https?:\/\/.+id.+u-123.+token.+secret-token/;
                     expect(msg.text).toMatch(regex);
@@ -992,7 +988,7 @@ describe('cwrxStream', function() {
             }
         }).then(function() {
             mailman.once('Terry, Welcome to Reelcontent', function(msg) {
-                expect(msg.from[0].address).toBe('no-reply@reelcontent.com');
+                expect(msg.from[0].address).toBe('support@cinema6.com');
                 expect(msg.to[0].address).toBe('c6e2etester@gmail.com');
                 var regex = /https?:\/\/.+id.+u-123.+token.+secret-token/;
                 expect(msg.text).toMatch(regex);

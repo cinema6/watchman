@@ -618,7 +618,7 @@ describe('cwrxStream campaignCreated', function() {
         });
 
         it('should send an email to support', function() {
-            expect(email.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+            expect(email.from[0].address.toLowerCase()).toBe('support@cinema6.com');
             expect(email.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
             expect(email.text).toContain('http://stingersbx.beeswax.com/advertisers/' + advertiser.beeswaxIds.advertiser + '/campaigns/' + campaign.externalCampaigns.beeswax.externalId + '/line_items');
         });

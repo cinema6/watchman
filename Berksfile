@@ -1,4 +1,4 @@
 source "https://supermarket.chef.io"
 
-cookbook 'watchman', path: '../cookbooks/watchman'
+cookbook 'watchman', git: 'git@bitbucket.org:cinema6/watchman.git'
 cookbook 'c6env', git: 'git@bitbucket.org:cinema6/c6env.git'

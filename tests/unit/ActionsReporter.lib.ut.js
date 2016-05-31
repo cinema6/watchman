@@ -4,27 +4,25 @@ var ActionsReporter;
 var proxyquire = require('proxyquire').noCallThru();
 
 describe('ActionsReporter', function() {
-    var reporter, mockConfig, MockCloudWatchReporter;
-
     beforeEach(function() {
-        mockConfig = {
+        this.mockConfig = {
             namespace: 'namespace',
             dimensions: 'dimensions',
             region: 'region',
             sendInterval: 1000
         };
-        MockCloudWatchReporter = jasmine.createSpy('constructor');
-        MockCloudWatchReporter.prototype = {
+        this.MockCloudWatchReporter = jasmine.createSpy('constructor');
+        this.MockCloudWatchReporter.prototype = {
             flush: jasmine.createSpy('flush'),
             push : jasmine.createSpy('push')
         };
         ActionsReporter = proxyquire('../../lib/ActionsReporter.js', {
-            'cwrx/lib/cloudWatchReporter.js': MockCloudWatchReporter
+            'cwrx/lib/cloudWatchReporter.js': this.MockCloudWatchReporter
         });
-        reporter = new ActionsReporter(mockConfig);
-        spyOn(reporter, 'enableReportingForActions');
-        spyOn(reporter, 'disableReportingForActions');
-        spyOn(reporter, 'flush');
+        this.reporter = new ActionsReporter(this.mockConfig);
+        spyOn(this.reporter, 'enableReportingForActions');
+        spyOn(this.reporter, 'disableReportingForActions');
+        spyOn(this.reporter, 'flush');
         jasmine.clock().install();
     });
 
@@ -34,150 +32,144 @@ describe('ActionsReporter', function() {
 
     describe('the constructor', function() {
         it('should initialize properties', function() {
-            expect(reporter.config).toEqual(mockConfig);
-            expect(reporter.interval).toBeNull();
-            expect(reporter.reporters).toEqual({ });
+            expect(this.reporter.config).toEqual(this.mockConfig);
+            expect(this.reporter.interval).toBeNull();
+            expect(this.reporter.reporters).toEqual({ });
         });
     });
 
     describe('updateReportingActions', function() {
         beforeEach(function() {
-            reporter.reporters = {
+            this.reporter.reporters = {
                 action1: null,
                 action2: null,
                 action3: null
             };
-            reporter.updateReportingActions(['action3', 'action4', 'action5']);
+            this.reporter.updateReportingActions(['action3', 'action4', 'action5']);
         });
 
         it('should enable reporting for the given actions', function() {
-            expect(reporter.enableReportingForActions).toHaveBeenCalledWith(['action3', 'action4', 'action5']);
+            expect(this.reporter.enableReportingForActions).toHaveBeenCalledWith(['action3', 'action4', 'action5']);
         });
 
         it('should disable reporting for unused actions', function() {
-            expect(reporter.disableReportingForActions).toHaveBeenCalledWith(['action1', 'action2']);
+            expect(this.reporter.disableReportingForActions).toHaveBeenCalledWith(['action1', 'action2']);
         });
     });
 
     describe('enableReportingForActions', function() {
         beforeEach(function() {
-            reporter.enableReportingForActions.and.callThrough();
-            reporter.reporters = {
+            this.reporter.enableReportingForActions.and.callThrough();
+            this.reporter.reporters = {
                 action1: 'reporter'
             };
         });
 
         it('should create reporters if needed for the given actions', function() {
-            reporter.enableReportingForActions(['action1', 'action2']);
-            expect(MockCloudWatchReporter.calls.count()).toBe(1);
-            expect(MockCloudWatchReporter).toHaveBeenCalledWith('namespace', {
+            this.reporter.enableReportingForActions(['action1', 'action2']);
+            expect(this.MockCloudWatchReporter.calls.count()).toBe(1);
+            expect(this.MockCloudWatchReporter).toHaveBeenCalledWith('namespace', {
                 MetricName: 'action2-Time',
                 Unit: 'Milliseconds',
                 Dimensions: 'dimensions'
             }, {
                 region: 'region'
             });
-            expect(reporter.reporters.action2).toEqual(jasmine.any(MockCloudWatchReporter));
+            expect(this.reporter.reporters.action2).toEqual(jasmine.any(this.MockCloudWatchReporter));
         });
     });
 
     describe('disableReportingForActions', function() {
-        var mockReporter;
-
         beforeEach(function() {
-            mockReporter = new MockCloudWatchReporter();
-            reporter.disableReportingForActions.and.callThrough();
-            reporter.reporters = {
-                action1: mockReporter
+            this.mockReporter = new this.MockCloudWatchReporter();
+            this.reporter.disableReportingForActions.and.callThrough();
+            this.reporter.reporters = {
+                action1: this.mockReporter
             };
         });
 
         it('should flush and delete reporters for the given actions', function() {
-            reporter.disableReportingForActions(['action1', 'action2']);
-            expect(mockReporter.flush).toHaveBeenCalledWith();
-            expect(MockCloudWatchReporter.prototype.flush.calls.count()).toBe(1);
-            expect(reporter.reporters.action1).not.toBeDefined();
-            expect(reporter.reporters.action2).not.toBeDefined();
+            this.reporter.disableReportingForActions(['action1', 'action2']);
+            expect(this.mockReporter.flush).toHaveBeenCalledWith();
+            expect(this.MockCloudWatchReporter.prototype.flush.calls.count()).toBe(1);
+            expect(this.reporter.reporters.action1).not.toBeDefined();
+            expect(this.reporter.reporters.action2).not.toBeDefined();
         });
     });
 
     describe('pushMetricForAction', function() {
-        var mockReporter;
-
         beforeEach(function() {
-            mockReporter = new MockCloudWatchReporter();
-            reporter.reporters = {
-                action1: mockReporter
+            this.mockReporter = new this.MockCloudWatchReporter();
+            this.reporter.reporters = {
+                action1: this.mockReporter
             };
         });
 
         it('should push metric data to the reporter for the given action', function() {
-            reporter.pushMetricForAction('action1', 'metric');
-            expect(mockReporter.push).toHaveBeenCalledWith('metric');
+            this.reporter.pushMetricForAction('action1', 'metric');
+            expect(this.mockReporter.push).toHaveBeenCalledWith('metric');
         });
 
         it('should do nothing', function() {
-            reporter.pushMetricForAction('action2', 'metric');
-            expect(MockCloudWatchReporter.prototype.push).not.toHaveBeenCalled();
+            this.reporter.pushMetricForAction('action2', 'metric');
+            expect(this.MockCloudWatchReporter.prototype.push).not.toHaveBeenCalled();
         });
     });
 
     describe('autoflush', function() {
         it('should setup an interval', function() {
-            reporter.autoflush(true);
-            expect(reporter.interval).toBeDefined();
-            expect(reporter.flush).not.toHaveBeenCalled();
+            this.reporter.autoflush(true);
+            expect(this.reporter.interval).toBeDefined();
+            expect(this.reporter.flush).not.toHaveBeenCalled();
             jasmine.clock().tick(1000);
-            expect(reporter.flush).toHaveBeenCalledWith();
-            expect(reporter.flush.calls.count()).toBe(1);
+            expect(this.reporter.flush).toHaveBeenCalledWith();
+            expect(this.reporter.flush.calls.count()).toBe(1);
             jasmine.clock().tick(1000);
-            expect(reporter.flush.calls.count()).toBe(2);
+            expect(this.reporter.flush.calls.count()).toBe(2);
             jasmine.clock().tick(1000);
-            expect(reporter.flush.calls.count()).toBe(3);
+            expect(this.reporter.flush.calls.count()).toBe(3);
         });
 
         it('should not set an interval if one already exists', function() {
-            reporter.interval = 'defined';
-            reporter.autoflush(true);
-            expect(reporter.interval).toBe('defined');
+            this.reporter.interval = 'defined';
+            this.reporter.autoflush(true);
+            expect(this.reporter.interval).toBe('defined');
         });
 
         it('should be able to cancel the interval', function() {
-            reporter.autoflush(true);
+            this.reporter.autoflush(true);
             jasmine.clock().tick(1000);
-            expect(reporter.flush).toHaveBeenCalled();
-            reporter.flush.calls.reset();
-            reporter.autoflush(false);
-            expect(reporter.flush).toHaveBeenCalled();
+            expect(this.reporter.flush).toHaveBeenCalled();
+            this.reporter.flush.calls.reset();
+            this.reporter.autoflush(false);
+            expect(this.reporter.flush).toHaveBeenCalled();
             jasmine.clock().tick(1000);
-            expect(reporter.flush.calls.count()).toBe(1);
+            expect(this.reporter.flush.calls.count()).toBe(1);
             jasmine.clock().tick(1000);
-            expect(reporter.flush.calls.count()).toBe(1);
+            expect(this.reporter.flush.calls.count()).toBe(1);
         });
 
         it('should not flush if cancelling a non-existant interval', function() {
-            reporter.autoflush(false);
-            expect(reporter.flush).not.toHaveBeenCalled();
+            this.reporter.autoflush(false);
+            expect(this.reporter.flush).not.toHaveBeenCalled();
         });
     });
 
     describe('flush', function() {
-        var mockReporter1, mockReporter2;
-
         beforeEach(function() {
-            reporter.flush.and.callThrough();
-            mockReporter1 = new MockCloudWatchReporter();
-            mockReporter2 = new MockCloudWatchReporter();
-            reporter.reporters = {
-                action1: mockReporter1,
-                action2: mockReporter2
+            this.reporter.flush.and.callThrough();
+            this.mockReporter1 = new this.MockCloudWatchReporter();
+            this.mockReporter2 = new this.MockCloudWatchReporter();
+            this.reporter.reporters = {
+                action1: this.mockReporter1,
+                action2: this.mockReporter2
             };
         });
 
         it('should flush each reporter', function() {
-            reporter.flush();
-            expect(mockReporter1.flush).toHaveBeenCalled();
-            expect(mockReporter2.flush).toHaveBeenCalled();
+            this.reporter.flush();
+            expect(this.mockReporter1.flush).toHaveBeenCalled();
+            expect(this.mockReporter2.flush).toHaveBeenCalled();
         });
     });
 });
