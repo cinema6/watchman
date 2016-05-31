@@ -515,7 +515,7 @@ describe('timeStream payment plan billing', function() {
 
         it('should send the user an email', function() {
             expect(email.text).toContain('PLEASE CHECK YOUR PAYMENT METHOD');
-            expect(email.from[0].address.toLowerCase()).toBe('no-reply@reelcontent.com');
+            expect(email.from[0].address.toLowerCase()).toBe('support@cinema6.com');
             expect(email.to[0].address.toLowerCase()).toBe(user.email);
             expect(moment(email.date).isAfter(moment().subtract(1, 'minute'))).toBe(true, 'Email is too old.');
         });

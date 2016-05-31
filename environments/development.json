@@ -84,7 +84,7 @@
                         "sendInterval": 60000
                     },
                     "emails": {
-                        "sender": "no-reply@reelcontent.com",
+                        "sender": "support@cinema6.com",
                         "dashboardLinks": {
                             "selfie": "http://localhost:9000/#/apps/selfie/campaigns",
                             "showcase": "http://localhost:9000/#/showcase/products"
@@ -140,7 +140,37 @@
                             "type": "freeTrial",
                             "fulfillImmediately": false
                         }
-                    ]
+                    ],
+                    "postmark": {
+                        "key": "149523e0-3eb4-4e40-819c-f855efec4740",
+                        "templates": {
+                            "campaignExpired": "672685",
+                            "campaignOutOfBudget": "672705",
+                            "campaignApproved": "672706",
+                            "campaignUpdateApproved": "672707",
+                            "campaignRejected": "672781",
+                            "campaignUpdateRejected": "672782",
+                            "newUpdateRequest": "672784",
+                            "paymentReceipt": "672801",
+                            "paymentReceipt--app": "672786",
+                            "activateAccount": "672787",
+                            "activateAccount--app": "672803",
+                            "accountWasActivated": "672804",
+                            "accountWasActivated--app": "672805",
+                            "passwordChanged": "672788",
+                            "passwordChanged--app": "672806",
+                            "emailChanged": "672807",
+                            "emailChanged--app": "672901",
+                            "failedLogins": "672903",
+                            "failedLogins--app": "672904",
+                            "passwordReset": "672905",
+                            "passwordReset--app": "672906",
+                            "chargePaymentPlanFailure": "672809",
+                            "campaignActive": "672909",
+                            "campaignSubmitted": "672810",
+                            "initializedShowcaseCampaign": "672910"
+                        }
+                    }
                 }
             },
             "devTimeStreamApplication": {

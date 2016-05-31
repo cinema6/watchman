@@ -183,7 +183,11 @@ KclApp.prototype = {
                 previewLink: 'string'
             },
             paymentPlans: 'object',
-            promotions: 'object'
+            promotions: 'object',
+            postmark: {
+                key: 'string',
+                templates: 'object'
+            }
         };
         return validate(config, schema);
     },

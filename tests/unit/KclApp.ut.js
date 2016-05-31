@@ -68,7 +68,11 @@ describe('KclApp.js', function() {
             promotions: [
                 { type: 'signupReward', fulfillImmediately: true },
                 { type: 'freeTrial', fulfillImmediately: false }
-            ]
+            ],
+            postmark: {
+                key: 'key',
+                templates: { }
+            }
         };
         runSpy = jasmine.createSpy('run()');
         mockKcl = jasmine.createSpy('kcl').and.returnValue({
