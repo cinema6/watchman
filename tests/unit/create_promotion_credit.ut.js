@@ -84,7 +84,8 @@ describe('create_promotion_credit.js', function() {
                 json: {
                     amount: 50,
                     org: 'o-1',
-                    promotion: 'pro-1'
+                    promotion: 'pro-1',
+                    description: JSON.stringify({ eventType: 'credit', source: 'promotion' })
                 }
             });
             expect(mockLog.warn).not.toHaveBeenCalled();
@@ -102,6 +103,7 @@ describe('create_promotion_credit.js', function() {
             }
         };
         event.data.paymentPlan = { price: 49.51 };
+        event.data.target = 'showcase';
 
         createCredit(event).then(function() {
             expect(requestUtils.makeSignedRequest).toHaveBeenCalledWith('i am watchman', 'post', {
@@ -109,7 +111,8 @@ describe('create_promotion_credit.js', function() {
                 json: {
                     amount: 24.76,
                     org: 'o-1',
-                    promotion: 'pro-1'
+                    promotion: 'pro-1',
+                    description: JSON.stringify({ eventType: 'credit', source: 'promotion', target: event.data.target })
                 }
             });
             expect(mockLog.warn).not.toHaveBeenCalled();

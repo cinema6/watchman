@@ -13,6 +13,7 @@ module.exports = function(config) {
         var org = event.data.org;
         var promotion = event.data.promotion;
         var paymentPlan = event.data.paymentPlan;
+        var target = event.data.target;
         
         if (!org || !promotion) {
             return q();
@@ -40,7 +41,12 @@ module.exports = function(config) {
             json: {
                 amount: amount,
                 org: org.id,
-                promotion: promotion.id
+                promotion: promotion.id,
+                description: JSON.stringify({
+                    eventType: 'credit',
+                    source: 'promotion',
+                    target: target
+                })
             }
         })
         .then(function(resp) {

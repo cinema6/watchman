@@ -18,6 +18,7 @@ module.exports = function activatePaymentPlanFactory(config) {
 
     return function activatePaymentPlan(event) {
         var data = event.data;
+        var options = event.options;
         var campaign = data.campaign;
         var now = moment(data.date);
         var orgEndpoint = orgsEndpoint + '/' + campaign.org;
@@ -50,7 +51,8 @@ module.exports = function activatePaymentPlanFactory(config) {
                             data: {
                                 org: org,
                                 promotion: promotion,
-                                paymentPlan: paymentPlan
+                                paymentPlan: paymentPlan,
+                                target: options.target
                             }
                         }).catch(function logError(reason) {
                             log.error(

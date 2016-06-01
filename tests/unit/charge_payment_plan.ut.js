@@ -132,7 +132,8 @@ describe('(action factory) charge_payment_plan', function() {
                     },
                     json: {
                         paymentMethod: data.paymentMethod.token,
-                        amount: data.paymentPlan.price
+                        amount: data.paymentPlan.price,
+                        description: JSON.stringify({ eventType: 'credit', source: 'braintree', target: options.target })
                     }
                 });
             });
