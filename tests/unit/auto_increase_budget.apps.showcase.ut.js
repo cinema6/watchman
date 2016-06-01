@@ -1,5 +1,7 @@
 'use strict';
 
+var Status = require('cwrx/lib/enums').Status;
+
 describe('(action factory) showcase/apps/auto_increase_budget', function() {
     var q, uuid, resolveURL, ld, logger;
     var JsonProducer, CwrxRequest;
@@ -120,7 +122,7 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                         campaign: null,
                         braintreeId: null,
                         promotion: 'pro-' + uuid.createUuid(),
-                        description: null
+                        description: JSON.stringify({ eventType: 'credit', source: 'braintree', target: 'showcase' })
                     }
                 };
                 options = {
@@ -141,7 +143,14 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
             it('should get all of the org\'s campaigns', function() {
                 expect(request.get).toHaveBeenCalledWith({
                     url: resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint),
-                    qs: { org: data.transaction.org }
+                    qs: {
+                        org: data.transaction.org,
+                        application: 'showcase',
+                        status: [
+                            Status.Draft, Status.New, Status.Pending, Status.Approved, Status.Rejected, Status.Active, Status.Paused,
+                            Status.Inactive, Status.Expired, Status.OutOfBudget, Status.Error
+                        ].join(',')
+                    }
                 });
             });
 
@@ -153,13 +162,23 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                     campaigns = [
                         {
                             id: 'cam-' + uuid.createUuid(),
-                            status: 'active',
-                            application: 'selfie',
+                            status: 'outOfBudget',
+                            application: 'showcase',
                             pricing: {
                                 model: 'cpv',
-                                cost: 0.06,
-                                budget: 250,
-                                dailyLimit: 50
+                                cost: 0.01,
+                                budget: 0,
+                                dailyLimit: 2
+                            },
+                            externalCampaigns: {
+                                beeswax: {
+                                    externalId: uuid.createUuid(),
+                                    budget: 0,
+                                    dailyLimit: 1
+                                }
+                            },
+                            product: {
+                                type: 'ecommerce'
                             }
                         },
                         {
@@ -196,17 +215,6 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                             },
                             product: {
                                 type: 'app'
-                            }
-                        },
-                        {
-                            id: 'cam-' + uuid.createUuid(),
-                            status: 'paused',
-                            application: 'selfie',
-                            pricing: {
-                                model: 'cpv',
-                                cost: 0.06,
-                                budget: 250,
-                                dailyLimit: 50
                             }
                         },
                         {
@@ -255,7 +263,7 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                         json: ld.assign({}, campaigns[1], {
                             status: 'active',
                             pricing: ld.assign({}, campaigns[1].pricing, {
-                                budget: campaigns[1].pricing.budget + (data.transaction.amount / campaigns.length),
+                                budget: campaigns[1].pricing.budget + (data.transaction.amount / 2),
                                 dailyLimit: options.dailyLimit
                             })
                         })
@@ -265,7 +273,7 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                         json: ld.assign({}, campaigns[2], {
                             status: 'active',
                             pricing: {
-                                budget: (data.transaction.amount / campaigns.length),
+                                budget: (data.transaction.amount / 2),
                                 dailyLimit: options.dailyLimit
                             }
                         })
@@ -286,14 +294,14 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                         expect(request.put).toHaveBeenCalledWith({
                             url: resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint + '/' + campaigns[1].id + '/external/beeswax'),
                             json: {
-                                budget: campaigns[1].externalCampaigns.beeswax.budget + ((data.transaction.amount / campaigns.length) * options.externalAllocationFactor),
+                                budget: campaigns[1].externalCampaigns.beeswax.budget + ((data.transaction.amount / 2) * options.externalAllocationFactor),
                                 dailyLimit: options.dailyLimit * options.externalAllocationFactor
                             }
                         });
                         expect(request.put).toHaveBeenCalledWith({
                             url: resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint + '/' + campaigns[2].id + '/external/beeswax'),
                             json: {
-                                budget: campaigns[2].externalCampaigns.beeswax.budget + ((data.transaction.amount / campaigns.length) * options.externalAllocationFactor),
+                                budget: campaigns[2].externalCampaigns.beeswax.budget + ((data.transaction.amount / 2) * options.externalAllocationFactor),
                                 dailyLimit: options.dailyLimit * options.externalAllocationFactor
                             }
                         });

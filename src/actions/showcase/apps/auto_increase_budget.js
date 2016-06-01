@@ -25,18 +25,22 @@ module.exports = function autoIncreaseBudgetFactory(config) {
 
         return request.get({
             url: campaignsEndpoint,
-            qs: { org: transaction.org }
-        }).spread(function increaseBudgets(campaigns) {
-            var showcaseCampaigns = filter(campaigns, {
+            qs: {
+                org: transaction.org,
                 application: 'showcase',
-                product: { type: 'app' }
-            });
+                status: [
+                    Status.Draft, Status.New, Status.Pending, Status.Approved, Status.Rejected,
+                    Status.Active, Status.Paused, Status.Inactive, Status.Expired,
+                    Status.OutOfBudget, Status.Error
+                ].join(',')
+            }
+        }).spread(function increaseBudgets(campaigns) {
+            var appCampaigns = filter(campaigns, { product: { type: 'app' } });
 
-            return q.all(showcaseCampaigns.map(function increaseBudget(campaign) {
+            return q.all(appCampaigns.map(function increaseBudget(campaign) {
                 var externalCampaign = get(campaign, 'externalCampaigns.beeswax', {});
-                // Split this transaction between ALL campaigns (even though we will only increase
-                // the budgets of showcase campaigns.)
-                var portion = (transaction.amount / campaigns.length);
+                // Split this transaction between all showcase (app) campaigns
+                var portion = (transaction.amount / appCampaigns.length);
 
                 return request.put({
                     url: campaignsEndpoint + '/' + campaign.id,

@@ -21,7 +21,12 @@ module.exports = function chargePaymentPlanFactory(config) {
             qs: { org: org.id, target: options.target },
             json: {
                 paymentMethod: paymentMethod.token,
-                amount: paymentPlan.price
+                amount: paymentPlan.price,
+                description: JSON.stringify({
+                    eventType: 'credit',
+                    source: 'braintree',
+                    target: options.target
+                })
             }
         }).spread(function handleSuccess(payment) {
             return watchmanStream.produce({

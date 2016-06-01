@@ -393,7 +393,7 @@ describe('timeStream payment plan billing', function() {
         });
 
         describe('and the org\'s paymentPlanStart is today', function() {
-            var payment;
+            var payment, transaction;
 
             beforeEach(function(done) {
                 updatePaymentPlanStart(moment()).then(function() {
@@ -402,16 +402,24 @@ describe('timeStream payment plan billing', function() {
                     return getMostRecentPayment();
                 }).then(function(/*payment*/) {
                     payment = arguments[0];
+                }).then(function() {
+                    return testUtils.pgQuery(
+                        'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC LIMIT 1',
+                        [org.id]
+                    );
+                }).then(function(result) {
+                    transaction = result.rows[0];
                 }).then(done, done.fail);
             });
 
             it('should make a payment for the amount of the payment plan', function() {
                 expect(payment.amount).toBe(paymentPlan.price);
+                expect(transaction.description).toBe(JSON.stringify({ eventType: 'credit', source: 'braintree', target: 'showcase' }));
             });
         });
 
         describe('and the org\'s paymentPlanStart was in the past', function() {
-            var payment;
+            var payment, transaction;
 
             beforeEach(function(done) {
                 updatePaymentPlanStart(moment().subtract(1, 'day')).then(function() {
@@ -420,11 +428,19 @@ describe('timeStream payment plan billing', function() {
                     return getMostRecentPayment();
                 }).then(function(/*payment*/) {
                     payment = arguments[0];
+                }).then(function() {
+                    return testUtils.pgQuery(
+                        'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC LIMIT 1',
+                        [org.id]
+                    );
+                }).then(function(result) {
+                    transaction = result.rows[0];
                 }).then(done, done.fail);
             });
 
             it('should make a payment for the amount of the payment plan', function() {
                 expect(payment.amount).toBe(paymentPlan.price);
+                expect(transaction.description).toBe(JSON.stringify({ eventType: 'credit', source: 'braintree', target: 'showcase' }));
             });
         });
     });
@@ -453,7 +469,7 @@ describe('timeStream payment plan billing', function() {
         });
 
         describe('one month ago', function() {
-            var payments;
+            var payments, transaction;
 
             beforeEach(function(done) {
                 dailyEvent(moment().add(1, 'month')).then(function() {
@@ -464,17 +480,25 @@ describe('timeStream payment plan billing', function() {
                     });
                 }).then(function(/*payments*/) {
                     payments = arguments[0];
+                }).then(function() {
+                    return testUtils.pgQuery(
+                        'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC LIMIT 1',
+                        [org.id]
+                    );
+                }).then(function(result) {
+                    transaction = result.rows[0];
                 }).then(done, done.fail);
             });
 
             it('should create a payment', function() {
                 expect(payments.length).toBe(2, 'New payment not created.');
                 expect(payments[0].amount).toBe(paymentPlan.price);
+                expect(transaction.description).toBe(JSON.stringify({ eventType: 'credit', source: 'braintree', target: 'showcase' }));
             });
         });
 
         describe('over a month ago', function() {
-            var payments;
+            var payments, transaction;
 
             beforeEach(function(done) {
                 dailyEvent(moment().add(1, 'month').add(1, 'day')).then(function() {
@@ -485,12 +509,20 @@ describe('timeStream payment plan billing', function() {
                     });
                 }).then(function(/*payments*/) {
                     payments = arguments[0];
+                }).then(function() {
+                    return testUtils.pgQuery(
+                        'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC LIMIT 1',
+                        [org.id]
+                    );
+                }).then(function(result) {
+                    transaction = result.rows[0];
                 }).then(done, done.fail);
             });
 
             it('should create a payment', function() {
                 expect(payments.length).toBe(2, 'New payment not created.');
                 expect(payments[0].amount).toBe(paymentPlan.price);
+                expect(transaction.description).toBe(JSON.stringify({ eventType: 'credit', source: 'braintree', target: 'showcase' }));
             });
         });
     });

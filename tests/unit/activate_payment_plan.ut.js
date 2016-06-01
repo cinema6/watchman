@@ -125,7 +125,9 @@ describe('(action factory) activate_payment_plan', function() {
                     },
                     date: moment().subtract(1, 'month').format()
                 };
-                options = {};
+                options = {
+                    target: 'showcase'
+                };
                 event = { data: data, options: options };
 
                 success = jasmine.createSpy('success()');
@@ -389,7 +391,8 @@ describe('(action factory) activate_payment_plan', function() {
                                         data: {
                                             org: org,
                                             promotion: promotions[Object.keys(promotions)[0]],
-                                            paymentPlan: config.paymentPlans[org.paymentPlanId]
+                                            paymentPlan: config.paymentPlans[org.paymentPlanId],
+                                            target: options.target
                                         }
                                     });
                                     expect(watchmanStream.produce).toHaveBeenCalledWith({
@@ -397,7 +400,8 @@ describe('(action factory) activate_payment_plan', function() {
                                         data: {
                                             org: org,
                                             promotion: promotions[Object.keys(promotions)[2]],
-                                            paymentPlan: config.paymentPlans[org.paymentPlanId]
+                                            paymentPlan: config.paymentPlans[org.paymentPlanId],
+                                            target: options.target
                                         }
                                     });
                                     expect(watchmanStream.produce.calls.count()).toBe(2, 'Incorrect number of events produced.');

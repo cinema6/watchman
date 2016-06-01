@@ -347,7 +347,7 @@ describe('cwrxStream transactionCreated', function() {
                 campaign: null,
                 braintreeId: null,
                 promotion: createId('pro'),
-                description: null
+                description: JSON.stringify({ target: 'showcase' })
             };
 
             transactionCreatedEvent().then(function() {
@@ -383,7 +383,7 @@ describe('cwrxStream transactionCreated', function() {
             updatedCampaigns.forEach(function(campaign) {
                 var oldCampaign = ld.find(campaigns, { id: campaign.id });
 
-                expect(campaign.pricing.budget).toBe(oldCampaign.pricing.budget + (transaction.amount / ourCampaignIds.length));
+                expect(campaign.pricing.budget).toBe(oldCampaign.pricing.budget + (transaction.amount / targetCampaignIds.length));
             });
         });
 
@@ -397,7 +397,7 @@ describe('cwrxStream transactionCreated', function() {
             updatedCampaigns.forEach(function(campaign) {
                 var oldCampaign = ld.find(campaigns, { id: campaign.id });
 
-                expect(campaign.externalCampaigns.beeswax.budget).toBe(ld.ceil(oldCampaign.externalCampaigns.beeswax.budget + ((transaction.amount / ourCampaignIds.length) * 0.5), 2));
+                expect(campaign.externalCampaigns.beeswax.budget).toBe(ld.ceil(oldCampaign.externalCampaigns.beeswax.budget + ((transaction.amount / targetCampaignIds.length) * 0.5), 2));
             });
         });
 
