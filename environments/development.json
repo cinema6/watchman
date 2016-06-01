@@ -142,7 +142,6 @@
                         }
                     ],
                     "postmark": {
-                        "key": "149523e0-3eb4-4e40-819c-f855efec4740",
                         "templates": {
                             "campaignExpired": "672685",
                             "campaignOutOfBudget": "672705",

@@ -185,7 +185,6 @@ KclApp.prototype = {
             paymentPlans: 'object',
             promotions: 'object',
             postmark: {
-                key: 'string',
                 templates: 'object'
             }
         };
