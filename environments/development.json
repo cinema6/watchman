@@ -298,7 +298,10 @@
                         "initializedShowcaseCampaign": {
                             "actions": [
                                 {
-                                    "name": "activate_payment_plan"
+                                    "name": "activate_payment_plan",
+                                    "options": {
+                                        "target": "showcase"
+                                    }
                                 },
                                 {
                                     "name": "message/campaign_email",
@@ -468,7 +471,8 @@
                                         "externalAllocationFactor": 0.5
                                     },
                                     "ifData": {
-                                        "transaction.sign": "^1$"
+                                        "transaction.sign": "^1$",
+                                        "transaction.description": "\"target\"\\s*:\\s*\"showcase\""
                                     }
                                 }
                             ]

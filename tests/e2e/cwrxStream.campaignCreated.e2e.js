@@ -788,7 +788,7 @@ describe('cwrxStream campaignCreated', function() {
                         campaign_id: null,
                         braintree_id: null,
                         promotion_id: promotions[2].id,
-                        description: JSON.stringify({ eventType: 'credit', source: 'promotion' })
+                        description: JSON.stringify({ eventType: 'credit', source: 'promotion', target: 'showcase' })
                     }));
 
                     expect(transactions[1]).toEqual(jasmine.objectContaining({
@@ -803,7 +803,7 @@ describe('cwrxStream campaignCreated', function() {
                         campaign_id: null,
                         braintree_id: null,
                         promotion_id: promotions[0].id,
-                        description: JSON.stringify({ eventType: 'credit', source: 'promotion' })
+                        description: JSON.stringify({ eventType: 'credit', source: 'promotion', target: 'showcase' })
                     }));
                 });
             });
