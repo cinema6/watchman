@@ -1,7 +1,9 @@
 # Watchman
 
+## v0.7.0 (June 1, 2016)
 * *[v0.7.0-rc1]*
   * [FEATURE]: Support sending emails through Postmark
+* *[/v0.7.0-rc1]*
 
 ## v0.6.0 (May 25, 2016)
 * *[v0.6.0-rc4]*

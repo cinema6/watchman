@@ -71,7 +71,6 @@ describe('campaign_email.js', function() {
             },
             appCreds: 'appCreds',
             postmark: {
-                key: 'server key',
                 templates: {
                     campaignExpired: 'campaignExpired-template-id',
                     campaignOutOfBudget: 'campaignOutOfBudget-template-id',
@@ -98,6 +97,13 @@ describe('campaign_email.js', function() {
                     campaignActive: 'campaignActive-template-id',
                     campaignSubmitted: 'campaignSubmitted-template-id',
                     initializedShowcaseCampaign: 'initializedShowcaseCampaign-template-id'
+                }
+            },
+            state: {
+                secrets: {
+                    postmark: {
+                        key: 'server key'
+                    }
                 }
             }
         };

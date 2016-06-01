@@ -70,7 +70,6 @@ describe('KclApp.js', function() {
                 { type: 'freeTrial', fulfillImmediately: false }
             ],
             postmark: {
-                key: 'key',
                 templates: { }
             }
         };

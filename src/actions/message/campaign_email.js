@@ -17,7 +17,7 @@ var resolveURL = require('url').resolve;
 
 module.exports = function factory(config) {
     var emailConfig = config.emails;
-    var postmarkClient = new postmark.Client(config.postmark.key);
+    var postmarkClient = new postmark.Client(config.state.secrets.postmark.key);
 
     function friendlyName(data) {
         return (data && data.user && data.user.firstName) ? data.user.firstName + ', ' : '';
