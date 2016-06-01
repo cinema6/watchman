@@ -1,5 +1,14 @@
 # Watchman
 
+* *[v0.7.1-rc1]*
+  * [FIX]: Make sure funds are only allocated to a showcase campaign
+    when funds are added for showcase promotions or subscription
+    payments
+  * ** Extra Deployment Steps**:
+    * Deploy new version of the org service with the ability to
+      set the transaction description when making payments
+    * Update watchman environments
+
 ## v0.7.0 (June 1, 2016)
 * *[v0.7.0-rc1]*
   * [FEATURE]: Support sending emails through Postmark
