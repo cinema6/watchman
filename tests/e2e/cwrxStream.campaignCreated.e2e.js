@@ -188,9 +188,14 @@ describe('cwrxStream campaignCreated', function() {
             });
         }).spread(function(placements) {
             return q.all(placements.map(function(placement) {
-                return request.delete({
-                    url: api('/api/placements/' + placement.id)
-                });
+                var beeswaxId = placement.beeswaxIds && placement.beeswaxIds.creative;
+
+                if (!beeswaxId) { return; }
+
+                return beeswax.creatives.edit(beeswaxId, { active: false })
+                    .then(function() {
+                        return beeswax.creatives.delete(beeswaxId);
+                    });
             }));
         });
     }
@@ -583,38 +588,38 @@ describe('cwrxStream campaignCreated', function() {
         });
 
         it('should create two placements', function() {
-            expect(ld.find(placements, { tagType: 'mraid' })).toEqual({
+            expect(ld.find(placements, { tagType: 'mraid' })).toEqual(jasmine.objectContaining({
                 label: 'Showcase--Interstitial for App: "Count Coins"',
                 tagType: 'mraid',
-                tagParams: {
+                tagParams: jasmine.objectContaining({
                     container: 'beeswax',
                     type: 'mobile-card',
                     branding: 'showcase-app--interstitial',
                     card: campaign.cards[0].id,
                     campaign: campaign.id
-                },
-                showInTag: {},
+                }),
+                showInTag: jasmine.objectContaining({}),
                 id: jasmine.any(String),
                 created: jasmine.any(String),
                 lastUpdated: jasmine.any(String),
                 status: 'active'
-            });
-            expect(ld.find(placements, { tagType: 'display' })).toEqual({
+            }));
+            expect(ld.find(placements, { tagType: 'display' })).toEqual(jasmine.objectContaining({
                 label: 'Showcase--300x250 for App: "Count Coins"',
                 tagType: 'display',
-                tagParams: {
+                tagParams: jasmine.objectContaining({
                     container: 'beeswax',
                     type: 'mobile-card',
                     branding: 'showcase-app--300x250',
                     card: campaign.cards[1].id,
                     campaign: campaign.id
-                },
-                showInTag: {},
+                }),
+                showInTag: jasmine.objectContaining({}),
                 id: jasmine.any(String),
                 created: jasmine.any(String),
                 lastUpdated: jasmine.any(String),
                 status: 'active'
-            });
+            }));
         });
 
         it('should send an email to support', function() {
