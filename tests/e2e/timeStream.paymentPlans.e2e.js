@@ -414,7 +414,7 @@ describe('timeStream payment plan billing', function() {
 
             it('should make a payment for the amount of the payment plan', function() {
                 expect(payment.amount).toBe(paymentPlan.price);
-                expect(transaction.description).toBe(JSON.stringify({ eventType: 'credit', source: 'braintree', target: 'showcase' }));
+                expect(transaction.description).toBe(JSON.stringify({ eventType: 'credit', source: 'braintree', target: 'showcase', paymentPlanId: org.paymentPlanId }));
             });
         });
 
@@ -440,7 +440,7 @@ describe('timeStream payment plan billing', function() {
 
             it('should make a payment for the amount of the payment plan', function() {
                 expect(payment.amount).toBe(paymentPlan.price);
-                expect(transaction.description).toBe(JSON.stringify({ eventType: 'credit', source: 'braintree', target: 'showcase' }));
+                expect(transaction.description).toBe(JSON.stringify({ eventType: 'credit', source: 'braintree', target: 'showcase', paymentPlanId: org.paymentPlanId }));
             });
         });
     });
@@ -493,7 +493,7 @@ describe('timeStream payment plan billing', function() {
             it('should create a payment', function() {
                 expect(payments.length).toBe(2, 'New payment not created.');
                 expect(payments[0].amount).toBe(paymentPlan.price);
-                expect(transaction.description).toBe(JSON.stringify({ eventType: 'credit', source: 'braintree', target: 'showcase' }));
+                expect(transaction.description).toBe(JSON.stringify({ eventType: 'credit', source: 'braintree', target: 'showcase', paymentPlanId: org.paymentPlanId }));
             });
         });
 
@@ -522,7 +522,7 @@ describe('timeStream payment plan billing', function() {
             it('should create a payment', function() {
                 expect(payments.length).toBe(2, 'New payment not created.');
                 expect(payments[0].amount).toBe(paymentPlan.price);
-                expect(transaction.description).toBe(JSON.stringify({ eventType: 'credit', source: 'braintree', target: 'showcase' }));
+                expect(transaction.description).toBe(JSON.stringify({ eventType: 'credit', source: 'braintree', target: 'showcase', paymentPlanId: org.paymentPlanId }));
             });
         });
     });

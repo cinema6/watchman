@@ -347,7 +347,7 @@ describe('cwrxStream transactionCreated', function() {
                 campaign: null,
                 braintreeId: null,
                 promotion: createId('pro'),
-                description: JSON.stringify({ target: 'showcase' })
+                description: JSON.stringify({ target: 'showcase', paymentPlanId: 'pp-0Ek5Na02vCohpPgw' })
             };
 
             transactionCreatedEvent().then(function() {
@@ -358,7 +358,7 @@ describe('cwrxStream transactionCreated', function() {
                             json: true
                         }).spread(function(campaign) {
                             return moment(campaign.lastUpdated).isAfter(moment().subtract(1, 'day')) &&
-                                campaign.externalCampaigns.beeswax.budget !== ld.find(campaigns, { id: campaign.id }).externalCampaigns.beeswax.budget &&
+                                campaign.externalCampaigns.beeswax.budgetImpressions !== ld.find(campaigns, { id: campaign.id }).externalCampaigns.beeswax.budgetImpressions &&
                                 campaign;
                         });
                     })).then(function(results) {
@@ -393,17 +393,19 @@ describe('cwrxStream transactionCreated', function() {
             });
         });
 
-        it('should increase the budget of every externalCampaign', function() {
+        it('should increase the impressions of every externalCampaign', function() {
             updatedCampaigns.forEach(function(campaign) {
                 var oldCampaign = ld.find(campaigns, { id: campaign.id });
 
-                expect(campaign.externalCampaigns.beeswax.budget).toBe(ld.ceil(oldCampaign.externalCampaigns.beeswax.budget + ((transaction.amount / targetCampaignIds.length) * 0.5), 2));
+                expect(campaign.externalCampaigns.beeswax.budgetImpressions).toBe((oldCampaign.externalCampaigns.beeswax.budgetImpressions || 0) + ((transaction.amount / targetCampaignIds.length) * 50));
+                expect(campaign.externalCampaigns.beeswax.budget).toBeNull();
             });
         });
 
         it('should set the dailyLimit on the externalCampaign', function() {
             updatedCampaigns.forEach(function(campaign) {
-                expect(campaign.externalCampaigns.beeswax.dailyLimit).toBe(1);
+                expect(campaign.externalCampaigns.beeswax.dailyLimitImpressions).toBe(100);
+                expect(campaign.externalCampaigns.beeswax.dailyLimit).toBeNull();
             });
         });
 
