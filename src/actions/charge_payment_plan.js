@@ -25,7 +25,8 @@ module.exports = function chargePaymentPlanFactory(config) {
                 description: JSON.stringify({
                     eventType: 'credit',
                     source: 'braintree',
-                    target: options.target
+                    target: options.target,
+                    paymentPlanId: paymentPlan.id
                 })
             }
         }).spread(function handleSuccess(payment) {

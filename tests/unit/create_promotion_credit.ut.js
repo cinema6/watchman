@@ -5,6 +5,7 @@ var util            = require('util');
 var logger          = require('cwrx/lib/logger.js');
 var requestUtils    = require('cwrx/lib/requestUtils');
 var actionFactory   = require('../../src/actions/create_promotion_credit.js');
+var uuid            = require('rc-uuid');
 
 describe('create_promotion_credit.js', function() {
     var mockOptions, mockConfig, mockLog, event, transResp, createCredit;
@@ -102,7 +103,7 @@ describe('create_promotion_credit.js', function() {
                 trialLength: 15
             }
         };
-        event.data.paymentPlan = { price: 49.51 };
+        event.data.paymentPlan = { price: 49.51, id: 'pp-' + uuid.createUuid() };
         event.data.target = 'showcase';
 
         createCredit(event).then(function() {
@@ -112,7 +113,7 @@ describe('create_promotion_credit.js', function() {
                     amount: 24.76,
                     org: 'o-1',
                     promotion: 'pro-1',
-                    description: JSON.stringify({ eventType: 'credit', source: 'promotion', target: event.data.target })
+                    description: JSON.stringify({ eventType: 'credit', source: 'promotion', target: event.data.target, paymentPlanId: event.data.paymentPlan.id })
                 }
             });
             expect(mockLog.warn).not.toHaveBeenCalled();
