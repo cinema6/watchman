@@ -599,6 +599,7 @@ describe('cwrxStream campaignCreated', function() {
                     campaign: campaign.id
                 }),
                 showInTag: jasmine.objectContaining({}),
+                thumbnail: campaign.cards[0].thumbs.small,
                 id: jasmine.any(String),
                 created: jasmine.any(String),
                 lastUpdated: jasmine.any(String),
@@ -615,6 +616,7 @@ describe('cwrxStream campaignCreated', function() {
                     campaign: campaign.id
                 }),
                 showInTag: jasmine.objectContaining({}),
+                thumbnail: campaign.cards[1].thumbs.small,
                 id: jasmine.any(String),
                 created: jasmine.any(String),
                 lastUpdated: jasmine.any(String),
