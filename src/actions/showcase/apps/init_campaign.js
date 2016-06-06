@@ -95,7 +95,8 @@ module.exports = function initCampaignFactory(config) {
                     tagParams: assign({}, tagParams(options.placement.interstitial), {
                         card: interstitial.id
                     }),
-                    showInTag: showInTag(options.placement.interstitial)
+                    showInTag: showInTag(options.placement.interstitial),
+                    thumbnail: interstitial.thumbs.small
                 },
                 {
                     label: 'Showcase--300x250 for App: "' + campaign.name + '"',
@@ -103,7 +104,8 @@ module.exports = function initCampaignFactory(config) {
                     tagParams: assign({}, tagParams(options.placement.threeHundredByTwoFifty), {
                         card: threeHundredByTwoFifty.id
                     }),
-                    showInTag: showInTag(options.placement.threeHundredByTwoFifty)
+                    showInTag: showInTag(options.placement.threeHundredByTwoFifty),
+                    thumbnail: threeHundredByTwoFifty.thumbs.small
                 }
             ].map(function(json) {
                 return request.post({

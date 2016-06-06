@@ -420,7 +420,8 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                                 },
                                 showInTag: {
                                     uuid: true
-                                }
+                                },
+                                thumbnail: interstitial.thumbs.small
                             }
                         });
                         expect(request.post).toHaveBeenCalledWith({
@@ -438,7 +439,8 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                                 },
                                 showInTag: {
                                     uuid: true
-                                }
+                                },
+                                thumbnail: threeHundredByTwoFifty.thumbs.small
                             }
                         });
                     });
