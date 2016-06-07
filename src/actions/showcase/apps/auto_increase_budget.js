@@ -6,6 +6,7 @@ var ld = require('lodash');
 var filter = ld.filter;
 var assign = ld.assign;
 var get = ld.get;
+var floor = ld.floor;
 var q = require('q');
 var Status = require('cwrx/lib/enums').Status;
 var logger = require('cwrx/lib/logger');
@@ -16,12 +17,23 @@ module.exports = function autoIncreaseBudgetFactory(config) {
     var request = new CwrxRequest(config.appCreds);
     var campaignsEndpoint = resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint);
 
-    return function autoIncreaseBudget(event) {
+    return function autoIncreaseBudget(event) { return q().then(function() {
         var data = event.data;
         var options = event.options;
         var transaction = data.transaction;
+        var transactionDescription = (function() {
+            try {
+                return JSON.parse(transaction.description) || {};
+            } catch(error) {
+                throw new Error('"' + transaction.description + '" is not JSON.');
+            }
+        }());
         var dailyLimit = options.dailyLimit;
-        var externalAllocationFactor = options.externalAllocationFactor;
+        var paymentPlan = config.paymentPlans[transactionDescription.paymentPlanId];
+
+        if (!paymentPlan) {
+            throw new Error('Unknown payment plan id: ' + transactionDescription.paymentPlanId);
+        }
 
         return request.get({
             url: campaignsEndpoint,
@@ -36,18 +48,21 @@ module.exports = function autoIncreaseBudgetFactory(config) {
             }
         }).spread(function increaseBudgets(campaigns) {
             var appCampaigns = filter(campaigns, { product: { type: 'app' } });
+            // Split this transaction between all showcase (app) campaigns
+            var externalImpressionPortion = floor(
+                (transaction.amount / appCampaigns.length) * paymentPlan.impressionsPerDollar
+            );
+            var budgetPortion = (transaction.amount / appCampaigns.length);
 
             return q.all(appCampaigns.map(function increaseBudget(campaign) {
                 var externalCampaign = get(campaign, 'externalCampaigns.beeswax', {});
-                // Split this transaction between all showcase (app) campaigns
-                var portion = (transaction.amount / appCampaigns.length);
 
                 return request.put({
                     url: campaignsEndpoint + '/' + campaign.id,
                     json: assign({}, campaign, {
                         status: Status.Active,
                         pricing: assign({}, campaign.pricing, {
-                            budget: get(campaign, 'pricing.budget', 0) + portion,
+                            budget: get(campaign, 'pricing.budget', 0) + budgetPortion,
                             dailyLimit: dailyLimit
                         })
                     })
@@ -55,8 +70,11 @@ module.exports = function autoIncreaseBudgetFactory(config) {
                     return request.put({
                         url: campaignsEndpoint + '/' + campaign.id + '/external/beeswax',
                         json: {
-                            budget: externalCampaign.budget + (portion * externalAllocationFactor),
-                            dailyLimit: (dailyLimit * externalAllocationFactor)
+                            budgetImpressions: (externalCampaign.budgetImpressions || 0) +
+                                externalImpressionPortion,
+                                dailyLimitImpressions: paymentPlan.dailyImpressionLimit,
+                                budget: null,
+                                dailyLimit: null
                         }
                     }).spread(function logSuccess(newExternalCampaign) {
                         log.info(
@@ -71,9 +89,9 @@ module.exports = function autoIncreaseBudgetFactory(config) {
                         );
                     });
                 });
-            })).catch(function logError(reason) {
-                return log.error('Failed to increase campaign budget: %1', inspect(reason));
-            });
-        }).thenResolve(undefined);
-    };
+            }));
+        });
+    }).catch(function logError(reason) {
+        return log.error('Failed to increase campaign budget: %1', inspect(reason));
+    }).thenResolve(undefined); };
 };

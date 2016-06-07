@@ -45,7 +45,8 @@ module.exports = function(config) {
                 description: JSON.stringify({
                     eventType: 'credit',
                     source: 'promotion',
-                    target: target
+                    target: target,
+                    paymentPlanId: paymentPlan && paymentPlan.id
                 })
             }
         })

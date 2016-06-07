@@ -113,22 +113,40 @@
                     },
                     "paymentPlans": {
                         "pp-0Ek5Na02vCohpPgw": {
-                            "price": 49.99
+                            "id": "pp-0Ek5Na02vCohpPgw",
+                            "price": 49.99,
+                            "impressionsPerDollar": 50,
+                            "dailyImpressionLimit": 100
                         },
                         "pp-0Ek2xF0332Eh3-FY": {
-                            "price": 39.99
+                            "id": "pp-0Ek2xF0332Eh3-FY",
+                            "price": 39.99,
+                            "impressionsPerDollar": 50,
+                            "dailyImpressionLimit": 100
                         },
                         "pp-0Ek2zH0332VnSBqZ": {
-                            "price": 29.99
+                            "id": "pp-0Ek2zH0332VnSBqZ",
+                            "price": 29.99,
+                            "impressionsPerDollar": 50,
+                            "dailyImpressionLimit": 100
                         },
                         "pp-0Ek2HA0334w6CXbl": {
-                            "price": 19.99
+                            "id": "pp-0Ek2HA0334w6CXbl",
+                            "price": 19.99,
+                            "impressionsPerDollar": 50,
+                            "dailyImpressionLimit": 100
                         },
                         "pp-0Ek2Ik0334Dio8u_": {
-                            "price": 9.99
+                            "id": "pp-0Ek2Ik0334Dio8u_",
+                            "price": 9.99,
+                            "impressionsPerDollar": 50,
+                            "dailyImpressionLimit": 100
                         },
                         "pp-0EkadV034j3RVWIw": {
-                            "price": 2499
+                            "id": "pp-0EkadV034j3RVWIw",
+                            "price": 2499,
+                            "impressionsPerDollar": 50,
+                            "dailyImpressionLimit": 100
                         }
                     },
                     "promotions": [
