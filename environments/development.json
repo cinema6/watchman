@@ -404,7 +404,12 @@
                                                 "tagParams": {
                                                     "container": { "value": "beeswax" },
                                                     "type": { "value": "mobile-card" },
-                                                    "branding": { "value": "showcase-app--interstitial" }
+                                                    "branding": { "value": "showcase-app--interstitial" },
+                                                    "hostApp": { "value": "{{APP_BUNDLE}}", "inTag": true },
+                                                    "network": { "value": "{{INVENTORY_SOURCE}}", "inTag": true },
+                                                    "uuid": { "value": "{{IOS_ID}}", "inTag": true },
+                                                    "clickUrls": { "value": ["{{CLICK_URL}}"], "inTag": true },
+                                                    "forceOrientation": { "value": "none" }
                                                 }
                                             },
                                             "threeHundredByTwoFifty": {
