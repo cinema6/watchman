@@ -1,5 +1,6 @@
 # Watchman
 
+## v0.8.0 (June 7, 2016)
 * *[v0.8.0-rc1]*
   * [FIX]: Make sure funds are only allocated to a showcase campaign
     when funds are added for showcase promotions or subscription
@@ -11,6 +12,7 @@
     * Deploy new version of ad service that supports setting number of
       impressions on external campaigns
     * Update watchman environments
+* *[/v0.8.0-rc1]*
 
 ## v0.7.0 (June 1, 2016)
 * *[v0.7.0-rc1]*
