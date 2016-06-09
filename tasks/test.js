@@ -43,6 +43,7 @@ module.exports = function(grunt) {
             var appSecret = grunt.option('appSecret');
             var auth = grunt.option('awsAuth') || path.join(process.env.HOME, '.aws.json');
             var cloudStack = grunt.option('formation');
+            var hubspotApiKey = grunt.option('hubspotApiKey');
             var region = grunt.option('region') || 'us-east-1';
             var timeStream = options.timeStream;
             var watchmanStream = options.watchmanStream;
@@ -77,6 +78,7 @@ module.exports = function(grunt) {
                     });
                 }
             }).then(function() {
+                // Read appCreds from file
                 var appCreds;
                 try {
                     appCreds = grunt.file.readJSON('.rcAppCreds.json');
@@ -94,14 +96,30 @@ module.exports = function(grunt) {
                     pass: 'password'
                 };
                 process.env.appCreds = JSON.stringify(appCreds);
+
+                // Read AWS creds from file
                 try {
                     var credsPath = path.join(process.env.HOME,'.aws.json');
                     process.env.awsCreds = fs.readFileSync(credsPath, {
                         encoding: 'utf-8'
                     });
-                } catch (error) {
+                } catch(error) {
                     process.env.awsCreds = null;
                 }
+
+                // Read other secrets from file
+                var secrets;
+                try {
+                    secrets = grunt.file.readJSON('.secrets.json');
+                } catch(error) {
+                    secrets = {
+                        hubspot: {
+                            key: hubspotApiKey
+                        }
+                    };
+                }
+                process.env.secrets = JSON.stringify(secrets);
+
                 process.env.apiRoot = apiRoot;
                 process.env.mongo = JSON.stringify(mongoCfg);
                 process.env.timeStream = timeStream;
