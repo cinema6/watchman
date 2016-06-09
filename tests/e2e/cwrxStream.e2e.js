@@ -662,7 +662,7 @@ describe('cwrxStream', function() {
                         function(msg) {
                     expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                    var regex = /Terry,\s+your\s+account\s+is\s+live/;
+                    var regex = /Terry,\s+your\s+account/;
                     expect(msg.text).toMatch(regex);
                     expect(msg.html).toMatch(regex);
                     expect((new Date() - msg.date)).toBeLessThan(30000);
