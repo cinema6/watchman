@@ -1,5 +1,10 @@
 # Watchman
 
+## v0.9.0 (June 9, 2016)
+* *[v0.9.0-rc1]*
+  * [FEATURE]: Add action for submitting forms in Hubspot
+* *[/v0.9.0-rc1]*
+
 ## v0.8.0 (June 7, 2016)
 * *[v0.8.0-rc1]*
   * [FIX]: Make sure funds are only allocated to a showcase campaign
