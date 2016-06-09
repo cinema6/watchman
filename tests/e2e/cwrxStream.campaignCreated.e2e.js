@@ -467,12 +467,16 @@ describe('cwrxStream campaignCreated', function() {
     });
 
     describe('when produced', function() {
-        var placements, emails, email;
+        var placements, supportEmails, supportEmail, userEmails, userEmail;
 
         beforeEach(function(done) {
-            emails = [];
+            supportEmails = [];
+            userEmails = [];
             mailman.on('New Showcase Campaign Started: ' + campaign.name, function(message) {
-                emails.push(message);
+                supportEmails.push(message);
+            });
+            mailman.on('Johnny, Welcome to Reelcontent Apps', function(message) {
+                userEmails.push(message);
             });
 
             campaignCreatedEvent().then(function() {
@@ -499,12 +503,14 @@ describe('cwrxStream campaignCreated', function() {
                 placements = arguments[0];
 
                 return waitUntil(function() {
-                    return ld.find(emails, function(email) {
+                    supportEmail = ld.find(supportEmails, function(email) {
                         return email.text.indexOf(campaign.externalCampaigns.beeswax.externalId) > -1;
                     });
+                    userEmail = ld.find(userEmails, function(email) {
+                        return email.text.indexOf(user.firstName) > -1;
+                    });
+                    return supportEmail && userEmail;
                 });
-            }).then(function(/*email*/) {
-                email = arguments[0];
             }).then(done, done.fail);
         });
 
@@ -625,9 +631,15 @@ describe('cwrxStream campaignCreated', function() {
         });
 
         it('should send an email to support', function() {
-            expect(email.from[0].address.toLowerCase()).toBe('support@cinema6.com');
-            expect(email.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-            expect(email.text).toContain('http://stingersbx.beeswax.com/advertisers/' + advertiser.beeswaxIds.advertiser + '/campaigns/' + campaign.externalCampaigns.beeswax.externalId + '/line_items');
+            expect(supportEmail.from[0].address.toLowerCase()).toBe('support@cinema6.com');
+            expect(supportEmail.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+            expect(supportEmail.text).toContain('http://stingersbx.beeswax.com/advertisers/' + advertiser.beeswaxIds.advertiser + '/campaigns/' + campaign.externalCampaigns.beeswax.externalId + '/line_items');
+        });
+
+        it('should send an email to the user', function() {
+            expect(userEmail.from[0].address.toLowerCase()).toBe('support@cinema6.com');
+            expect(userEmail.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+            expect(userEmail.text).toContain('We’ve got your ad');
         });
     });
 

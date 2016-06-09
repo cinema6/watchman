@@ -185,7 +185,8 @@
                             "chargePaymentPlanFailure": "672809",
                             "campaignActive": "672909",
                             "campaignSubmitted": "672810",
-                            "initializedShowcaseCampaign": "672910"
+                            "initializedShowcaseCampaign": "672910",
+                            "campaignActive--app": "694541"
                         }
                     }
                 }
@@ -319,6 +320,12 @@
                                     "name": "activate_payment_plan",
                                     "options": {
                                         "target": "showcase"
+                                    }
+                                },
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "campaignActive"
                                     }
                                 },
                                 {

@@ -96,7 +96,8 @@ describe('campaign_email.js', function() {
                     chargePaymentPlanFailure: 'chargePaymentPlanFailure-template-id',
                     campaignActive: 'campaignActive-template-id',
                     campaignSubmitted: 'campaignSubmitted-template-id',
-                    initializedShowcaseCampaign: 'initializedShowcaseCampaign-template-id'
+                    initializedShowcaseCampaign: 'initializedShowcaseCampaign-template-id',
+                    'campaignActive--app': 'campaignActive--app-template-id'
                 }
             },
             state: {
@@ -113,6 +114,13 @@ describe('campaign_email.js', function() {
             { filename: 'twitter-round-icon.png', cid: 'twitterRoundIcon', path: path.join(__dirname, '../../templates/assets/twitter-round-icon.png') },
             { filename: 'linkedin-round-icon.png', cid: 'linkedinRoundIcon', path: path.join(__dirname, '../../templates/assets/linkedin-round-icon.png') },
             { filename: 'website-round-icon.png', cid: 'websiteRoundIcon', path: path.join(__dirname, '../../templates/assets/website-round-icon.png') }
+        ];
+        this.showcasePostmarkAttachments = [
+            { Name: 'reelcontent-email-logo-white.png', Content: 'abcdef', ContentType: 'image/png', ContentID: 'cid:reelContentLogoWhite' },
+            { Name: 'facebook-round-icon.png', Content: 'abcdef', ContentType: 'image/png', ContentID: 'cid:facebookRoundIcon' },
+            { Name: 'twitter-round-icon.png', Content: 'abcdef', ContentType: 'image/png', ContentID: 'cid:twitterRoundIcon' },
+            { Name: 'linkedin-round-icon.png', Content: 'abcdef', ContentType: 'image/png', ContentID: 'cid:linkedinRoundIcon' },
+            { Name: 'website-round-icon.png', Content: 'abcdef', ContentType: 'image/png', ContentID: 'cid:websiteRoundIcon' },
         ];
         this.email = this.emailFactory(this.config);
         this.mockTemplate = jasmine.createSpy('mockTemplate()').and.returnValue('compiled template');
@@ -302,7 +310,7 @@ describe('campaign_email.js', function() {
                 it('should be made correctly', function(done) {
                     this.email(this.event).finally(function() {
                         expect(requestUtils.makeSignedRequest).toHaveBeenCalledWith('appCreds', 'get', {
-                            fields: 'email',
+                            fields: 'email,firstName',
                             json: true,
                             url: 'https://root/users/u-123'
                         });
@@ -317,7 +325,8 @@ describe('campaign_email.js', function() {
                                 statusCode: 200
                             },
                             body: {
-                                email: 'somedude@fake.com'
+                                email: 'somedude@fake.com',
+                                firstName: 'Bob'
                             }
                         }));
                         this.email(this.event).then(done, done.fail);
@@ -325,6 +334,13 @@ describe('campaign_email.js', function() {
 
                     it('should email the user of the campaign', function() {
                         expect(this.mockTransport.sendMail.calls.mostRecent().args[0].to).toBe('somedude@fake.com');
+                    });
+
+                    it('should add the requested user to the data object', function() {
+                        expect(this.event.data.user).toEqual({
+                            email: 'somedude@fake.com',
+                            firstName: 'Bob'
+                        });
                     });
                 });
 
@@ -2067,17 +2083,19 @@ describe('campaign_email.js', function() {
     describe('sending a campaignActive email', function() {
         beforeEach(function() {
             this.event.data.campaign = { name: 'Amazing Campaign' };
+            this.event.data.user = { firstName: 'Bob' };
             this.event.options.type = 'campaignActive';
             this.event.options.to = 'somedude@fake.com';
         });
 
-        it('should be able to send using ses', function(done) {
+        it('should be able to send using ses to selfie targets', function(done) {
             var self = this;
             self.email(self.event).then(function() {
                 expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/campaignActive.html'), { encoding: 'utf8' }, jasmine.any(Function));
                 expect(self.mockTemplate).toHaveBeenCalledWith({
                     campName: 'Amazing Campaign',
-                    dashboardLink: 'dashboard link'
+                    dashboardLink: 'dashboard link',
+                    firstName: 'Bob'
                 });
                 expect(self.mockTransport.sendMail).toHaveBeenCalledWith({
                     to: 'somedude@fake.com',
@@ -2094,14 +2112,15 @@ describe('campaign_email.js', function() {
             }).then(done, done.fail);
         });
 
-        it('should be able to send using postmark', function(done) {
+        it('should be able to send using postmark to selfie targets', function(done) {
             this.event.options.provider = 'postmark';
             this.email(this.event).then(function() {
                 expect(postmark.Client.prototype.sendEmailWithTemplate).toHaveBeenCalledWith({
                     TemplateId: 'campaignActive-template-id',
                     TemplateModel: {
                         campName: 'Amazing Campaign',
-                        dashboardLink: 'dashboard link'
+                        dashboardLink: 'dashboard link',
+                        firstName: 'Bob'
                     },
                     InlineCss: true,
                     From: 'e2eSender@fake.com',
@@ -2114,6 +2133,34 @@ describe('campaign_email.js', function() {
                         ContentType: 'image/png',
                         ContentID: 'cid:reelContentLogo'
                     }]
+                }, jasmine.any(Function));
+            }).then(done, done.fail);
+        });
+
+        it('should be able to send to showcase targets', function(done) {
+            var self = this;
+            this.event.options.provider = 'postmark';
+            this.event.data.target = 'showcase';
+            this.event.data.campaign.application = 'showcase';
+            this.email(this.event).then(function() {
+                expect(postmark.Client.prototype.sendEmailWithTemplate).toHaveBeenCalledWith({
+                    TemplateId: 'campaignActive--app-template-id',
+                    TemplateModel: {
+                        campName: 'Amazing Campaign',
+                        dashboardLink: 'showcase dashboard link',
+                        firstName: 'Bob'
+                    },
+                    InlineCss: true,
+                    From: 'e2eSender@fake.com',
+                    To: 'somedude@fake.com',
+                    Tag: 'campaignActive--app',
+                    TrackOpens: true,
+                    Attachments: self.showcasePostmarkAttachments.concat({
+                        Name: 'plant-success.png',
+                        Content: 'abcdef',
+                        ContentType: 'image/png',
+                        ContentID: 'cid:plantSuccess'
+                    })
                 }, jasmine.any(Function));
             }).then(done, done.fail);
         });
