@@ -1,6 +1,10 @@
 # Watchman
 
 ## v0.10.0 (June 10, 2016)
+* *[v0.10.0-rc2]*
+  * [FIX]: Fix for an issue that caused initializedShowcaseCampaign emails to support to not contain the proper images
+* *[/v0.10.0-rc2]*
+
 * *[v0.10.0-rc1]*
   * [FEATURE]: Add support for sending campaignActive emails for showcase users
 * *[/v0.10.0-rc1]*

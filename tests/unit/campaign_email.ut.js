@@ -59,6 +59,9 @@ describe('campaign_email.js', function() {
                     portal: 'http://localhost:9000/#/password/reset',
                     selfie: 'http://localhost:9000/#/pass/reset?selfie=true',
                     showcase: 'http://localhost:9000/#/showcase/pass/reset'
+                },
+                beeswax: {
+                    campaignLink: 'https://www.link.com/{{advertiserId}}/{{campaignId}}'
                 }
             },
             cwrx: {
@@ -66,6 +69,9 @@ describe('campaign_email.js', function() {
                     root: 'https://root',
                     users: {
                         endpoint: '/users'
+                    },
+                    advertisers: {
+                        endpoint: '/advertisers'
                     }
                 }
             },
@@ -2214,6 +2220,56 @@ describe('campaign_email.js', function() {
                     From: 'e2eSender@fake.com',
                     To: 'somedude@fake.com',
                     Tag: 'campaignSubmitted',
+                    TrackOpens: true,
+                    Attachments: [{
+                        Name: 'logo.png',
+                        Content: 'abcdef',
+                        ContentType: 'image/png',
+                        ContentID: 'cid:reelContentLogo'
+                    }]
+                }, jasmine.any(Function));
+            }).then(done, done.fail);
+        });
+    });
+
+    describe('sending initializedShowcaseCampaign emails', function() {
+        beforeEach(function() {
+            this.event.options.type = 'initializedShowcaseCampaign';
+            this.event.options.toSupport = true;
+            this.event.data.campaign = {
+                name: 'Amazing Campaign',
+                externalCampaigns: {
+                    beeswax: {
+                        externalId: 'beeswax_id'
+                    }
+                }
+            };
+            requestUtils.makeSignedRequest.and.returnValue(Q.resolve({
+                response: {
+                    statusCode: 200
+                },
+                body: {
+                    beeswaxIds: {
+                        advertiser: 'beeswax_advertiser'
+                    }
+                }
+            }));
+        });
+
+        it('should be able to be sent using postmark', function(done) {
+            this.event.options.provider = 'postmark';
+            this.email(this.event).then(function() {
+                expect(postmark.Client.prototype.sendEmailWithTemplate).toHaveBeenCalledWith({
+                    TemplateId: 'initializedShowcaseCampaign-template-id',
+                    TemplateModel: {
+                        beeswaxCampaignURI: 'https://www.link.com/beeswax_advertiser/beeswax_id',
+                    	beeswaxCampaignId: 'beeswax_id',
+                    	campName: 'Amazing Campaign'
+                    },
+                    InlineCss: true,
+                    From: 'e2eSender@fake.com',
+                    To: 'e2eSupport@fake.com',
+                    Tag: 'initializedShowcaseCampaign',
                     TrackOpens: true,
                     Attachments: [{
                         Name: 'logo.png',
