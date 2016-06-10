@@ -256,17 +256,12 @@ module.exports = function factory(config) {
                 }
             },
             data: function(data) {
-                var result = {
+                return {
                     contact    : emailConfig.supportAddress,
                     newEmail   : data.newEmail,
+                    oldEmail   : data.oldEmail,
                     firstName  : data.user.firstName
                 };
-
-                if (data.user.email === data.newEmail || data.target === 'showcase') {
-                    result.oldEmail = data.oldEmail;
-                }
-
-                return result;
             },
             attachments: getAttachments
         },
@@ -495,7 +490,8 @@ module.exports = function factory(config) {
                 if(options.toSupport) {
                     return config.emails.supportAddress;
                 } else if(options.to) {
-                    return options.to;
+                    var compiledRecipient = handlebars.compile(options.to);
+                    return compiledRecipient(data);
                 } else if(data.user && data.user.email) {
                     return data.user.email;
                 } else if(data.campaign && data.campaign.user) {

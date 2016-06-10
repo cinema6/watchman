@@ -17,25 +17,26 @@ var resolveURL = require('url').resolve;
 
 describe('campaign_email.js', function() {
     beforeEach(function() {
-        this.event = {
+        var self = this;
+        self.event = {
             data: { campaign: { } },
             options: {
                 provider: 'ses'
             }
         };
-        this.mockLog = {
+        self.mockLog = {
             warn: jasmine.createSpy('warn()')
         };
-        this.mockSesTransport = jasmine.createSpy('sesTransport()');
-        this.mockTransport = {
+        self.mockSesTransport = jasmine.createSpy('sesTransport()');
+        self.mockTransport = {
             sendMail: jasmine.createSpy('sendMail()').and.callFake(function(email, callback) {
                 callback(null, null);
             })
         };
-        this.emailFactory = proxyquire('../../src/actions/message/campaign_email.js', {
-            'nodemailer-ses-transport': this.mockSesTransport
+        self.emailFactory = proxyquire('../../src/actions/message/campaign_email.js', {
+            'nodemailer-ses-transport': self.mockSesTransport
         });
-        this.config = {
+        self.config = {
             emails: {
                 manageLink: 'manage link for campaign :campId',
                 dashboardLinks: {
@@ -114,22 +115,22 @@ describe('campaign_email.js', function() {
                 }
             }
         };
-        this.showcaseAttachments = [
+        self.showcaseAttachments = [
             { filename: 'reelcontent-email-logo-white.png', cid: 'reelContentLogoWhite', path: path.join(__dirname, '../../templates/assets/reelcontent-email-logo-white.png') },
             { filename: 'facebook-round-icon.png', cid: 'facebookRoundIcon', path: path.join(__dirname, '../../templates/assets/facebook-round-icon.png')},
             { filename: 'twitter-round-icon.png', cid: 'twitterRoundIcon', path: path.join(__dirname, '../../templates/assets/twitter-round-icon.png') },
             { filename: 'linkedin-round-icon.png', cid: 'linkedinRoundIcon', path: path.join(__dirname, '../../templates/assets/linkedin-round-icon.png') },
             { filename: 'website-round-icon.png', cid: 'websiteRoundIcon', path: path.join(__dirname, '../../templates/assets/website-round-icon.png') }
         ];
-        this.showcasePostmarkAttachments = [
+        self.showcasePostmarkAttachments = [
             { Name: 'reelcontent-email-logo-white.png', Content: 'abcdef', ContentType: 'image/png', ContentID: 'cid:reelContentLogoWhite' },
             { Name: 'facebook-round-icon.png', Content: 'abcdef', ContentType: 'image/png', ContentID: 'cid:facebookRoundIcon' },
             { Name: 'twitter-round-icon.png', Content: 'abcdef', ContentType: 'image/png', ContentID: 'cid:twitterRoundIcon' },
             { Name: 'linkedin-round-icon.png', Content: 'abcdef', ContentType: 'image/png', ContentID: 'cid:linkedinRoundIcon' },
             { Name: 'website-round-icon.png', Content: 'abcdef', ContentType: 'image/png', ContentID: 'cid:websiteRoundIcon' },
         ];
-        this.email = this.emailFactory(this.config);
-        this.mockTemplate = jasmine.createSpy('mockTemplate()').and.returnValue('compiled template');
+        self.email = self.emailFactory(self.config);
+        self.mockTemplate = jasmine.createSpy('mockTemplate()').and.returnValue('compiled template');
         spyOn(postmark.Client.prototype, 'sendEmailWithTemplate').and.callFake(function(body, callback) {
             callback(null, { });
         });
@@ -145,11 +146,17 @@ describe('campaign_email.js', function() {
                 isFile: jasmine.createSpy('isFile()').and.returnValue(true)
             });
         });
-        spyOn(handlebars, 'compile').and.returnValue(this.mockTemplate);
+        spyOn(handlebars, 'compile').and.callFake(function(template) {
+            return [
+                'somedude@fake.com'
+            ].indexOf(template) === -1 ? self.mockTemplate : function() {
+                return template;
+            };
+        });
         spyOn(htmlToText, 'fromString').and.returnValue('text');
         spyOn(requestUtils, 'makeSignedRequest').and.returnValue(Q.resolve());
-        spyOn(logger, 'getLog').and.returnValue(this.mockLog);
-        spyOn(nodemailer, 'createTransport').and.returnValue(this.mockTransport);
+        spyOn(logger, 'getLog').and.returnValue(self.mockLog);
+        spyOn(nodemailer, 'createTransport').and.returnValue(self.mockTransport);
     });
 
     describe('the exported function', function() {
@@ -282,13 +289,25 @@ describe('campaign_email.js', function() {
         });
 
         describe('when the "to" option is specified', function() {
-            beforeEach(function(done) {
-                this.event.options.to = 'somedude@fake.com';
-                this.email(this.event).then(done, done.fail);
+            beforeEach(function() {
+                handlebars.compile.and.callThrough();
             });
 
-            it('should email the specified email', function() {
-                expect(this.mockTransport.sendMail.calls.mostRecent().args[0].to).toBe('somedude@fake.com');
+            it('should email the specified email', function(done) {
+                var self = this;
+                self.event.options.to = 'somedude@fake.com';
+                self.email(self.event).then(function() {
+                    expect(self.mockTransport.sendMail.calls.mostRecent().args[0].to).toBe('somedude@fake.com');
+                }).then(done, done.fail);
+            });
+
+            it('should be able to compile the field with data', function(done) {
+                var self = this;
+                self.event.options.to = '{{oldEmail}}';
+                self.event.data.oldEmail = 'somedude@fake.com';
+                self.email(self.event).then(function() {
+                    expect(self.mockTransport.sendMail.calls.mostRecent().args[0].to).toBe('somedude@fake.com');
+                }).then(done, done.fail);
             });
         });
 
@@ -1767,6 +1786,7 @@ describe('campaign_email.js', function() {
                     expect(self.mockTemplate).toHaveBeenCalledWith({
                         contact: 'e2eSupport@fake.com',
                         newEmail: 'new-email@gmail.com',
+                        oldEmail: 'old-email@gmail.com',
                         firstName: 'Randy'
                     });
                     expect(self.mockTransport.sendMail).toHaveBeenCalledWith({

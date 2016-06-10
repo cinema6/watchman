@@ -28,7 +28,7 @@ module.exports = function factory() {
             firstname: data.user.firstName,
             lastname: data.user.lastName,
             email: data.user.email
-        });
+        }, options.data || { });
 
         if(data.hubspot && data.hubspot.hutk) {
             context.hutk = data.hubspot.hutk;

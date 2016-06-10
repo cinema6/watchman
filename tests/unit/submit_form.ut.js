@@ -92,6 +92,34 @@ describe('submit_form', function() {
         }).then(done, done.fail);
     });
 
+    it('should be able to submit a form with data from the action\'s options', function(done) {
+        this.event.options.data = {
+            foo: 'bar'
+        };
+        requestUtils.qRequest.and.returnValue(Q.resolve({
+            response: {
+                statusCode: 302
+            }
+        }));
+        this.action(this.event).then(function() {
+            expect(requestUtils.qRequest).toHaveBeenCalledWith('post', {
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                uri: 'https://forms.hubspot.com/uploads/form/v2/portal_id/form_id',
+                body: url.format({
+                    query: {
+                        firstname: 'John',
+                        lastname: 'Smith',
+                        email: 'JohnSmith@fake.com',
+                        foo: 'bar',
+                        /* jshint camelcase:false */
+                        hs_context: '{}'
+                        /* jshint camelcase:true */
+                    }
+                }).slice(1)
+            });
+        }).then(done, done.fail);
+    });
+
     it('should reject if not provided with a portal id', function(done) {
         delete this.event.options.portal;
         this.action(this.event).then(done.fail).catch(function(error) {
