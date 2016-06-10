@@ -413,7 +413,9 @@ module.exports = function factory(config) {
                     });
                 });
             },
-            attachments: getAttachments
+            attachments: [
+                { filename: 'logo.png', cid: 'reelContentLogo' }
+            ]
         }
     };
 
