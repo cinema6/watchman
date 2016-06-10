@@ -28,15 +28,21 @@ module.exports = function factory(config) {
     }
 
     function getAttachments(data) {
-        return (data.target === 'showcase') ? [
-            { filename: 'reelcontent-email-logo-white.png', cid: 'reelContentLogoWhite' },
-            { filename: 'facebook-round-icon.png', cid: 'facebookRoundIcon' },
-            { filename: 'twitter-round-icon.png', cid: 'twitterRoundIcon' },
-            { filename: 'linkedin-round-icon.png', cid: 'linkedinRoundIcon' },
-            { filename: 'website-round-icon.png', cid: 'websiteRoundIcon' }
-        ] : [
-            { filename: 'logo.png', cid: 'reelContentLogo' }
-        ];
+        var target = data.target || (data.campaign && data.campaign.application);
+        switch(target) {
+        case 'showcase':
+            return [
+                { filename: 'reelcontent-email-logo-white.png', cid: 'reelContentLogoWhite' },
+                { filename: 'facebook-round-icon.png', cid: 'facebookRoundIcon' },
+                { filename: 'twitter-round-icon.png', cid: 'twitterRoundIcon' },
+                { filename: 'linkedin-round-icon.png', cid: 'linkedinRoundIcon' },
+                { filename: 'website-round-icon.png', cid: 'websiteRoundIcon' }
+            ];
+        default:
+            return [
+                { filename: 'logo.png', cid: 'reelContentLogo' }
+            ];
+        }
     }
 
     /**
@@ -325,14 +331,33 @@ module.exports = function factory(config) {
             subject: function(data) {
                 return campaignName(data) + ' Is Now Live!';
             },
-            template: 'campaignActive',
+            template: function(data) {
+                switch (data.campaign.application) {
+                case 'showcase':
+                    return 'campaignActive--app';
+                default:
+                    return 'campaignActive';
+                }
+            },
             data: function(data) {
                 return {
                     campName       : data.campaign.name,
-                    dashboardLink  : emailConfig.dashboardLinks[data.target || 'selfie']
+                    dashboardLink  : emailConfig.dashboardLinks[data.target || 'selfie'],
+                    firstName      : data.user.firstName
                 };
             },
-            attachments: getAttachments
+            attachments: function(data) {
+                var attachments = getAttachments(data);
+                switch (data.campaign.application) {
+                case 'showcase':
+                    return attachments.concat([{
+                        filename: 'plant-success.png',
+                        cid: 'plantSuccess'
+                    }]);
+                default:
+                    return attachments;
+                }
+            }
         },
         campaignSubmitted: {
             subject: function(data) {
@@ -477,13 +502,14 @@ module.exports = function factory(config) {
                     var userId = data.campaign.user;
                     var userEndpoint = apiRoot + config.cwrx.api.users.endpoint + '/' + userId;
                     return requestUtils.makeSignedRequest(appCreds, 'get', {
-                        fields: 'email',
+                        fields: 'email,firstName',
                         json: true,
                         url: userEndpoint
                     }).then(function(response) {
                         var statusCode = response.response.statusCode;
                         var body = response.body;
                         if(statusCode === 200) {
+                            ld.set(data, 'user', body);
                             return body.email;
                         } else {
                             log.warn('Error requesting user %1, code: %2 body: %3', userId,
@@ -608,23 +634,24 @@ module.exports = function factory(config) {
             return Q.reject('Must specify a valid email type');
         }
 
-        return compileEmailOptions(transactionalEmails[emailType]).then(function(email) {
-            return getRecipient(data, options).then(function(recipient) {
+
+        return getRecipient(data, options).then(function(recipient) {
+            return compileEmailOptions(transactionalEmails[emailType]).then(function(email) {
                 email.to = recipient;
                 email.from = emailConfig.sender;
 
-                return validAttachments(email);
-            }).then(function(attachments) {
-                email.attachments = attachments;
+                return validAttachments(email).then(function(attachments) {
+                    email.attachments = attachments;
 
-                switch(provider) {
-                case 'ses':
-                    return sesAdapter(email);
-                case 'postmark':
-                    return postmarkAdapter(email);
-                default:
-                    throw new Error('Unrecognized provider ' + provider);
-                }
+                    switch(provider) {
+                    case 'ses':
+                        return sesAdapter(email);
+                    case 'postmark':
+                        return postmarkAdapter(email);
+                    default:
+                        throw new Error('Unrecognized provider ' + provider);
+                    }
+                });
             });
         });
     };

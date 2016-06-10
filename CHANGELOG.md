@@ -1,5 +1,10 @@
 # Watchman
 
+## v0.10.0 (June 10, 2016)
+* *[v0.10.0-rc1]*
+  * [FEATURE]: Add support for sending campaignActive emails for showcase users
+* *[/v0.10.0-rc1]*
+
 ## v0.9.0 (June 9, 2016)
 * *[v0.9.0-rc1]*
   * [FEATURE]: Add action for submitting forms in Hubspot

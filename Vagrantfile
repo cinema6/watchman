@@ -24,7 +24,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   # Enable the Berkshelf plugin
   config.berkshelf.enabled = true
 
-  config.omnibus.chef_version = :latest
+  config.omnibus.chef_version = '12.10.24'
 
   # Provision with chef solo
   config.vm.provision "chef_solo" do |chef|
