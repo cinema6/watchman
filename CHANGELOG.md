@@ -1,11 +1,13 @@
 # Watchman
 
+## v0.11.0 (June 13, 2016)
 * *[v0.11.0-rc1]*
   * [FEATURE]: Add the ability to update users in Hubspot
   * Improve emailChanged event to make it intended to only be fired once when a user's email is changed
   * ** Extra Deployment Steps**:
     * Deploy new version of userSvc
     * Deploy new watchman cookbook
+* *[/v0.11.0-rc1]*
 
 ## v0.10.0 (June 10, 2016)
 * *[v0.10.0-rc2]*
