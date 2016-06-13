@@ -605,8 +605,7 @@ describe('cwrxStream', function() {
                     waitForEmails(['Terry, Welcome to Reelcontent Apps']),
                     self.waitForHubspotContactToExist()
                 ]);
-            }).then(function(results) {
-                var contact = results[1];
+            }).spread(function(msg, contact) {
                 self.createdContact = contact.vid;
 
                 expect(contact.properties.firstname.value).toBe('Terry');
