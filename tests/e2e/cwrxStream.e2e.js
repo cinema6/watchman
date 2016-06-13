@@ -1,6 +1,6 @@
 'use strict';
 
-var Hubspot = require('../helpers/Hubspot.js');
+var Hubspot = require('../../lib/Hubspot.js');
 var JsonProducer = require('rc-kinesis').JsonProducer;
 var Q = require('q');
 var testUtils = require('cwrx/test/e2e/testUtils.js');
@@ -20,7 +20,36 @@ describe('cwrxStream', function() {
     var mockUser;
     var mockUpdateRequest;
 
+    function waitForTrue(promise) {
+        return Q.resolve().then(promise).then(function(value) {
+            return Q.Promise(function(resolve, reject) {
+                if(value) {
+                    resolve(value);
+                } else {
+                    setTimeout(function() {
+                        waitForTrue(promise).then(resolve, reject);
+                    }, WAIT_TIME);
+                }
+            });
+        });
+    }
+
+    function waitForEmails(subjects) {
+        return Q.all(subjects.map(function(subject) {
+            return Q.Promise(function(resolve) {
+                mailman.once(subject, resolve);
+            });
+        }));
+    }
+
     beforeAll(function(done) {
+        var self = this;
+        self.waitForHubspotContactToExist = function() {
+            return waitForTrue(function() {
+                return self.hubspot.getContactByEmail(mockUser.email);
+            });
+        };
+        self.hubspot = new Hubspot(HUBSPOT_API_KEY);
         mailman = new testUtils.Mailman();
         mailman2 = new testUtils.Mailman({ user: 'c6e2eTester2@gmail.com' });
         mailman.on('error', function(error) { throw new Error(error); });
@@ -92,37 +121,20 @@ describe('cwrxStream', function() {
         return testUtils.mongoUpsert('applications', { key: mockApp.key }, mockApp).done(done);
     });
 
-    afterEach(function() {
+    afterEach(function(done) {
         mailman.removeAllListeners();
         mailman2.removeAllListeners();
+        if(this.createdContact) {
+            this.hubspot.deleteContact(this.createdContact).then(done, done.fail);
+        } else {
+            done();
+        }
     });
 
     afterAll(function() {
         mailman.stop();
         mailman2.stop();
     });
-
-    function waitForTrue(promise) {
-        return Q.resolve().then(promise).then(function(value) {
-            return Q.Promise(function(resolve, reject) {
-                if(value) {
-                    resolve(value);
-                } else {
-                    setTimeout(function() {
-                        waitForTrue(promise).then(resolve, reject);
-                    }, WAIT_TIME);
-                }
-            });
-        });
-    }
-
-    function waitForEmails(subjects) {
-        return Q.all(subjects.map(function(subject) {
-            return Q.Promise(function(resolve) {
-                mailman.once(subject, resolve);
-            });
-        }));
-    }
 
     describe('when a campaignStateChange event occurs', function() {
         describe('when an active campaign expires', function() {
@@ -530,18 +542,6 @@ describe('cwrxStream', function() {
     });
 
     describe('when a new user account has been created', function() {
-        beforeEach(function() {
-            this.hubspot = new Hubspot(HUBSPOT_API_KEY);
-        });
-
-        afterEach(function(done) {
-            if(this.createdContact) {
-                this.hubspot.deleteContact(this.createdContact).then(done, done.fail);
-            } else {
-                done();
-            }
-        });
-
         it('should send an activation email', function(done) {
             producer.produce({
                 type: 'accountCreated',
@@ -575,21 +575,15 @@ describe('cwrxStream', function() {
             }).then(function() {
                 return Q.all([
                     waitForEmails(['Terry, Welcome to Reelcontent Apps']),
-                    waitForTrue(function() {
-                        return self.hubspot.getContactByEmail(mockUser.email).then(function(contact) {
-                            return contact;
-                        }).catch(function() {
-                            return null;
-                        });
-                    })
+                    self.waitForHubspotContactToExist()
                 ]);
-            }).then(function(results) {
-                var msg = results[0][0];
-                self.createdContact = results[1].vid;
+            }).spread(function(messages, contact) {
+                var msg = messages[0];
+                var regex = /https?:\/\/.+id.+u-123.+token.+secret-token/;
+                self.createdContact = contact.vid;
 
                 expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                 expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                var regex = /https?:\/\/.+id.+u-123.+token.+secret-token/;
                 expect(msg.text).toMatch(regex);
                 expect(msg.html).toMatch(regex);
                 expect((new Date() - msg.date)).toBeLessThan(30000);
@@ -609,13 +603,7 @@ describe('cwrxStream', function() {
             }).then(function() {
                 return Q.all([
                     waitForEmails(['Terry, Welcome to Reelcontent Apps']),
-                    waitForTrue(function() {
-                        return self.hubspot.getContactByEmail(mockUser.email).then(function(contact) {
-                            return contact;
-                        }).catch(function() {
-                            return null;
-                        });
-                    })
+                    self.waitForHubspotContactToExist()
                 ]);
             }).then(function(results) {
                 var contact = results[1];
@@ -623,34 +611,34 @@ describe('cwrxStream', function() {
 
                 expect(contact.properties.firstname.value).toBe('Terry');
                 expect(contact.properties.lastname.value).toBe('Fakeuser');
+                expect(contact.properties.applications.value).toBe('apps');
             }).then(done, done.fail);
         });
     });
 
     describe('when an account was activated', function() {
-        it('should send an email notifying the user that their account has been activated',
-                function(done) {
+        it('should send an email notifying the user that their account has been activated', function(done) {
             producer.produce({
                 type: 'accountActivated',
                 data: {
                     user: mockUser
                 }
             }).then(function() {
-                mailman.once('Terry, Your Reelcontent Account Is Ready To Go',
-                        function(msg) {
-                    expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
-                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                    var regex = /account\s*is\s*now\s*active/;
-                    expect(msg.text).toMatch(regex);
-                    expect(msg.html).toMatch(regex);
-                    expect((new Date() - msg.date)).toBeLessThan(30000);
-                    done();
-                });
-            }).catch(done.fail);
+                return waitForEmails(['Terry, Your Reelcontent Account Is Ready To Go']);
+            }).then(function(messages) {
+                var msg = messages[0];
+                var regex = /account\s*is\s*now\s*active/;
+
+                expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
+                expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                expect(msg.text).toMatch(regex);
+                expect(msg.html).toMatch(regex);
+                expect((new Date() - msg.date)).toBeLessThan(30000);
+            }).then(done, done.fail);
         });
 
-        it('should send an email notifying the user that their showcase account has been activated',
-                function(done) {
+        it('should send an email notifying the user that their showcase account has been activated', function(done) {
+            var self = this;
             producer.produce({
                 type: 'accountActivated',
                 data: {
@@ -658,17 +646,21 @@ describe('cwrxStream', function() {
                     target: 'showcase'
                 }
             }).then(function() {
-                mailman.once('Terry, Your Reelcontent Account Is Ready To Go',
-                        function(msg) {
-                    expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
-                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                    var regex = /Terry,\s+your\s+account/;
-                    expect(msg.text).toMatch(regex);
-                    expect(msg.html).toMatch(regex);
-                    expect((new Date() - msg.date)).toBeLessThan(30000);
-                    done();
-                });
-            }).catch(done.fail);
+                return Q.all([
+                    waitForEmails(['Terry, Your Reelcontent Account Is Ready To Go']),
+                    self.waitForHubspotContactToExist()
+                ]);
+            }).spread(function(messages, contact) {
+                var msg = messages[0];
+                var regex = /Terry,\s+your\s+account/;
+                self.createdContact = contact.vid;
+
+                expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
+                expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                expect(msg.text).toMatch(regex);
+                expect(msg.html).toMatch(regex);
+                expect((new Date() - msg.date)).toBeLessThan(30000);
+            }).then(done, done.fail);
         });
 
         describe('with a promotion', function() {
@@ -756,7 +748,9 @@ describe('cwrxStream', function() {
 
                     return producer.produce({ type: 'accountActivated', data: { user: newUser } });
                 }))
-                .then(Q.delay(5000))
+                .then(function() {
+                    return Q.delay(5000);
+                })
                 .then(function() {
                     return testUtils.mongoFind('orgs', { id: 'o-e2e-1' });
                 }).then(function(orgs) {
@@ -800,6 +794,79 @@ describe('cwrxStream', function() {
 
             /* jshint camelcase: true */
         });
+
+        describe('in hubspot', function() {
+            it('should create a user if one does not exist', function(done) {
+                var self = this;
+                producer.produce({
+                    type: 'accountActivated',
+                    data: {
+                        user: mockUser,
+                        target: 'showcase'
+                    }
+                }).then(function() {
+                    return self.waitForHubspotContactToExist();
+                }).then(function(contact) {
+                    self.createdContact = contact.vid;
+
+                    expect(contact.properties.email.value).toBe(mockUser.email);
+                    expect(contact.properties.firstname.value).toBe(mockUser.firstName);
+                    expect(contact.properties.lastname.value).toBe(mockUser.lastName);
+                    expect(contact.properties.applications.value).toBe('apps');
+                    expect(contact.properties.lifecyclestage.value).toBe('salesqualifiedlead');
+                }).then(done, done.fail);
+            });
+
+            it('should update a user if one does exist', function(done) {
+                var self = this;
+                self.hubspot.createContact({
+                    properties: [
+                        {
+                            property: 'email',
+                            value: mockUser.email
+                        },
+                        {
+                            property: 'firstname',
+                            value: mockUser.firstName
+                        },
+                        {
+                            property: 'lastname',
+                            value: mockUser.lastName
+                        },
+                        {
+                            property: 'applications',
+                            value: 'apps'
+                        },
+                        {
+                            property: 'lifecyclestage',
+                            value: 'lead'
+                        }
+                    ]
+                }).then(function(contact) {
+                    self.createdContact = contact.vid;
+                    return producer.produce({
+                        type: 'accountActivated',
+                        data: {
+                            user: mockUser,
+                            target: 'showcase'
+                        }
+                    });
+                }).then(function() {
+                    return waitForTrue(function() {
+                        return self.hubspot.getContactByEmail(mockUser.email).then(function(contact) {
+                            return contact.properties.lifecyclestage.value === 'salesqualifiedlead' ? contact : null;
+                        });
+                    });
+                }).then(function(contact) {
+                    expect(contact.vid).toBe(self.createdContact);
+                    expect(contact.properties.email.value).toBe(mockUser.email);
+                    expect(contact.properties.firstname.value).toBe(mockUser.firstName);
+                    expect(contact.properties.lastname.value).toBe(mockUser.lastName);
+                    expect(contact.properties.applications.value).toBe('apps');
+                    expect(contact.properties.lifecyclestage.value).toBe('salesqualifiedlead');
+                }).then(done, done.fail);
+            });
+        });
     });
 
     describe('notifying the user that their password has been changed', function() {
@@ -811,8 +878,7 @@ describe('cwrxStream', function() {
                     user: mockUser
                 }
             }).then(function() {
-                mailman.once('Reelcontent Password Change Notice',
-                        function(msg) {
+                mailman.once('Reelcontent Password Change Notice', function(msg) {
                     expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                     var regex = /password\s*was\s*changed\s*on.*at.*/;
@@ -849,28 +915,7 @@ describe('cwrxStream', function() {
 
     describe('sending an email to notify of an email change', function() {
         describe('for selfie campaigns', function() {
-            it('should be able to notify the old email address', function(done) {
-                producer.produce({
-                    type: 'emailChanged',
-                    data: {
-                        user: mockUser,
-                        oldEmail: 'c6e2etester@gmail.com',
-                        newEmail: 'c6e2etester2@gmail.com'
-                    }
-                }).then(function() {
-                    mailman.once('Your Email Has Been Changed', function(msg) {
-                        expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
-                        expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                        var regex = /c6e2etester2@gmail\.com/;
-                        expect(msg.text).toMatch(regex);
-                        expect(msg.html).toMatch(regex);
-                        expect((new Date() - msg.date)).toBeLessThan(30000);
-                        done();
-                    });
-                }).catch(done.fail);
-            });
-
-            it('should be able to notify the new email address', function(done) {
+            beforeEach(function(done) {
                 mockUser.email = 'c6e2etester2@gmail.com';
                 producer.produce({
                     type: 'emailChanged',
@@ -879,76 +924,184 @@ describe('cwrxStream', function() {
                         oldEmail: 'c6e2etester@gmail.com',
                         newEmail: 'c6e2etester2@gmail.com'
                     }
-                }).then(function() {
-                    mailman2.once('Your Email Has Been Changed', function(msg) {
-                        expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
-                        expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester2@gmail.com');
-                        [
-                            /c6e2etester@gmail\.com/,
-                            /c6e2etester2@gmail\.com/
-                        ].forEach(function(regex) {
-                            expect(msg.text).toMatch(regex);
-                            expect(msg.html).toMatch(regex);
-                        });
-                        expect((new Date() - msg.date)).toBeLessThan(30000);
-                        done();
+                }).then(done, done.fail);
+            });
+
+            it('should be able to notify the old email address', function(done) {
+                return Q.Promise(function(resolve) {
+                    var emails = [null, null];
+                    mailman.once('Your Email Has Been Changed', function(msg) {
+                        emails[0] = msg;
+                        if(emails[0] && emails[1]) {
+                            resolve(emails);
+                        }
                     });
-                }).catch(done.fail);
+                    mailman2.once('Your Email Has Been Changed', function(msg) {
+                        emails[1] = msg;
+                        if(emails[0] && emails[1]) {
+                            resolve(emails);
+                        }
+                    });
+                }).spread(function(msg) {
+                    var regex = /c6e2etester2@gmail\.com/;
+
+                    expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
+                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                    expect(msg.text).toMatch(regex);
+                    expect(msg.html).toMatch(regex);
+                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                }).then(done, done.fail);
+            });
+
+            it('should be able to notify the new email address', function(done) {
+                return Q.Promise(function(resolve) {
+                    var emails = [null, null];
+                    mailman.once('Your Email Has Been Changed', function(msg) {
+                        emails[0] = msg;
+                        if(emails[0] && emails[1]) {
+                            resolve(emails);
+                        }
+                    });
+                    mailman2.once('Your Email Has Been Changed', function(msg) {
+                        emails[1] = msg;
+                        if(emails[0] && emails[1]) {
+                            resolve(emails);
+                        }
+                    });
+                }).spread(function(firstMsg, msg) {
+                    expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
+                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester2@gmail.com');
+                    [
+                        /c6e2etester@gmail\.com/,
+                        /c6e2etester2@gmail\.com/
+                    ].forEach(function(regex) {
+                        expect(msg.text).toMatch(regex);
+                        expect(msg.html).toMatch(regex);
+                    });
+                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                }).then(done, done.fail);
             });
         });
 
         describe('for showcase campaigns', function() {
-            it('should be able to notify the old email address', function(done) {
-                producer.produce({
-                    type: 'emailChanged',
-                    data: {
-                        user: mockUser,
-                        oldEmail: 'c6e2etester@gmail.com',
-                        newEmail: 'c6e2etester2@gmail.com',
-                        target: 'showcase'
-                    }
-                }).then(function() {
-                    mailman.once('Your Email Has Been Changed', function(msg) {
-                        expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
-                        expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-                        [
-                            /c6e2etester@gmail\.com/,
-                            /c6e2etester2@gmail\.com/
-                        ].forEach(function(regex) {
-                            expect(msg.text).toMatch(regex);
-                            expect(msg.html).toMatch(regex);
-                        });
-                        expect((new Date() - msg.date)).toBeLessThan(30000);
-                        done();
+            beforeEach(function(done) {
+                var self = this;
+                self.hubspot.createContact({
+                    properties: [
+                        {
+                            property: 'email',
+                            value: mockUser.email
+                        },
+                        {
+                            property: 'firstname',
+                            value: mockUser.firstName
+                        },
+                        {
+                            property: 'lastname',
+                            value: mockUser.lastName
+                        },
+                        {
+                            property: 'applications',
+                            value: 'apps'
+                        },
+                        {
+                            property: 'lifecyclestage',
+                            value: 'customer'
+                        }
+                    ]
+                }).then(function(contact) {
+                    self.createdContact = contact.vid;
+                    mockUser.email = 'c6e2etester2@gmail.com';
+                    return producer.produce({
+                        type: 'emailChanged',
+                        data: {
+                            user: mockUser,
+                            oldEmail: 'c6e2etester@gmail.com',
+                            newEmail: 'c6e2etester2@gmail.com',
+                            target: 'showcase'
+                        }
                     });
-                }).catch(done.fail);
+                }).then(done, done.fail);
+            });
+
+            it('should be able to notify the old email address', function(done) {
+                var self = this;
+                return Q.Promise(function(resolve) {
+                    var emails = [null, null];
+                    mailman.once('Your Email Has Been Changed', function(msg) {
+                        emails[0] = msg;
+                        if(emails[0] && emails[1]) {
+                            resolve(emails);
+                        }
+                    });
+                    mailman2.once('Your Email Has Been Changed', function(msg) {
+                        emails[1] = msg;
+                        if(emails[0] && emails[1]) {
+                            resolve(emails);
+                        }
+                    });
+                }).spread(function(msg) {
+                    expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
+                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                    [
+                        /c6e2etester@gmail\.com/,
+                        /c6e2etester2@gmail\.com/
+                    ].forEach(function(regex) {
+                        expect(msg.text).toMatch(regex);
+                        expect(msg.html).toMatch(regex);
+                    });
+                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                }).then(function() {
+                    return waitForTrue(function() {
+                        return self.hubspot.getContactByEmail(mockUser.email);
+                    });
+                }).then(done, done.fail);
             });
 
             it('should be able to notify the new email address', function(done) {
-                mockUser.email = 'c6e2etester2@gmail.com';
-                producer.produce({
-                    type: 'emailChanged',
-                    data: {
-                        user: mockUser,
-                        oldEmail: 'c6e2etester@gmail.com',
-                        newEmail: 'c6e2etester2@gmail.com',
-                        target: 'showcase'
-                    }
-                }).then(function() {
-                    mailman2.once('Your Email Has Been Changed', function(msg) {
-                        expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
-                        expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester2@gmail.com');
-                        [
-                            /c6e2etester@gmail\.com/,
-                            /c6e2etester2@gmail\.com/
-                        ].forEach(function(regex) {
-                            expect(msg.text).toMatch(regex);
-                            expect(msg.html).toMatch(regex);
-                        });
-                        expect((new Date() - msg.date)).toBeLessThan(30000);
-                        done();
+                var self = this;
+                return Q.Promise(function(resolve) {
+                    var emails = [null, null];
+                    mailman.once('Your Email Has Been Changed', function(msg) {
+                        emails[0] = msg;
+                        if(emails[0] && emails[1]) {
+                            resolve(emails);
+                        }
                     });
-                }).catch(done.fail);
+                    mailman2.once('Your Email Has Been Changed', function(msg) {
+                        emails[1] = msg;
+                        if(emails[0] && emails[1]) {
+                            resolve(emails);
+                        }
+                    });
+                }).spread(function(firstMsg, msg) {
+                    expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
+                    expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester2@gmail.com');
+                    [
+                        /c6e2etester@gmail\.com/,
+                        /c6e2etester2@gmail\.com/
+                    ].forEach(function(regex) {
+                        expect(msg.text).toMatch(regex);
+                        expect(msg.html).toMatch(regex);
+                    });
+                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                }).then(function() {
+                    return waitForTrue(function() {
+                        return self.hubspot.getContactByEmail(mockUser.email);
+                    });
+                }).then(done, done.fail);
+            });
+
+            it('should update the user in Hubspot with the new email', function(done) {
+                var self = this;
+                return waitForTrue(function() {
+                    return self.hubspot.getContactByEmail(mockUser.email);
+                }).then(function(contact) {
+                    expect(contact.vid).toBe(self.createdContact);
+                    expect(contact.properties.firstname.value).toBe('Terry');
+                    expect(contact.properties.lastname.value).toBe('Fakeuser');
+                    expect(contact.properties.applications.value).toBe('apps');
+                }).then(done, done.fail);
             });
         });
     });

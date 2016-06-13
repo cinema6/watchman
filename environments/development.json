@@ -334,6 +334,15 @@
                                         "type": "initializedShowcaseCampaign",
                                         "toSupport": true
                                     }
+                                },
+                                {
+                                    "name": "hubspot/update_user",
+                                    "options": {
+                                        "properties": {
+                                            "applications": "apps",
+                                            "lifecyclestage": "customer"
+                                        }
+                                    }
                                 }
                             ]
                         }
@@ -519,7 +528,10 @@
                                     "name": "hubspot/submit_form",
                                     "options": {
                                         "portal": "2041560",
-                                        "form": "73472e84-6426-4fab-b092-936c0f692da6"
+                                        "form": "73472e84-6426-4fab-b092-936c0f692da6",
+                                        "data": {
+                                            "application": "apps"
+                                        }
                                     },
                                     "ifData": {
                                         "target": "^showcase$"
@@ -537,6 +549,18 @@
                                 },
                                 {
                                     "name": "check_signup_promotion"
+                                },
+                                {
+                                    "name": "hubspot/update_user",
+                                    "options": {
+                                        "properties": {
+                                            "applications": "apps",
+                                            "lifecyclestage": "salesqualifiedlead"
+                                        }
+                                    },
+                                    "ifData": {
+                                        "target": "^showcase$"
+                                    }
                                 }
                             ]
                         },
@@ -555,7 +579,21 @@
                                 {
                                     "name": "message/campaign_email",
                                     "options": {
-                                        "type": "emailChanged"
+                                        "type": "emailChanged",
+                                        "to": "{{oldEmail}}"
+                                    }
+                                },
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "emailChanged",
+                                        "to": "{{newEmail}}"
+                                    }
+                                },
+                                {
+                                    "name": "hubspot/update_user",
+                                    "ifData": {
+                                        "target": "^showcase$"
                                     }
                                 }
                             ]
