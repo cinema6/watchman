@@ -1,7 +1,7 @@
 'use strict';
 
 describe('(action factory) charge_payment_plan', function() {
-    var q, uuid, resolveURL;
+    var q, uuid, resolveURL, ld, moment, logger;
     var JsonProducer, CwrxRequest;
     var factory;
 
@@ -13,6 +13,9 @@ describe('(action factory) charge_payment_plan', function() {
         q = require('q');
         uuid = require('rc-uuid');
         resolveURL = require('url').resolve;
+        ld = require('lodash');
+        moment = require('moment');
+        logger = require('cwrx/lib/logger');
 
         JsonProducer = (function(JsonProducer) {
             return jasmine.createSpy('JsonProducer()').and.callFake(function(name, options) {
@@ -47,7 +50,7 @@ describe('(action factory) charge_payment_plan', function() {
     describe('when called', function() {
         var config;
         var chargePaymentPlan;
-        var request, watchmanStream;
+        var request, watchmanStream, log;
 
         beforeEach(function() {
             config = {
@@ -60,6 +63,9 @@ describe('(action factory) charge_payment_plan', function() {
                         root: 'http://33.33.33.10/',
                         payments: {
                             endpoint: '/api/payments/'
+                        },
+                        orgs: {
+                            endpoint: '/api/account/orgs'
                         }
                     }
                 },
@@ -70,6 +76,13 @@ describe('(action factory) charge_payment_plan', function() {
                     }
                 }
             };
+
+            spyOn(logger, 'getLog').and.returnValue(log = jasmine.createSpyObj('log', [
+                'info',
+                'trace',
+                'warn',
+                'error'
+            ]));
 
             chargePaymentPlan = factory(config);
 
@@ -107,7 +120,8 @@ describe('(action factory) charge_payment_plan', function() {
                     paymentMethod: {
                         token: uuid.createUuid(),
                         default: true
-                    }
+                    },
+                    date: moment().format()
                 };
                 options = {
                     target: 'showcase'
@@ -139,45 +153,88 @@ describe('(action factory) charge_payment_plan', function() {
             });
 
             describe('if the request succeeds', function() {
-                var produceDeferred;
+                var putOrgDeferred;
 
                 beforeEach(function(done) {
-                    watchmanStream.produce.and.returnValue((produceDeferred = q.defer()).promise);
+                    spyOn(request, 'put').and.returnValue((putOrgDeferred = q.defer()).promise);
 
                     postPaymentDeferred.fulfill([request.post.calls.mostRecent().args[0].json]);
                     process.nextTick(done);
                 });
 
-                it('should produce an event into the watchman stream', function() {
-                    expect(watchmanStream.produce).toHaveBeenCalledWith({
-                        type: 'chargedPaymentPlan',
-                        data: {
-                            org: data.org,
-                            paymentPlan: data.paymentPlan,
-                            payment: postPaymentDeferred.promise.inspect().value[0]
+                it('should update the org', function() {
+                    expect(request.put).toHaveBeenCalledWith({
+                        url: resolveURL(config.cwrx.api.root, config.cwrx.api.orgs.endpoint + '/' + data.org.id),
+                        json: {
+                            nextPaymentDate: moment(data.date).add(1, 'month').format()
                         }
                     });
                 });
 
-                describe('if producing the event fails', function() {
-                    var reason;
+                describe('if updating the org succeeds', function() {
+                    var produceDeferred;
 
                     beforeEach(function(done) {
-                        reason = new Error('It went wrong!');
-                        produceDeferred.reject(reason);
+                        watchmanStream.produce.and.returnValue((produceDeferred = q.defer()).promise);
 
+                        putOrgDeferred.resolve([ld.assign({}, data.org, request.put.calls.mostRecent().args[0].json)]);
                         process.nextTick(done);
                     });
 
-                    it('should reject the promise', function() {
-                        expect(failure).toHaveBeenCalledWith(reason);
+                    it('should produce an event into the watchman stream', function() {
+                        expect(watchmanStream.produce).toHaveBeenCalledWith({
+                            type: 'chargedPaymentPlan',
+                            data: {
+                                org: data.org,
+                                paymentPlan: data.paymentPlan,
+                                payment: postPaymentDeferred.promise.inspect().value[0]
+                            }
+                        });
+                    });
+
+                    describe('if producing the event fails', function() {
+                        var reason;
+
+                        beforeEach(function(done) {
+                            reason = new Error('It went wrong!');
+                            produceDeferred.reject(reason);
+
+                            process.nextTick(done);
+                        });
+
+                        it('should reject the promise', function() {
+                            expect(failure).toHaveBeenCalledWith(reason);
+                        });
+                    });
+
+                    describe('if producing the event succeeds', function() {
+                        beforeEach(function(done) {
+                            produceDeferred.fulfill(watchmanStream.produce.calls.mostRecent().args[0]);
+                            process.nextTick(done);
+                        });
+
+                        it('should fulfill with undefined', function() {
+                            expect(success).toHaveBeenCalledWith(undefined);
+                        });
                     });
                 });
 
-                describe('if producing the event succeeds', function() {
+                describe('if updating the org fails', function() {
+                    var reason;
+
                     beforeEach(function(done) {
-                        produceDeferred.fulfill(watchmanStream.produce.calls.mostRecent().args[0]);
+                        reason = new Error('It didn\'t work.');
+                        putOrgDeferred.reject(reason);
+
                         process.nextTick(done);
+                    });
+
+                    it('should log an error', function() {
+                        expect(log.error).toHaveBeenCalled();
+                    });
+
+                    it('should not produce anything', function() {
+                        expect(watchmanStream.produce).not.toHaveBeenCalled();
                     });
 
                     it('should fulfill with undefined', function() {
