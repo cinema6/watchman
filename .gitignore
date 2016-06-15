@@ -6,3 +6,4 @@ reports
 
 *.lock
 .rcAppCreds.json
+.secrets.json
