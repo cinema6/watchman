@@ -2,7 +2,7 @@
 
 describe('(action factory) check_payment_required', function() {
     var JsonProducer, CwrxRequest;
-    var uuid, q, MockObjectStore, resolveURL, moment;
+    var uuid, q, MockObjectStore, resolveURL, moment, ld;
     var factory;
 
     beforeAll(function() {
@@ -15,6 +15,7 @@ describe('(action factory) check_payment_required', function() {
         MockObjectStore = require('../helpers/MockObjectStore');
         resolveURL = require('url').resolve;
         moment = require('moment');
+        ld = require('lodash');
 
         JsonProducer = (function(JsonProducer) {
             return jasmine.createSpy('JsonProducer()').and.callFake(function(name, options) {
@@ -62,6 +63,9 @@ describe('(action factory) check_payment_required', function() {
                         root: 'http://33.33.33.10/',
                         payments: {
                             endpoint: '/api/payments/'
+                        },
+                        orgs: {
+                            endpoint: '/api/account/orgs'
                         }
                     }
                 },
@@ -98,17 +102,19 @@ describe('(action factory) check_payment_required', function() {
         });
 
         describe('the action', function() {
-            var data, options, event;
+            var now, data, options, event;
             var getPaymentsDeferred;
             var result;
 
             beforeEach(function() {
+                now = moment(new Date(2016, 3, 15));
+
                 data = {
                     org: {
                         id: 'o-' + uuid.createUuid(),
-                        paymentPlanStart: moment().format()
+                        paymentPlanStart: now.format()
                     },
-                    date: new Date(2016, 3, 15).toISOString()
+                    date: now.format()
                 };
                 options = {};
                 event = { data: data, options: options };
@@ -158,13 +164,16 @@ describe('(action factory) check_payment_required', function() {
 
                 beforeEach(function(done) {
                     data.org.paymentPlanId = 'pp-0Ek5Na02vCohpPgw';
-                    data.org.paymentPlanStart = moment().format();
+                    data.org.paymentPlanStart = moment(data.date).format();
 
                     paymentMethod = {
                         token: 'dq9whudfuier',
                         default: true
                     };
 
+                    spyOn(request, 'put').and.callFake(function(requestConfig) {
+                        return q([ld.assign({}, data.org, requestConfig.json)]);
+                    });
                     request.get.and.callFake(function(requestConfig) {
                         if (requestConfig.url === resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint)) {
                             return q([[], { statusCode: 200 }]);
@@ -184,7 +193,8 @@ describe('(action factory) check_payment_required', function() {
                         data: {
                             org: data.org,
                             paymentPlan: config.paymentPlans[data.org.paymentPlanId],
-                            paymentMethod: paymentMethod
+                            paymentMethod: paymentMethod,
+                            date: data.date
                         }
                     });
                 });
@@ -200,13 +210,16 @@ describe('(action factory) check_payment_required', function() {
 
                 beforeEach(function(done) {
                     data.org.paymentPlanId = 'pp-0Ek5Na02vCohpPgw';
-                    data.org.paymentPlanStart = moment().subtract(1, 'day').format();
+                    data.org.paymentPlanStart = moment(data.date).subtract(1, 'day').format();
 
                     paymentMethod = {
                         token: 'dq9whudfuier',
                         default: true
                     };
 
+                    spyOn(request, 'put').and.callFake(function(requestConfig) {
+                        return q([ld.assign({}, data.org, requestConfig.json)]);
+                    });
                     request.get.and.callFake(function(requestConfig) {
                         if (requestConfig.url === resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint)) {
                             return q([[], { statusCode: 200 }]);
@@ -226,7 +239,8 @@ describe('(action factory) check_payment_required', function() {
                         data: {
                             org: data.org,
                             paymentPlan: config.paymentPlans[data.org.paymentPlanId],
-                            paymentMethod: paymentMethod
+                            paymentMethod: paymentMethod,
+                            date: data.date
                         }
                     });
                 });
@@ -240,7 +254,11 @@ describe('(action factory) check_payment_required', function() {
             describe('if the paymentPlanStart is after today', function() {
                 beforeEach(function(done) {
                     data.org.paymentPlanId = 'pp-0Ek5Na02vCohpPgw';
-                    data.org.paymentPlanStart = moment().add(1, 'day').format();
+                    data.org.paymentPlanStart = moment(data.date).add(1, 'day').format();
+
+                    spyOn(request, 'put').and.callFake(function(requestConfig) {
+                        return q([ld.assign({}, data.org, requestConfig.json)]);
+                    });
 
                     result = checkPaymentRequired(event);
                     process.nextTick(done);
@@ -248,6 +266,15 @@ describe('(action factory) check_payment_required', function() {
 
                 it('should not fetch any payments', function() {
                     expect(request.get).not.toHaveBeenCalled();
+                });
+
+                it('should update the org with a nextPaymentDate', function() {
+                    expect(request.put).toHaveBeenCalledWith({
+                        url: resolveURL(config.cwrx.api.root, config.cwrx.api.orgs.endpoint + '/' + data.org.id),
+                        json: {
+                            nextPaymentDate: moment(data.org.paymentPlanStart).format()
+                        }
+                    });
                 });
 
                 it('should return a promise resolved to undefined', function() {
@@ -295,6 +322,105 @@ describe('(action factory) check_payment_required', function() {
                         });
                     });
 
+                    describe('and a nextPaymentDate', function() {
+                        var paymentMethod;
+
+                        beforeEach(function() {
+                            success.calls.reset();
+                            failure.calls.reset();
+                            request.get.calls.reset();
+                            watchmanStream.produce.calls.reset();
+
+                            paymentMethod = { token: uuid.createUuid(), default: true };
+                            request.get.and.returnValue(q([
+                                [
+                                    { token: uuid.createUuid(), default: false },
+                                    paymentMethod,
+                                    { token: uuid.createUuid(), default: false }
+                                ]
+                            ]));
+                        });
+
+                        describe('that is after today', function() {
+                            beforeEach(function(done) {
+                                data.org.nextPaymentDate = moment(data.date).add(1, 'day').format();
+
+                                checkPaymentRequired(event).then(success, failure);
+                                process.nextTick(done);
+                            });
+
+                            it('should not GET anything', function() {
+                                expect(request.get).not.toHaveBeenCalled();
+                            });
+
+                            it('should not produce anything', function() {
+                                expect(watchmanStream.produce).not.toHaveBeenCalled();
+                            });
+
+                            it('should fulfill the promise', function() {
+                                expect(success).toHaveBeenCalledWith(undefined);
+                            });
+                        });
+
+                        describe('that is today', function() {
+                            beforeEach(function(done) {
+                                data.org.nextPaymentDate = moment(data.date).format();
+
+                                checkPaymentRequired(event).then(success, failure);
+                                process.nextTick(done);
+                            });
+
+                            it('should get the orgs payment methods', function() {
+                                expect(request.get.calls.count()).toBe(1);
+                                expect(request.get).toHaveBeenCalledWith({
+                                    url: resolveURL(resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint), 'methods'),
+                                    qs: { org: data.org.id }
+                                });
+                            });
+
+                            it('should add a record to the watchman stream', function() {
+                                expect(watchmanStream.produce).toHaveBeenCalledWith({
+                                    type: 'paymentRequired',
+                                    data: {
+                                        org: data.org,
+                                        paymentPlan: config.paymentPlans[data.org.paymentPlanId],
+                                        paymentMethod: paymentMethod,
+                                        date: data.date
+                                    }
+                                });
+                            });
+                        });
+
+                        describe('that is before today', function() {
+                            beforeEach(function(done) {
+                                data.org.nextPaymentDate = moment(data.date).subtract(1, 'day').format();
+
+                                checkPaymentRequired(event).then(success, failure);
+                                process.nextTick(done);
+                            });
+
+                            it('should get the orgs payment methods', function() {
+                                expect(request.get.calls.count()).toBe(1);
+                                expect(request.get).toHaveBeenCalledWith({
+                                    url: resolveURL(resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint), 'methods'),
+                                    qs: { org: data.org.id }
+                                });
+                            });
+
+                            it('should add a record to the watchman stream', function() {
+                                expect(watchmanStream.produce).toHaveBeenCalledWith({
+                                    type: 'paymentRequired',
+                                    data: {
+                                        org: data.org,
+                                        paymentPlan: config.paymentPlans[data.org.paymentPlanId],
+                                        paymentMethod: paymentMethod,
+                                        date: data.date
+                                    }
+                                });
+                            });
+                        });
+                    });
+
                     describe('if the request for payments fails', function() {
                         var reason;
 
@@ -316,6 +442,9 @@ describe('(action factory) check_payment_required', function() {
                         var paymentMethod;
 
                         beforeEach(function() {
+                            spyOn(request, 'put').and.callFake(function(config) {
+                                return q([ld.assign({}, data.org, config.json)]);
+                            });
                             watchmanStream.produce.and.returnValue((produceDeferred = q.defer()).promise);
                         });
 
@@ -370,6 +499,15 @@ describe('(action factory) check_payment_required', function() {
                                         expect(watchmanStream.produce).not.toHaveBeenCalled();
                                     });
 
+                                    it('should update the org with a nextPaymentDate', function() {
+                                        expect(request.put).toHaveBeenCalledWith({
+                                            url: resolveURL(config.cwrx.api.root, config.cwrx.api.orgs.endpoint + '/' + data.org.id),
+                                            json: {
+                                                nextPaymentDate: moment(payments[0].createdAt).add(1, 'month').format()
+                                            }
+                                        });
+                                    });
+
                                     it('should fulfill the promise', function() {
                                         expect(success).toHaveBeenCalledWith(undefined);
                                     });
@@ -390,13 +528,23 @@ describe('(action factory) check_payment_required', function() {
                                         });
                                     });
 
+                                    it('should update the org with a nextPaymentDate', function() {
+                                        expect(request.put).toHaveBeenCalledWith({
+                                            url: resolveURL(config.cwrx.api.root, config.cwrx.api.orgs.endpoint + '/' + data.org.id),
+                                            json: {
+                                                nextPaymentDate: moment(data.date).format()
+                                            }
+                                        });
+                                    });
+
                                     it('should add a record to the watchman stream', function() {
                                         expect(watchmanStream.produce).toHaveBeenCalledWith({
                                             type: 'paymentRequired',
                                             data: {
                                                 org: data.org,
                                                 paymentPlan: config.paymentPlans[data.org.paymentPlanId],
-                                                paymentMethod: paymentMethod
+                                                paymentMethod: paymentMethod,
+                                                date: data.date
                                             }
                                         });
                                     });
@@ -440,6 +588,15 @@ describe('(action factory) check_payment_required', function() {
                                     expect(watchmanStream.produce).not.toHaveBeenCalled();
                                 });
 
+                                it('should update the org with a nextPaymentDate', function() {
+                                    expect(request.put).toHaveBeenCalledWith({
+                                        url: resolveURL(config.cwrx.api.root, config.cwrx.api.orgs.endpoint + '/' + data.org.id),
+                                        json: {
+                                            nextPaymentDate: moment(payments[0].createdAt).add(1, 'month').format()
+                                        }
+                                    });
+                                });
+
                                 it('should fulfill the promise', function() {
                                     expect(success).toHaveBeenCalledWith(undefined);
                                 });
@@ -475,13 +632,23 @@ describe('(action factory) check_payment_required', function() {
                                     });
                                 });
 
+                                it('should update the org with a nextPaymentDate', function() {
+                                    expect(request.put).toHaveBeenCalledWith({
+                                        url: resolveURL(config.cwrx.api.root, config.cwrx.api.orgs.endpoint + '/' + data.org.id),
+                                        json: {
+                                            nextPaymentDate: moment(data.date).format()
+                                        }
+                                    });
+                                });
+
                                 it('should add a record to the watchman stream', function() {
                                     expect(watchmanStream.produce).toHaveBeenCalledWith({
                                         type: 'paymentRequired',
                                         data: {
                                             org: data.org,
                                             paymentPlan: config.paymentPlans[data.org.paymentPlanId],
-                                            paymentMethod: paymentMethod
+                                            paymentMethod: paymentMethod,
+                                            date: data.date
                                         }
                                     });
                                 });
@@ -530,13 +697,23 @@ describe('(action factory) check_payment_required', function() {
                                     });
                                 });
 
+                                it('should update the org with a nextPaymentDate', function() {
+                                    expect(request.put).toHaveBeenCalledWith({
+                                        url: resolveURL(config.cwrx.api.root, config.cwrx.api.orgs.endpoint + '/' + data.org.id),
+                                        json: {
+                                            nextPaymentDate: moment(data.date).format()
+                                        }
+                                    });
+                                });
+
                                 it('should add a record to the watchman stream', function() {
                                     expect(watchmanStream.produce).toHaveBeenCalledWith({
                                         type: 'paymentRequired',
                                         data: {
                                             org: data.org,
                                             paymentPlan: config.paymentPlans[data.org.paymentPlanId],
-                                            paymentMethod: paymentMethod
+                                            paymentMethod: paymentMethod,
+                                            date: data.date
                                         }
                                     });
                                 });
@@ -580,13 +757,23 @@ describe('(action factory) check_payment_required', function() {
                                         process.nextTick(done);
                                     });
 
+                                    it('should update the org with a nextPaymentDate', function() {
+                                        expect(request.put).toHaveBeenCalledWith({
+                                            url: resolveURL(config.cwrx.api.root, config.cwrx.api.orgs.endpoint + '/' + data.org.id),
+                                            json: {
+                                                nextPaymentDate: moment(data.date).format()
+                                            }
+                                        });
+                                    });
+
                                     it('should add a record to the watchman stream', function() {
                                         expect(watchmanStream.produce).toHaveBeenCalledWith({
                                             type: 'paymentRequired',
                                             data: {
                                                 org: data.org,
                                                 paymentPlan: config.paymentPlans[data.org.paymentPlanId],
-                                                paymentMethod: paymentMethods[1]
+                                                paymentMethod: paymentMethods[1],
+                                                date: data.date
                                             }
                                         });
                                     });

@@ -755,6 +755,7 @@ describe('cwrxStream campaignCreated', function() {
 
             it('should not give the org a paymentPlanStart', function() {
                 expect(org.paymentPlanStart).toBeNull();
+                expect(org.nextPaymentDate).not.toBeDefined();
             });
 
             it('should not give the org any credits', function(done) {
@@ -799,6 +800,7 @@ describe('cwrxStream campaignCreated', function() {
 
                 it('should give the org a paymentPlanStart of now', function() {
                     expect(moment(org.paymentPlanStart).isSame(now, 'day')).toBe(true, 'paymentPlanStart is not today.');
+                    expect(moment(org.nextPaymentDate).isSame(now, 'day')).toBe(true, 'nextPaymentDate is not today.');
                 });
 
                 it('should not give the org any credits', function(done) {
@@ -844,6 +846,7 @@ describe('cwrxStream campaignCreated', function() {
 
                 it('should give the org a paymentPlanStart computed from the transactions', function() {
                     expect(moment(org.paymentPlanStart).isSame(moment(now).add(17, 'days'), 'day')).toBe(true, 'paymentPlanStart is the wrong day.');
+                    expect(moment(org.nextPaymentDate).isSame(moment(now).add(17, 'days'), 'day')).toBe(true, 'nextPaymentDate is the wrong day.');
                 });
 
                 it('should create transactions for each promotion', function() {

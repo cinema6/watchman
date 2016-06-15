@@ -38,11 +38,13 @@ module.exports = function activatePaymentPlanFactory(config) {
             ).spread(function updateOrg(promotions) {
                 var freeTrials = ld.filter(promotions, { type: 'freeTrial' });
                 var trialLength = ld.sum(freeTrials.map(ld.property('data.trialLength')));
+                var startDate = moment(now).add(trialLength, 'days').format();
 
                 return request.put({
                     url: orgEndpoint,
                     json: ld.merge({}, org, {
-                        paymentPlanStart: moment(now).add(trialLength, 'days').format()
+                        paymentPlanStart: startDate,
+                        nextPaymentDate: startDate
                     })
                 }).spread(function fulfillPromotions() {
                     return q.all(freeTrials.map(function(promotion) {
