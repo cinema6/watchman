@@ -3,6 +3,9 @@
 ## v0.12.0 (June 17, 2016)
 * *[v0.12.0-rc1]*
   * [FEATURE]: Add `nextPaymentDate` property to orgs with payment plans
+  * [FEATURE]: Revamp `check_available_funds` action to fetch orgs itself, and batch requests to `/api/accounting/balances`
+  * ** Extra Deployment Steps**:
+    * Update environment so that `check_available_funds` runs on `hourly` event from time stream, and not on `hourly_orgPulse` from watchman stream
 * *[/v0.12.0-rc1]*
 
 ## v0.11.0 (June 13, 2016)
