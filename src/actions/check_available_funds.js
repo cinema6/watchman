@@ -7,7 +7,7 @@ var JsonProducer = require('rc-kinesis').JsonProducer;
 var Q = require('q');
 var hl = require('highland');
 var ld = require('lodash');
-var url = require('url');
+var urlUtils = require('url');
 
 /**
 * This action checks the balance of an org passed through data. If the balance is non positive,
@@ -21,15 +21,18 @@ var url = require('url');
 */
 module.exports = function checkAvailableFundsFactory(config) {
     var log = logger.getLog();
-    var orgsEndpoint = url.resolve(config.cwrx.api.root, config.cwrx.api.orgs.endpoint);
-    var accountingEndpoint = url.resolve(config.cwrx.api.root,
-        config.cwrx.api.accounting.endpoint + '/balances');
-    var campaignsEndpoint = url.resolve(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint);
+    var orgUrl = urlUtils.resolve(config.cwrx.api.root, config.cwrx.api.orgs.endpoint);
+    var campUrl = urlUtils.resolve(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint);
+    var balanceUrl = urlUtils.resolve(
+        config.cwrx.api.root,
+        config.cwrx.api.accounting.endpoint + '/balances'
+    );
+
     var request = new CwrxRequest(config.appCreds);
     var producer = new JsonProducer(config.kinesis.producer.stream, config.kinesis.producer);
 
     return function checkAvailableFunds(/*event*/) {
-        var orgStream = new CwrxEntities(orgsEndpoint, config.appCreds);
+        var orgStream = new CwrxEntities(orgUrl, config.appCreds);
         var watchmanStream = producer.createWriteStream();
         
         return new Q.Promise(function(resolve, reject) {
@@ -41,7 +44,7 @@ module.exports = function checkAvailableFundsFactory(config) {
                 
                 // fetch balance stats for this batch of orgs
                 return hl(request.get({
-                    url: accountingEndpoint,
+                    url: balanceUrl,
                     qs: { orgs: idStr }
                 })
                 .spread(function(statsObj) {
@@ -57,14 +60,14 @@ module.exports = function checkAvailableFundsFactory(config) {
                         }
                         return true;
                     });
-                }))
+                }).catch(reject))
                 .flatten();
             })
             .flatMap(function(org) {
                 log.info('Org %1 is out of funds', org.id);
                 // map + return all of the org's active campaigns
                 return hl(new CwrxEntities(
-                    campaignsEndpoint,
+                    campUrl,
                     config.appCreds,
                     { org: org.id, statuses: 'active' }
                 ).on('error', reject));
@@ -82,7 +85,6 @@ module.exports = function checkAvailableFundsFactory(config) {
                 };
             })
             .pipe(watchmanStream.on('error', reject)) // produce to watchman event stream
-            // .done(resolve);
             .on('finish', resolve);
         });
     };

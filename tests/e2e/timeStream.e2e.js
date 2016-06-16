@@ -379,18 +379,6 @@ describe('timeStream', function() {
         });
     }
 
-    function waitForMockman(eventType, n) {
-        var records = [];
-        return Q.Promise(function(resolve) {
-            mockman.on(eventType, function(record) {
-                records.push(record);
-                if(records.length === n) {
-                    resolve(records);
-                }
-            });
-        });
-    }
-
     describe('the time event prompting campaigns to be fetched', function() {
         beforeEach(function(done) {
             producer.produce({ type: 'hourly', data: { date: new Date() } }).then(done, done.fail);
