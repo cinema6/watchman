@@ -1,7 +1,9 @@
 # Watchman
 
+## v0.12.0 (June 17, 2016)
 * *[v0.12.0-rc1]*
   * [FEATURE]: Add `nextPaymentDate` property to orgs with payment plans
+* *[/v0.12.0-rc1]*
 
 ## v0.11.0 (June 13, 2016)
 * *[v0.11.0-rc1]*
