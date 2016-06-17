@@ -1,18 +1,18 @@
 'use strict';
 
+var Q = require('q');
+var proxyquire = require('proxyquire');
+var url = require('url');
+var MockObjectStore = require('../helpers/MockObjectStore.js');
+var MockObjectStream = require('../helpers/MockObjectStream.js');
+
 var CwrxEntities;
 var CwrxRequest;
 var JsonProducer;
-var MockObjectStore = require('../helpers/MockObjectStore.js');
-var MockObjectStream = require('../helpers/MockObjectStream.js');
-var Q = require('q');
 var factory;
-var proxyquire = require('proxyquire');
-var url = require('url');
-var ld = require('lodash');
 
 describe('check_available_funds', function() {
-    var mockConfig, action, mockObjectStream, mockObjectStore;
+    var mockConfig, action, mockStreams, mockObjectStore, balanceResp;
 
     beforeEach(function() {
         mockConfig = {
@@ -25,6 +25,9 @@ describe('check_available_funds', function() {
                     },
                     campaigns: {
                         endpoint: '/api/campaigns'
+                    },
+                    orgs: {
+                        endpoint: '/api/account/orgs'
                     }
                 }
             },
@@ -35,13 +38,23 @@ describe('check_available_funds', function() {
                 }
             }
         };
-        mockObjectStream = new MockObjectStream();
         mockObjectStore = new MockObjectStore();
-        CwrxEntities = jasmine.createSpy('CwrxEntities()').and.returnValue(mockObjectStream);
+        mockStreams = {
+            orgs: new MockObjectStream(),
+            campaigns: {}
+        };
+        CwrxEntities = jasmine.createSpy('CwrxEntities()').and.callFake(function(url, appCreds, qs) {
+            if (/orgs/.test(url)) {
+                return mockStreams.orgs;
+            } else {
+                return mockStreams.campaigns[qs.org];
+            }
+        });
+        balanceResp = {};
         CwrxRequest = jasmine.createSpy('CwrxRequest()');
         CwrxRequest['@noCallThru'] = true;
         CwrxRequest.prototype = {
-            get: jasmine.createSpy('get()')
+            get: jasmine.createSpy('get()').and.callFake(function() { return Q.resolve([balanceResp, {}]); })
         };
         JsonProducer = jasmine.createSpy('JsonProducer()');
         JsonProducer.prototype = {
@@ -68,130 +81,206 @@ describe('check_available_funds', function() {
         expect(action.name).toBe('checkAvailableFunds');
     });
 
-    it('create the json producer', function() {
+    it('should create the json producer and CwrxRequest', function() {
         expect(JsonProducer).toHaveBeenCalledWith('devWatchmanStream', jasmine.objectContaining({
             region: 'narnia'
         }));
+        expect(CwrxRequest).toHaveBeenCalledWith('appCreds');
     });
-
-    it('should reject if not passed a valid org through data', function(done) {
-        Q.all([{ }, { org: null }, { org: 'o-123' }].map(function(data) {
-            return action({ data: data, options: { } }).catch(function(error) {
-                expect(error).toBeDefined();
-            });
-        })).then(done, done.fail);
-    });
-
-    it('should fetch the available funds of the org passed through data', function(done) {
-        CwrxRequest.prototype.get.and.returnValue(Q.resolve([{}]));
-        action({ data: { org: { id: 'o-123' } }, options: { } }).then(function() {
-            expect(url.resolve).toHaveBeenCalledWith('https://apiroot.com', '/api/accounting/balance');
-            expect(CwrxRequest).toHaveBeenCalledWith('appCreds');
-            expect(CwrxRequest.prototype.get).toHaveBeenCalledWith({
-                url: 'https://apiroot.com/api/accounting/balance',
-                qs: {
-                    org: 'o-123'
-                }
-            });
-        }).then(done, done.fail);
-    });
-
-    describe('if the available funds are at or below zero', function() {
-        [0, -100].forEach(function(balance) {
-            describe('if the budget is ' + balance, function() {
-                describe('if aggregate campaign budgets are 0', function() {
-                    beforeEach(function() {
-                        CwrxRequest.prototype.get.and.returnValue(Q.resolve([{
-                            balance: balance,
-                            outstandingBudget: 0
-                        }]));
-                    });
-
-                    it('should not fetch campaigns in the org', function(done) {
-                        action({ data: { org: { id: 'o-123' } }, options: { } }).then(function() {
-                            CwrxRequest.prototype.get.calls.allArgs().forEach(function(arg) {
-                                expect(arg.url).not.toContain('campaigns');
-                            });
-                        }).then(done, done.fail);
-                    });
-                });
-
-                describe('if aggregate campaign budgets are greater than 0', function() {
-                    var campaigns;
-
-                    beforeEach(function() {
-                        CwrxRequest.prototype.get.and.returnValue(Q.resolve([{
-                            balance: balance,
-                            outstandingBudget: 100
-                        }]));
-                        campaigns = [
-                            {
-                                id: 'cam-123',
-                                pricing: {
-                                    budget: 0
-                                }
-                            },
-                            {
-                                id: 'cam-456',
-                                pricing: {
-                                    budget: 100
-                                }
-                            }
-                        ];
-                    });
-
-                    it('should fetch the campaigns in the org', function(done) {
-                        mockObjectStream.source.add(ld.chunk(campaigns, 1), true);
-                        action({ data: { org: { id: 'o-123' } }, options: { } }).then(function() {
-                            expect(CwrxEntities).toHaveBeenCalledWith('https://apiroot.com/api/campaigns', 'appCreds', { org: 'o-123', statuses: 'active' });
-                        }).then(done, done.fail);
-                    });
-
-                    it('should produce campaigns with a budget greater than zero', function(done) {
-                        mockObjectStream.source.add(ld.chunk(campaigns, 1), true);
-                        action({ data: { org: { id: 'o-123' } }, options: { } }).then(function() {
-                            expect(JsonProducer.prototype.createWriteStream).toHaveBeenCalledWith();
-                            expect(mockObjectStore.items).toEqual([{
-                                type: 'campaignOutOfFunds',
-                                data: {
-                                    campaign: campaigns[1]
-                                }
-                            }]);
-                        }).then(done, done.fail);
-                    });
-
-                    it('should reject if there is a problem fetching the campaigns', function(done) {
-                        mockObjectStream.source.fail(new Error('epic fail'));
-                        action({ data: { org: { id: 'o-123' } }, options: { } }).then(done.fail).catch(function(error) {
-                            expect(error).toBeDefined();
-                        }).then(done, done.fail);
-                    });
-
-                    it('should reject if there is a problem producing the campaigns', function(done) {
-                        mockObjectStream.source.add(ld.chunk(campaigns, 1), true);
-                        mockObjectStore.fail(new Error('epic fail'));
-                        action({ data: { org: { id: 'o-123' } }, options: { } }).then(done.fail).catch(function(error) {
-                            expect(error).toBeDefined();
-                        }).then(done, done.fail);
-                    });
-                });
-            });
-        });
-    });
-
-    describe('if the available funds are greater than zero', function() {
+    
+    describe('creates an action that', function() {
         beforeEach(function() {
-            CwrxRequest.prototype.get.and.returnValue(Q.resolve([{
-                balance: 100,
-                outstandingBudget: 50
-            }]));
+            mockStreams.orgs.source.add([
+                { id: 'o-1', status: 'active', name: 'org 1' }
+            ], true);
+            mockStreams.campaigns['o-1'] = new MockObjectStream();
+            mockStreams.campaigns['o-1'].source.add([
+                { id: 'cam-1', status: 'active', org: 'o-1', pricing: { budget: 100 } },
+                { id: 'cam-2', status: 'active', org: 'o-1', pricing: { budget: 200 } }
+            ], true);
+            balanceResp = {
+                'o-1': {
+                    balance: -300.12,
+                    outstandingBudget: 500.45,
+                    totalSpend: 13.3
+                }
+            };
         });
 
-        it('should not fetch the campaigns in the org', function(done) {
-            action({ data: { org: { id: 'o-123' } }, options: { } }).then(function() {
-                CwrxRequest.prototype.get.calls.allArgs().forEach(function(arg) {
-                    expect(arg.url).not.toContain('campaigns');
+        it('should produce campaignOutOfFunds for all active campaigns from an org without funds', function(done) {
+            action({}).then(function() {
+                expect(CwrxEntities.calls.count()).toBe(2);
+                expect(CwrxEntities).toHaveBeenCalledWith('https://apiroot.com/api/account/orgs', 'appCreds');
+                expect(CwrxEntities).toHaveBeenCalledWith('https://apiroot.com/api/campaigns', 'appCreds', { org: 'o-1', statuses: 'active' });
+                expect(CwrxRequest.prototype.get.calls.count()).toBe(1);
+                expect(CwrxRequest.prototype.get).toHaveBeenCalledWith({ url: 'https://apiroot.com/api/accounting/balances', qs: { orgs: 'o-1' } });
+                expect(mockObjectStore.items.length).toBe(2);
+                expect(mockObjectStore.items[0]).toEqual({
+                    type: 'campaignOutOfFunds',
+                    data: { campaign: { id: 'cam-1', status: 'active', org: 'o-1', pricing: { budget: 100 } } }
                 });
+                expect(mockObjectStore.items[1]).toEqual({
+                    type: 'campaignOutOfFunds',
+                    data: { campaign: { id: 'cam-2', status: 'active', org: 'o-1', pricing: { budget: 200 } } }
+                });
+            }).then(done, done.fail);
+        });
+        
+        it('should ignore campaigns without a budget', function(done) {
+            mockStreams.campaigns['o-1'].source.add([
+                { id: 'cam-13', status: 'active', org: 'o-1', pricing: { dailyLimit: 10 } },
+                { id: 'cam-14', status: 'active', org: 'o-1' },
+                { id: 'cam-15', status: 'active', org: 'o-1', pricing: { budget: 0 } },
+                { id: 'cam-16', status: 'active', org: 'o-1', pricing: { budget: 666 } }
+            ], true);
+
+            action({}).then(function() {
+                expect(mockObjectStore.items.length).toBe(3);
+                expect(mockObjectStore.items[0]).toEqual({
+                    type: 'campaignOutOfFunds',
+                    data: { campaign: { id: 'cam-1', status: 'active', org: 'o-1', pricing: { budget: 100 } } }
+                });
+                expect(mockObjectStore.items[1]).toEqual({
+                    type: 'campaignOutOfFunds',
+                    data: { campaign: { id: 'cam-2', status: 'active', org: 'o-1', pricing: { budget: 200 } } }
+                });
+                expect(mockObjectStore.items[2]).toEqual({
+                    type: 'campaignOutOfFunds',
+                    data: { campaign: { id: 'cam-16', status: 'active', org: 'o-1', pricing: { budget: 666 } } }
+                });
+            }).then(done, done.fail);
+        });
+        
+        it('should handle multiple orgs', function(done) {
+            mockStreams.orgs.source.add([
+                { id: 'o-2', status: 'active', name: 'org 2' },
+                { id: 'o-no-stats', status: 'active', name: 'no stats' },
+                { id: 'o-enough-balance', status: 'active', name: 'enough balance' },
+                { id: 'o-no-outstanding-budget', status: 'active', name: 'no stats' },
+                { id: 'o-no-campaigns', status: 'active', name: 'no campaigns' },
+            ]);
+            balanceResp['o-2'] = { balance: -200.1, outstandingBudget: 100.1, totalSpend: 1 };
+            balanceResp['o-no-stats'] = null;
+            balanceResp['o-enough-balance'] = { balance: 5000.1, outstandingBudget: 100.1, totalSpend: 1 };
+            balanceResp['o-no-outstanding-budget'] = { balance: -200.1, outstandingBudget: 0, totalSpend: 1 };
+            balanceResp['o-no-campaigns'] = { balance: -200.1, outstandingBudget: 100.1, totalSpend: 1 };
+            
+            mockStreams.campaigns['o-2'] = new MockObjectStream();
+            mockStreams.campaigns['o-2'].source.add([
+                { id: 'cam-o2-1', status: 'active', org: 'o-2', pricing: { budget: 100 } },
+                { id: 'cam-o2-2', status: 'active', org: 'o-2', pricing: { budget: 200 } }
+            ], true);
+            mockStreams.campaigns['o-no-campaigns'] = new MockObjectStream();
+            mockStreams.campaigns['o-no-campaigns'].source.add([], true);
+            
+            action({}).then(function() {
+                expect(CwrxEntities.calls.count()).toBe(4);
+                expect(CwrxEntities).toHaveBeenCalledWith('https://apiroot.com/api/account/orgs', 'appCreds');
+                expect(CwrxEntities).toHaveBeenCalledWith('https://apiroot.com/api/campaigns', 'appCreds', { org: 'o-1', statuses: 'active' });
+                expect(CwrxEntities).toHaveBeenCalledWith('https://apiroot.com/api/campaigns', 'appCreds', { org: 'o-2', statuses: 'active' });
+                expect(CwrxEntities).toHaveBeenCalledWith('https://apiroot.com/api/campaigns', 'appCreds', { org: 'o-no-campaigns', statuses: 'active' });
+                expect(CwrxRequest.prototype.get.calls.count()).toBe(1);
+                expect(CwrxRequest.prototype.get).toHaveBeenCalledWith({
+                    url: 'https://apiroot.com/api/accounting/balances',
+                    qs: { orgs: 'o-1,o-2,o-no-stats,o-enough-balance,o-no-outstanding-budget,o-no-campaigns' }
+                });
+                expect(mockObjectStore.items.length).toBe(4);
+                expect(mockObjectStore.items[0]).toEqual({
+                    type: 'campaignOutOfFunds',
+                    data: { campaign: { id: 'cam-1', status: 'active', org: 'o-1', pricing: { budget: 100 } } }
+                });
+                expect(mockObjectStore.items[1]).toEqual({
+                    type: 'campaignOutOfFunds',
+                    data: { campaign: { id: 'cam-2', status: 'active', org: 'o-1', pricing: { budget: 200 } } }
+                });
+                expect(mockObjectStore.items[2]).toEqual({
+                    type: 'campaignOutOfFunds',
+                    data: { campaign: { id: 'cam-o2-1', status: 'active', org: 'o-2', pricing: { budget: 100 } } }
+                });
+                expect(mockObjectStore.items[3]).toEqual({
+                    type: 'campaignOutOfFunds',
+                    data: { campaign: { id: 'cam-o2-2', status: 'active', org: 'o-2', pricing: { budget: 200 } } }
+                });
+            }).then(done, done.fail);
+        });
+        
+        it('should handle the case where no orgs are fetched', function(done) {
+            mockStreams.orgs.source.items = [];
+            action({}).then(function() {
+                expect(CwrxEntities.calls.count()).toBe(1);
+                expect(CwrxEntities).toHaveBeenCalledWith('https://apiroot.com/api/account/orgs', 'appCreds');
+                expect(CwrxRequest.prototype.get).not.toHaveBeenCalled();
+                expect(mockObjectStore.items).toEqual([]);
+            }).then(done, done.fail);
+        });
+
+        it('should handle batches of 50 orgs at a time', function(done) {
+            for (var i = 2; i <= 200; i++) {
+                var id = 'o-' + i;
+                mockStreams.orgs.source.add([{ id: id, status: 'active' }]);
+                balanceResp[id] = null;
+            }
+
+            action({}).then(function() {
+                expect(CwrxEntities.calls.count()).toBe(2);
+                expect(CwrxEntities).toHaveBeenCalledWith('https://apiroot.com/api/account/orgs', 'appCreds');
+                expect(CwrxEntities).toHaveBeenCalledWith('https://apiroot.com/api/campaigns', 'appCreds', { org: 'o-1', statuses: 'active' });
+
+                expect(CwrxRequest.prototype.get.calls.count()).toBe(4);
+                CwrxRequest.prototype.get.calls.allArgs().forEach(function(argArr, idx) {
+                    expect(argArr[0].url).toBe('https://apiroot.com/api/accounting/balances');
+                    var orgIds = argArr[0].qs.orgs.split(',');
+                    expect(orgIds.length).toBe(50);
+                    expect(orgIds[0]).toBe('o-' + String((idx * 50) + 1));
+                    expect(orgIds[49]).toBe('o-' + String(((idx + 1) * 50)));
+                });
+                
+                expect(mockObjectStore.items.length).toBe(2);
+                expect(mockObjectStore.items[0]).toEqual({
+                    type: 'campaignOutOfFunds',
+                    data: { campaign: { id: 'cam-1', status: 'active', org: 'o-1', pricing: { budget: 100 } } }
+                });
+                expect(mockObjectStore.items[1]).toEqual({
+                    type: 'campaignOutOfFunds',
+                    data: { campaign: { id: 'cam-2', status: 'active', org: 'o-1', pricing: { budget: 200 } } }
+                });
+            }).then(done, done.fail);
+        });
+        
+        it('should reject if fetching orgs fails', function(done) {
+            mockStreams.orgs.source.fail(new Error('Orgs got a problem'));
+            action({}).then(done.fail)
+            .catch(function(error) {
+                expect(error).toEqual(new Error('Orgs got a problem'));
+                expect(CwrxEntities.calls.count()).toBe(1);
+                expect(CwrxEntities).toHaveBeenCalledWith('https://apiroot.com/api/account/orgs', 'appCreds');
+                expect(CwrxRequest.prototype.get).not.toHaveBeenCalled();
+                expect(mockObjectStore.items).toEqual([]);
+            }).then(done, done.fail);
+        });
+        
+        it('should reject if fetching balances fails', function(done) {
+            balanceResp = Q.reject(new Error('Accountant got a problem'));
+            action({}).then(done.fail)
+            .catch(function(error) {
+                expect(error).toEqual(new Error('Accountant got a problem'));
+                expect(CwrxEntities.calls.count()).toBe(1);
+                expect(CwrxEntities).toHaveBeenCalledWith('https://apiroot.com/api/account/orgs', 'appCreds');
+                expect(CwrxRequest.prototype.get).toHaveBeenCalled();
+                expect(mockObjectStore.items).toEqual([]);
+            }).then(done, done.fail);
+        });
+        
+        it('should reject if fetching campaigns fails', function(done) {
+            mockStreams.campaigns['o-1'].source.fail(new Error('Campaigns got a problem'));
+            action({}).then(done.fail)
+            .catch(function(error) {
+                expect(error).toEqual(new Error('Campaigns got a problem'));
+                expect(CwrxEntities.calls.count()).toBe(2);
+                expect(CwrxEntities).toHaveBeenCalledWith('https://apiroot.com/api/account/orgs', 'appCreds');
+                expect(CwrxEntities).toHaveBeenCalledWith('https://apiroot.com/api/campaigns', 'appCreds', { org: 'o-1', statuses: 'active' });
+                expect(CwrxRequest.prototype.get).toHaveBeenCalled();
+                expect(mockObjectStore.items).toEqual([]);
             }).then(done, done.fail);
         });
     });

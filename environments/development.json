@@ -215,10 +215,7 @@
                                     }
                                 },
                                 {
-                                    "name": "fetch_orgs",
-                                    "options": {
-                                        "prefix": "hourly"
-                                    }
+                                    "name": "check_available_funds"
                                 }
                             ]
                         },
@@ -252,9 +249,6 @@
                         },
                         "hourly_campaignPulse": {
                             "actions": ["check_expiry"]
-                        },
-                        "hourly_orgPulse": {
-                            "actions": ["check_available_funds"]
                         },
                         "campaignOutOfFunds": {
                             "actions": [

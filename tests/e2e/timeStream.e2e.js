@@ -379,18 +379,6 @@ describe('timeStream', function() {
         });
     }
 
-    function waitForMockman(eventType, n) {
-        var records = [];
-        return Q.Promise(function(resolve) {
-            mockman.on(eventType, function(record) {
-                records.push(record);
-                if(records.length === n) {
-                    resolve(records);
-                }
-            });
-        });
-    }
-
     describe('the time event prompting campaigns to be fetched', function() {
         beforeEach(function(done) {
             producer.produce({ type: 'hourly', data: { date: new Date() } }).then(done, done.fail);
@@ -400,7 +388,6 @@ describe('timeStream', function() {
             beforeEach(function(done) {
                 var promises = [
                     waitForStatus(['e2e-cam-01', 'e2e-cam-02', 'e2e-cam-07', 'e2e-cam-09'], 'expired'),
-                    waitForMockman('campaignOutOfFunds', 3)
                 ];
                 Q.all(promises).then(done, done.fail);
             });
@@ -431,7 +418,6 @@ describe('timeStream', function() {
             beforeEach(function(done) {
                 var promises = [
                     waitForStatus(['e2e-cam-05', 'e2e-cam-06', 'e2e-cam-10'], 'outOfBudget'),
-                    waitForMockman('campaignOutOfFunds', 3)
                 ];
                 Q.all(promises).then(done, done.fail);
             });
@@ -453,19 +439,6 @@ describe('timeStream', function() {
                     expect(updateRequest.status).toBe('rejected');
                     expect(updateRequest.rejectionReason).toContain('Your campaign has exhausted its budget');
                     expect(updateRequest.campaignExpired).toBe(true);
-                }).then(done, done.fail);
-            });
-        });
-
-        describe('when an org has a non positive balance', function() {
-            it('should produce a campaignOutOfFunds event for each active campaign in the org', function(done) {
-                waitForMockman('campaignOutOfFunds', 3).then(function(records) {
-                    var campaignIds = records.map(function(record) {
-                        return record.data.campaign.id;
-                    });
-                    ['e2e-cam-01', 'e2e-cam-03', 'e2e-cam-08'].forEach(function(id) {
-                        expect(campaignIds).toContain(id);
-                    });
                 }).then(done, done.fail);
             });
         });
