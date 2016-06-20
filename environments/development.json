@@ -68,6 +68,9 @@
                             },
                             "advertisers": {
                                 "endpoint": "/api/account/advertisers"
+                            },
+                            "productData" : {
+                                "endpoint": "/api/collateral/product-data"
                             }
                         }
                     },
@@ -251,7 +254,7 @@
                             "actions": ["check_payment_required"]
                         },
                         "hourly_campaignPulse": {
-                            "actions": ["check_expiry"]
+                            "actions": ["check_expiry", "fetch_product_data"]
                         },
                         "hourly_orgPulse": {
                             "actions": ["check_available_funds"]
