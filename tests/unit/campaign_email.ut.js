@@ -104,7 +104,8 @@ describe('campaign_email.js', function() {
                     campaignActive: 'campaignActive-template-id',
                     campaignSubmitted: 'campaignSubmitted-template-id',
                     initializedShowcaseCampaign: 'initializedShowcaseCampaign-template-id',
-                    'campaignActive--app': 'campaignActive--app-template-id'
+                    'campaignActive--app': 'campaignActive--app-template-id',
+                    'promotionEnded--app': 'promotionEnded--app-template-id'
                 }
             },
             state: {
@@ -421,7 +422,7 @@ describe('campaign_email.js', function() {
             it('should make a request for the org\'s users', function() {
                 expect(requestUtils.makeSignedRequest).toHaveBeenCalledWith(this.config.appCreds, 'get', {
                     url: resolveURL(this.config.cwrx.api.root, this.config.cwrx.api.users.endpoint),
-                    qs: { org: this.event.data.org.id, fields: 'email', sort: 'created,1' }
+                    qs: { org: this.event.data.org.id, fields: 'email,firstName', sort: 'created,1' }
                 });
             });
 
@@ -2297,6 +2298,47 @@ describe('campaign_email.js', function() {
                         ContentType: 'image/png',
                         ContentID: 'cid:reelContentLogo'
                     }]
+                }, jasmine.any(Function));
+            }).then(done, done.fail);
+        });
+    });
+
+
+    describe('sending promotionEnded emails', function() {
+        beforeEach(function() {
+            this.event.options.type = 'promotionEnded';
+            this.event.data.org = {
+                id: 'o-123'
+            };
+            requestUtils.makeSignedRequest.and.returnValue(Q.resolve({
+                response: {
+                    statusCode: 200
+                },
+                body: [
+                    {
+                        email: 'somedude@fake.com',
+                        firstName: 'Henry'
+                    }
+                ]
+            }));
+        });
+
+        it('should be able to be sent using postmark', function(done) {
+            var self = this;
+            self.event.options.provider = 'postmark';
+            self.email(this.event).then(function() {
+                expect(postmark.Client.prototype.sendEmailWithTemplate).toHaveBeenCalledWith({
+                    TemplateId: 'promotionEnded--app-template-id',
+                    TemplateModel: {
+                        firstName: 'Henry',
+                        dashboardLink: 'showcase dashboard link'
+                    },
+                    InlineCss: true,
+                    From: 'e2eSender@fake.com',
+                    To: 'somedude@fake.com',
+                    Tag: 'promotionEnded--app',
+                    TrackOpens: true,
+                    Attachments: self.showcasePostmarkAttachments
                 }, jasmine.any(Function));
             }).then(done, done.fail);
         });

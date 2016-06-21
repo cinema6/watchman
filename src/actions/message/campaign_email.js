@@ -411,6 +411,20 @@ module.exports = function factory(config) {
             attachments: [
                 { filename: 'logo.png', cid: 'reelContentLogo' }
             ]
+        },
+        promotionEnded: {
+            template: 'promotionEnded--app',
+            data: function(data) {
+                return {
+                    firstName     : data.user.firstName,
+                    dashboardLink : emailConfig.dashboardLinks.showcase
+                };
+            },
+            attachments: function() {
+                return getAttachments({
+                    target: 'showcase'
+                });
+            }
         }
     };
 
@@ -517,7 +531,7 @@ module.exports = function factory(config) {
                     });
                 } else if (data.org) {
                     return requestUtils.makeSignedRequest(config.appCreds, 'get', {
-                        qs: { fields: 'email', org: data.org.id, sort: 'created,1' },
+                        qs: { fields: 'email,firstName', org: data.org.id, sort: 'created,1' },
                         url: resolveURL(config.cwrx.api.root, config.cwrx.api.users.endpoint)
                     }).then(function handleResponse(result) {
                         var response = result.response;
@@ -528,6 +542,7 @@ module.exports = function factory(config) {
                                 body);
                         }
 
+                        ld.set(data, 'user', body[0]);
                         return body[0].email;
                     });
                 } else {
