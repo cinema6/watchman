@@ -86,9 +86,10 @@ describe('timeStream payment plan billing', function() {
 
     function dailyEvent(time) {
         return producer.produce({
-            type: 'daily',
+            type: 'hourly',
             data: {
-                date: time.format()
+                date: time.format(),
+                hour: 12
             }
         });
     }
@@ -526,8 +527,8 @@ describe('timeStream payment plan billing', function() {
             var payments;
 
             beforeEach(function(done) {
-                updatePaymentPlanStart(moment().add(1, 'day')).then(function() {
-                    return dailyEvent(moment().add(3, 'hours'));
+                updatePaymentPlanStart(moment().startOf('day').add(1, 'day')).then(function() {
+                    return dailyEvent(moment().startOf('day').add(3, 'hours'));
                 }).then(function() {
                     return waitUntil(function() {
                         return getOrg().then(function(org) {

@@ -3,7 +3,9 @@
 
 var JsonProducer = require('rc-kinesis').JsonProducer;
 var Q = require('q');
+var moment = require('moment');
 var testUtils = require('cwrx/test/e2e/testUtils.js');
+var uuid = require('rc-uuid');
 
 var APP_CREDS = JSON.parse(process.env.appCreds);
 var AWS_CREDS = JSON.parse(process.env.awsCreds);
@@ -23,10 +25,15 @@ describe('timeStream', function() {
             awsConfig.secretAccessKey = AWS_CREDS.secretAccessKey;
         }
         producer = new JsonProducer(TIME_STREAM, awsConfig);
+        this.mailman = new testUtils.Mailman();
+        this.mailman.on('error', function(error) { throw new Error(error); });
         mockman = new testUtils.Mockman({
             streamName: WATCHMAN_STREAM
         });
-        mockman.start().then(done, done.fail);
+        Q.all([
+            this.mailman.start(),
+            mockman.start()
+        ]).then(done, done.fail);
     });
 
     afterAll(function() {
@@ -349,11 +356,13 @@ describe('timeStream', function() {
     });
 
     afterAll(function(done) {
+        this.mailman.stop();
         mockman.stop();
         testUtils.closeDbs().then(done, done.fail);
     });
 
     afterEach(function() {
+        this.mailman.removeAllListeners();
         mockman.removeAllListeners();
     });
 
@@ -381,7 +390,7 @@ describe('timeStream', function() {
 
     describe('the time event prompting campaigns to be fetched', function() {
         beforeEach(function(done) {
-            producer.produce({ type: 'hourly', data: { date: new Date() } }).then(done, done.fail);
+            producer.produce({ type: 'tenMinutes', data: { date: new Date() } }).then(done, done.fail);
         });
 
         describe('when an active, paused, or outOfBudget campaign has reached its end date', function() {
@@ -440,6 +449,55 @@ describe('timeStream', function() {
                     expect(updateRequest.rejectionReason).toContain('Your campaign has exhausted its budget');
                     expect(updateRequest.campaignExpired).toBe(true);
                 }).then(done, done.fail);
+            });
+        });
+    });
+
+    describe('the hourly event', function() {
+        beforeEach(function(done) {
+            var orgId = 'o-' + uuid.createUuid();
+            var mockOrgs = [
+                {
+                    id: orgId,
+                    paymentPlanStart: moment().toDate()
+                }
+            ];
+            var mockUsers = [
+                {
+                    id: 'u-' + uuid.createUuid(),
+                    firstName: 'Allison',
+                    lastName: 'Applesmith',
+                    email: 'c6e2etester@gmail.com',
+                    org: orgId
+                }
+            ];
+            return Q.all([
+                producer.produce({
+                    type: 'hourly',
+                    data: {
+                        date: moment().toDate(),
+                        hour: 4
+                    }
+                }),
+                testUtils.resetCollection('orgs', mockOrgs),
+                testUtils.resetCollection('users', mockUsers)
+            ]).then(done, done.fail);
+        });
+
+        it('should be able to send an email informing the user if their promotion has ended', function(done) {
+            this.mailman.once('Allison, Your Free Trial Is About To End', function(msg) {
+                var regexes = [
+                    /Hi Allison,/,
+                    /trial is coming to an end/
+                ];
+                expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
+                expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                regexes.forEach(function(regex) {
+                    expect(msg.text).toMatch(regex);
+                    expect(msg.html).toMatch(regex);
+                });
+                expect((new Date() - msg.date)).toBeLessThan(30000);
+                done();
             });
         });
     });
