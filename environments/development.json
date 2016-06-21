@@ -530,6 +530,18 @@
                                     "ifData": {
                                         "target": "^showcase$"
                                     }
+                                },
+                                {
+                                    "name": "hubspot/update_user",
+                                    "options": {
+                                        "properties": {
+                                            "applications": "apps",
+                                            "lifecyclestage": "salesqualifiedlead"
+                                        }
+                                    },
+                                    "ifData": {
+                                        "target": "^showcase$"
+                                    }
                                 }
                             ]
                         },
@@ -549,7 +561,7 @@
                                     "options": {
                                         "properties": {
                                             "applications": "apps",
-                                            "lifecyclestage": "salesqualifiedlead"
+                                            "lifecyclestage": "opportunity"
                                         }
                                     },
                                     "ifData": {

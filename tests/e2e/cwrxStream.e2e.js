@@ -44,13 +44,6 @@ describe('cwrxStream', function() {
 
     beforeAll(function(done) {
         var self = this;
-        self.waitForHubspotContactToExist = function() {
-            return waitForTrue(function() {
-                return self.hubspot.getContactByEmail(mockUser.email).then(function(contact) {
-                    return contact && Object.keys(contact.properties).length > 0 && contact;
-                });
-            });
-        };
         self.hubspot = new Hubspot(HUBSPOT_API_KEY);
         mailman = new testUtils.Mailman();
         mailman2 = new testUtils.Mailman({ user: 'c6e2eTester2@gmail.com' });
@@ -544,6 +537,19 @@ describe('cwrxStream', function() {
     });
 
     describe('when a new user account has been created', function() {
+        beforeEach(function() {
+            var self = this;
+
+            // Wait for a user to be created in hubspot with the correct email and lifecyclestage
+            self.waitForHubspotContact = function() {
+                return waitForTrue(function() {
+                    return self.hubspot.getContactByEmail(mockUser.email).then(function(contact) {
+                        return (contact && contact.properties.lifecyclestage.value === 'salesqualifiedlead') ? contact : null;
+                    });
+                });
+            };
+        });
+
         it('should send an activation email', function(done) {
             producer.produce({
                 type: 'accountCreated',
@@ -577,7 +583,7 @@ describe('cwrxStream', function() {
             }).then(function() {
                 return Q.all([
                     waitForEmails(['Terry, Welcome to Reelcontent Apps']),
-                    self.waitForHubspotContactToExist()
+                    self.waitForHubspotContact()
                 ]);
             }).spread(function(messages, contact) {
                 var msg = messages[0];
@@ -605,7 +611,7 @@ describe('cwrxStream', function() {
             }).then(function() {
                 return Q.all([
                     waitForEmails(['Terry, Welcome to Reelcontent Apps']),
-                    self.waitForHubspotContactToExist()
+                    self.waitForHubspotContact()
                 ]);
             }).spread(function(msg, contact) {
                 self.createdContact = contact.vid;
@@ -618,6 +624,19 @@ describe('cwrxStream', function() {
     });
 
     describe('when an account was activated', function() {
+        beforeEach(function() {
+            var self = this;
+
+            // Wait for a user to be created in hubspot with the correct email and lifecyclestage
+            self.waitForHubspotContact = function() {
+                return waitForTrue(function() {
+                    return self.hubspot.getContactByEmail(mockUser.email).then(function(contact) {
+                        return (contact && contact.properties.lifecyclestage.value === 'opportunity') ? contact : null;
+                    });
+                });
+            };
+        });
+
         it('should send an email notifying the user that their account has been activated', function(done) {
             producer.produce({
                 type: 'accountActivated',
@@ -649,7 +668,7 @@ describe('cwrxStream', function() {
             }).then(function() {
                 return Q.all([
                     waitForEmails(['Terry, Your Reelcontent Account Is Ready To Go']),
-                    self.waitForHubspotContactToExist()
+                    self.waitForHubspotContact()
                 ]);
             }).spread(function(messages, contact) {
                 var msg = messages[0];
@@ -806,7 +825,7 @@ describe('cwrxStream', function() {
                         target: 'showcase'
                     }
                 }).then(function() {
-                    return self.waitForHubspotContactToExist();
+                    return self.waitForHubspotContact();
                 }).then(function(contact) {
                     self.createdContact = contact.vid;
 
@@ -814,7 +833,7 @@ describe('cwrxStream', function() {
                     expect(contact.properties.firstname.value).toBe(mockUser.firstName);
                     expect(contact.properties.lastname.value).toBe(mockUser.lastName);
                     expect(contact.properties.applications.value).toBe('apps');
-                    expect(contact.properties.lifecyclestage.value).toBe('salesqualifiedlead');
+                    expect(contact.properties.lifecyclestage.value).toBe('opportunity');
                 }).then(done, done.fail);
             });
 
@@ -853,18 +872,14 @@ describe('cwrxStream', function() {
                         }
                     });
                 }).then(function() {
-                    return waitForTrue(function() {
-                        return self.hubspot.getContactByEmail(mockUser.email).then(function(contact) {
-                            return contact.properties.lifecyclestage.value === 'salesqualifiedlead' ? contact : null;
-                        });
-                    });
+                    return self.waitForHubspotContact();
                 }).then(function(contact) {
                     expect(contact.vid).toBe(self.createdContact);
                     expect(contact.properties.email.value).toBe(mockUser.email);
                     expect(contact.properties.firstname.value).toBe(mockUser.firstName);
                     expect(contact.properties.lastname.value).toBe(mockUser.lastName);
                     expect(contact.properties.applications.value).toBe('apps');
-                    expect(contact.properties.lifecyclestage.value).toBe('salesqualifiedlead');
+                    expect(contact.properties.lifecyclestage.value).toBe('opportunity');
                 }).then(done, done.fail);
             });
         });
