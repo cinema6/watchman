@@ -149,7 +149,7 @@ describe('timeStream payment plan billing', function() {
             name: 'The Best Org',
             paymentPlanId: getPaymentPlanId(),
             paymentPlanStart: moment().format(),
-        }].concat(Array.apply([], new Array(50)).map(function() {
+        }].concat(Array.apply([], new Array(25)).map(function() {
             var id = uuid.createUuid();
 
             return {
@@ -414,14 +414,22 @@ describe('timeStream payment plan billing', function() {
                     }).then(function(/*payment*/) {
                         payment = arguments[0];
                     }).then(function() {
-                        return testUtils.pgQuery(
-                            'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC LIMIT 1',
-                            [org.id]
-                        );
+                        return waitUntil(function() {
+                            return testUtils.pgQuery(
+                                'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC LIMIT 1',
+                                [org.id]
+                            ).then(function(result) {
+                                return result.rows.length > 0 && result;
+                            });
+                        });
                     }).then(function(result) {
                         transaction = result.rows[0];
 
-                        return getOrg();
+                        return waitUntil(function() {
+                            return getOrg().then(function(org) {
+                                return moment(org.nextPaymentDate).isSame(moment(today).add(1, 'month'), 'day') && org;
+                            });
+                        });
                     }).then(function(/*org*/) {
                         org = arguments[0];
                     }).then(done, done.fail);
@@ -451,14 +459,22 @@ describe('timeStream payment plan billing', function() {
                     }).then(function(/*payment*/) {
                         payment = arguments[0];
                     }).then(function() {
-                        return testUtils.pgQuery(
-                            'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC LIMIT 1',
-                            [org.id]
-                        );
+                        return waitUntil(function() {
+                            return testUtils.pgQuery(
+                                'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC LIMIT 1',
+                                [org.id]
+                            ).then(function(result) {
+                                return result.rows.length > 0 && result;
+                            });
+                        });
                     }).then(function(result) {
                         transaction = result.rows[0];
 
-                        return getOrg();
+                        return waitUntil(function() {
+                            return getOrg().then(function(org) {
+                                return moment(org.nextPaymentDate).isSame(moment(today).add(1, 'month'), 'day') && org;
+                            });
+                        });
                     }).then(function(/*org*/) {
                         org = arguments[0];
                     }).then(done, done.fail);
@@ -553,14 +569,22 @@ describe('timeStream payment plan billing', function() {
                 }).then(function(/*payment*/) {
                     payment = arguments[0];
                 }).then(function() {
-                    return testUtils.pgQuery(
-                        'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC LIMIT 1',
-                        [org.id]
-                    );
+                    return waitUntil(function() {
+                        return testUtils.pgQuery(
+                            'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC LIMIT 1',
+                            [org.id]
+                        ).then(function(result) {
+                            return result.rows.length > 0 && result;
+                        });
+                    });
                 }).then(function(result) {
                     transaction = result.rows[0];
 
-                    return getOrg();
+                    return waitUntil(function() {
+                        return getOrg().then(function(org) {
+                            return moment(org.nextPaymentDate).isSame(moment().add(3, 'hours').add(1, 'month'), 'day') && org;
+                        });
+                    });
                 }).then(function(/*org*/) {
                     org = arguments[0];
                 }).then(done, done.fail);
@@ -590,14 +614,22 @@ describe('timeStream payment plan billing', function() {
                 }).then(function(/*payment*/) {
                     payment = arguments[0];
                 }).then(function() {
-                    return testUtils.pgQuery(
-                        'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC LIMIT 1',
-                        [org.id]
-                    );
+                    return waitUntil(function() {
+                        return testUtils.pgQuery(
+                            'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC LIMIT 1',
+                            [org.id]
+                        ).then(function(result) {
+                            return result.rows.length > 0 && result;
+                        });
+                    });
                 }).then(function(result) {
                     transaction = result.rows[0];
 
-                    return getOrg();
+                    return waitUntil(function() {
+                        return getOrg().then(function(org) {
+                            return moment(org.nextPaymentDate).isSame(moment().add(3, 'hours').add(1, 'month'), 'day') && org;
+                        });
+                    });
                 }).then(function(/*org*/) {
                     org = arguments[0];
                 }).then(done, done.fail);
@@ -674,14 +706,22 @@ describe('timeStream payment plan billing', function() {
                 }).then(function(/*payments*/) {
                     payments = arguments[0];
                 }).then(function() {
-                    return testUtils.pgQuery(
-                        'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC LIMIT 1',
-                        [org.id]
-                    );
+                    return waitUntil(function() {
+                        return testUtils.pgQuery(
+                            'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC',
+                            [org.id]
+                        ).then(function(result) {
+                            return result.rows.length > 1 && result;
+                        });
+                    });
                 }).then(function(result) {
                     transaction = result.rows[0];
 
-                    return getOrg();
+                    return waitUntil(function() {
+                        return getOrg().then(function(org) {
+                            return moment(org.nextPaymentDate).isSame(moment(today).add(1, 'month'), 'day') && org;
+                        });
+                    });
                 }).then(function(/*org*/) {
                     org = arguments[0];
                 }).then(done, done.fail);
@@ -716,14 +756,22 @@ describe('timeStream payment plan billing', function() {
                 }).then(function(/*payments*/) {
                     payments = arguments[0];
                 }).then(function() {
-                    return testUtils.pgQuery(
-                        'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC LIMIT 1',
-                        [org.id]
-                    );
+                    return waitUntil(function() {
+                        return testUtils.pgQuery(
+                            'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC',
+                            [org.id]
+                        ).then(function(result) {
+                            return result.rows.length > 1 && result;
+                        });
+                    });
                 }).then(function(result) {
                     transaction = result.rows[0];
 
-                    return getOrg();
+                    return waitUntil(function() {
+                        return getOrg().then(function(org) {
+                            return moment(org.nextPaymentDate).isSame(moment(today).add(1, 'month'), 'day') && org;
+                        });
+                    });
                 }).then(function(/*org*/) {
                     org = arguments[0];
                 }).then(done, done.fail);

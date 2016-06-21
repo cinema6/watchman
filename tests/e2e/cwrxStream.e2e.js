@@ -46,7 +46,9 @@ describe('cwrxStream', function() {
         var self = this;
         self.waitForHubspotContactToExist = function() {
             return waitForTrue(function() {
-                return self.hubspot.getContactByEmail(mockUser.email);
+                return self.hubspot.getContactByEmail(mockUser.email).then(function(contact) {
+                    return contact && Object.keys(contact.properties).length > 0 && contact;
+                });
             });
         };
         self.hubspot = new Hubspot(HUBSPOT_API_KEY);
@@ -60,7 +62,7 @@ describe('cwrxStream', function() {
     });
 
     beforeEach(function() {
-        jasmine.DEFAULT_TIMEOUT_INTERVAL = 60000;
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 120000;
         var awsConfig = {
             region: 'us-east-1',
         };
