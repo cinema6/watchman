@@ -1,6 +1,10 @@
 # Watchman
 
 ## v0.12.0 (June 17, 2016)
+* *[v0.12.0-rc2]*
+  * [FIX]: Improve the reliability of deployments and the nightly build
+* *[/v0.12.0-rc2]*
+
 * *[v0.12.0-rc1]*
   * [FEATURE]: Add `nextPaymentDate` property to orgs with payment plans
   * [FEATURE]: Revamp `check_available_funds` action to fetch orgs itself, and batch requests to `/api/accounting/balances`
