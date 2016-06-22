@@ -91,10 +91,10 @@ describe('timeStream available funds check', function() {
             { id: 'cam-o1-1', org: 'o-1', status: 'active', pricing: { budget: 500 } },
             { id: 'cam-o1-2', org: 'o-1', status: 'active', pricing: { budget: 100 } },
             { id: 'cam-o1-3', org: 'o-1', status: 'paused', pricing: { budget: 500 } },
-            
+
             { id: 'cam-o2-1', org: 'o-2', status: 'active', pricing: { budget: 9000 } },
         ];
-        
+
         return Q.all([
             testUtils.resetPGTable('fct.billing_transactions', mockTransactions),
             testUtils.resetCollection('orgs', mockOrgs),
@@ -102,9 +102,9 @@ describe('timeStream available funds check', function() {
         ])
         .thenResolve().then(done, done.fail);
     });
-    
+
     it('should produce campaignOutOfFunds events for active campaigns from orgs that are out of funds', function(done) {
-        producer.produce({ type: 'hourly', data: { date: new Date() } }).then(function() {
+        producer.produce({ type: 'tenMinutes', data: { date: new Date() } }).then(function() {
             return waitForMockman('campaignOutOfFunds', 2).then(function(records) {
                 var campIds = records.map(function(record) { return record.data.campaign.id; }).sort();
                 expect(campIds).toEqual(['cam-o1-1', 'cam-o1-2']);
@@ -112,7 +112,7 @@ describe('timeStream available funds check', function() {
         })
         .then(done, done.fail);
     });
-    
+
     it('should skip active campaigns that have no budget', function(done) {
         testUtils.resetCollection('campaigns', [
             { id: 'cam-o1-10', org: 'o-1', status: 'active', pricing: {} },
@@ -120,7 +120,7 @@ describe('timeStream available funds check', function() {
             { id: 'cam-o1-30', org: 'o-1', status: 'active', pricing: { budget: 600 } },
             { id: 'cam-o1-40', org: 'o-1', status: 'active', pricing: { budget: 200 } },
         ]).then(function() {
-            return producer.produce({ type: 'hourly', data: { date: new Date() } });
+            return producer.produce({ type: 'tenMinutes', data: { date: new Date() } });
         }).then(function() {
             return waitForMockman('campaignOutOfFunds', 2).then(function(records) {
                 var campIds = records.map(function(record) { return record.data.campaign.id; }).sort();

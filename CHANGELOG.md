@@ -1,5 +1,16 @@
 # Watchman
 
+## v0.13.0 (June 21, 2016)
+* *[v0.13.0-rc1]*
+  * [FEATURE]: Add support for sending promotionEnded emails for showcase users
+  * ** Extra Deployment Steps**:
+    * Update environments
+    * Update lambda function to produce tenMinutes event
+    * Add lambda function to produce hourly events with the hour in data
+    * Remove daily lambda function
+    * Promote promotionEnded template in Postmark
+* *[/v0.13.0-rc1]*
+
 ## v0.12.0 (June 17, 2016)
 * *[v0.12.0-rc2]*
   * [FIX]: Improve the reliability of deployments and the nightly build

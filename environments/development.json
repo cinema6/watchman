@@ -186,7 +186,8 @@
                             "campaignActive": "672909",
                             "campaignSubmitted": "672810",
                             "initializedShowcaseCampaign": "672910",
-                            "campaignActive--app": "694541"
+                            "campaignActive--app": "694541",
+                            "promotionEnded--app": "722104"
                         }
                     }
                 }
@@ -203,7 +204,7 @@
                         }
                     },
                     "eventHandlers": {
-                        "hourly": {
+                        "tenMinutes": {
                             "actions": [
                                 {
                                     "name": "fetch_campaigns",
@@ -219,12 +220,24 @@
                                 }
                             ]
                         },
-                        "daily": {
+                        "hourly": {
                             "actions": [
                                 {
                                     "name": "fetch_orgs",
                                     "options": {
-                                        "prefix": "daily"
+                                        "prefix": "morning"
+                                    },
+                                    "ifData": {
+                                        "hour": "^4$"
+                                    }
+                                },
+                                {
+                                    "name": "fetch_orgs",
+                                    "options": {
+                                        "prefix": "noon"
+                                    },
+                                    "ifData": {
+                                        "hour": "^12$"
                                     }
                                 }
                             ]
@@ -244,11 +257,28 @@
                         }
                     },
                     "eventHandlers": {
-                        "daily_orgPulse": {
+                        "morning_orgPulse": {
+                            "actions": [
+                                {
+                                    "name": "check_payment_plan_start"
+                                }
+                            ]
+                        },
+                        "noon_orgPulse": {
                             "actions": ["check_payment_required"]
                         },
                         "hourly_campaignPulse": {
                             "actions": ["check_expiry"]
+                        },
+                        "paymentPlanWillStart": {
+                            "actions": [
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "promotionEnded"
+                                    }
+                                }
+                            ]
                         },
                         "campaignOutOfFunds": {
                             "actions": [
