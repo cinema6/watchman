@@ -26,26 +26,15 @@ module.exports = function fetchProductDataFactory(config) {
 	        return (object1 === object2);
 	    }
 	    else {
-	        var objLrg, objSml;
-
-	        if (Object.keys(object1).length>=Object.keys(object2).length) {
-	            objLrg = object1;
-	            objSml = object2;
+	        if (Object.keys(object1).length!==Object.keys(object2).length) {
+	            return false;
 	        }
-	        else {
-	            objLrg = object2;
-	            objSml = object1;
-	        }
-
-	        for (var prop in objLrg) {
-	            if (typeof objLrg[prop] !== typeof objSml[prop]) {
-	                return false;
-	            }
-	            else if (objLrg[prop] !== objSml[prop]) {
-	                return isEqual(objLrg[prop], objSml[prop]);
+	        for (var prop in object1) {
+	            if (object1[prop] !== object2[prop]) {
+	                return isEqual(object1[prop], object2[prop]);
 	            }
 	        }
-	        return true;
+	    	return true;
 	    }
 	}
 
