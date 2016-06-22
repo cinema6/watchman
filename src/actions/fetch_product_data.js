@@ -33,7 +33,7 @@ module.exports = function fetchProductDataFactory(config) {
                 if (object1[prop] !== object2[prop]) {
                     if (isEqual(object1[prop], object2[prop])===false) {
                         return false;
-                    };
+                    }
                 }
             }
             return true;
