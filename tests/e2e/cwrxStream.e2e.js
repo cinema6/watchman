@@ -544,7 +544,10 @@ describe('cwrxStream', function() {
             self.waitForHubspotContact = function() {
                 return waitForTrue(function() {
                     return self.hubspot.getContactByEmail(mockUser.email).then(function(contact) {
-                        return (contact && contact.properties.lifecyclestage.value === 'salesqualifiedlead') ? contact : null;
+                        return (contact && contact.properties.lifecyclestage.value === 'salesqualifiedlead' &&
+                            'firstname' in contact.properties &&
+                            'lastname' in contact.properties &&
+                            'applications' in contact.properties) ? contact : null;
                     });
                 });
             };
