@@ -30,10 +30,8 @@ module.exports = function fetchProductDataFactory(config) {
                 return false;
             }
             for (var prop in object1) {
-                if (object1[prop] !== object2[prop]) {
-                    if (isEqual(object1[prop], object2[prop])===false) {
-                        return false;
-                    }
+                if (isEqual(object1[prop], object2[prop])===false) {
+                    return false;
                 }
             }
             return true;
