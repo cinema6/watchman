@@ -13,7 +13,7 @@ module.exports = function fetchProductDataFactory(config) {
 	var dataEndpoint = resolveURL(config.cwrx.api.root, config.cwrx.api.productData.endpoint);
     var campEndpoint = resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint);
 
-		function isObject(obj) {
+        function isObject(obj) {
 		    return((typeof obj === 'object') && (obj !== null));
 		}
 
