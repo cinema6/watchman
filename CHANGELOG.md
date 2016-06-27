@@ -1,5 +1,13 @@
 # Watchman
 
+## v1.0.0 (June 27, 2016)
+* *[v1.0.0-rc1]*
+  * Switch to use Node v4.4.6 for Watchman (ES6 Features)
+  * ** Extra Deployment Steps**:
+    * Deploy c6env cookbook v2.17.0
+    * Deploy watchman cookbook v2.0.0
+* *[/v1.0.0-rc1]*
+
 ## v0.13.0 (June 21, 2016)
 * *[v0.13.0-rc1]*
   * [FEATURE]: Add support for sending promotionEnded emails for showcase users
