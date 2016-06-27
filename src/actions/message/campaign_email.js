@@ -57,7 +57,7 @@ module.exports = function factory(config) {
             data: function(data) {
                 return {
                     campName       : data.campaign.name,
-                    date           : new Date(data.date).toLocaleDateString(),
+                    date           : moment(new Date(data.date)).format('dddd, MMMM DD, YYYY'),
                     dashboardLink  : emailConfig.dashboardLinks[data.target || 'selfie'],
                     manageLink     : emailConfig.manageLink.replace(':campId', data.campaign.id)
                 };
@@ -70,7 +70,7 @@ module.exports = function factory(config) {
             data: function(data) {
                 return {
                     campName       : data.campaign.name,
-                    date           : new Date(data.date).toLocaleDateString(),
+                    date           : moment(new Date(data.date)).format('dddd, MMMM DD, YYYY'),
                     dashboardLink  : emailConfig.dashboardLinks[data.target || 'selfie'],
                     manageLink     : emailConfig.manageLink.replace(':campId', data.campaign.id)
                 };
@@ -166,11 +166,12 @@ module.exports = function factory(config) {
                     amount          : '$' + data.payment.amount.toFixed(2),
                     isCreditCard    : data.payment.method.type === 'creditCard',
                     method          : data.payment.method,
-                    date            : new Date(data.payment.createdAt).toLocaleDateString(),
+                    date            : moment(new Date(data.payment.createdAt))
+                                        .format('dddd, MMMM DD, YYYY'),
                     balance         : '$' + data.balance.toFixed(2),
                     firstName       : data.user.firstName,
-                    billingEndDate  : moment(data.payment.createdAt).add(1, 'month')
-                                        .subtract(1, 'day').toDate().toLocaleDateString()
+                    billingEndDate  : moment(new Date(data.payment.createdAt)).add(1, 'month')
+                                        .subtract(1, 'day').format('dddd, MMMM DD, YYYY')
                 };
             },
             attachments: getAttachments
@@ -238,7 +239,7 @@ module.exports = function factory(config) {
                 return {
                     contact        : emailConfig.supportAddress,
                     dashboardLink  : emailConfig.dashboardLinks[data.target || 'selfie'],
-                    date           : new Date(data.date).toLocaleDateString(),
+                    date           : moment(new Date(data.date)).format('dddd, MMMM DD, YYYY'),
                     firstName      : data.user.firstName,
                     time           : new Date(data.date).toTimeString()
                 };

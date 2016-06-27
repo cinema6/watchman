@@ -1,6 +1,6 @@
 {
   "name": "watchman",
-  "version": "0.13.0",
+  "version": "1.0.0-rc1",
   "description": "",
   "scripts": {
     "preinstall": "sh ./scripts/preinstall.sh"
@@ -14,7 +14,7 @@
     "aws-kcl": "^0.5.0",
     "aws-sdk": "^2.2.29",
     "commander": "^2.9.0",
-    "cwrx": "git+ssh://git@github.com:cinema6/cwrx#master",
+    "cwrx": "cinema6/cwrx#2b3b1d8",
     "handlebars": "^4.0.5",
     "highland": "^2.7.3",
     "html-to-text": "^2.0.0",
@@ -32,7 +32,7 @@
     "beeswax-client": "^0.1.0",
     "braintree": "^1.37.1",
     "grunt": "^0.4.5",
-    "grunt-c6-util": "git+ssh://git@github.com:cinema6/c6-grunt-util#master",
+    "grunt-c6-util": "cinema6/c6-grunt-util#v0.8.3",
     "grunt-contrib-jshint": "^0.11.3",
     "grunt-contrib-watch": "^0.6.1",
     "grunt-contrib-yuidoc": "^0.10.0",
