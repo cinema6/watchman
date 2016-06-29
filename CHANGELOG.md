@@ -1,6 +1,10 @@
 # Watchman
 
 ## v1.0.0 (June 27, 2016)
+* *[v1.0.0-rc2]*
+  * [FIX]: Use Node v4.4.7
+* *[/v1.0.0-rc2]*
+
 * *[v1.0.0-rc1]*
   * Switch to use Node v4.4.6 for Watchman (ES6 Features)
   * ** Extra Deployment Steps**:
