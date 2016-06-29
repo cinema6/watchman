@@ -14,28 +14,28 @@ module.exports = function(config) {
         var promotion = event.data.promotion;
         var paymentPlan = event.data.paymentPlan;
         var target = event.data.target;
-        
+
         if (!org || !promotion) {
             return q();
         }
-        
+
         var amount;
 
         switch (promotion.type) {
-            case 'signupReward':
-                amount = promotion.data.rewardAmount;
-                break;
-            case 'freeTrial':
-                // Calculate the amount of credit by prorating the monthly price across each day of
-                // the trial (assuming a month is 30 days.)
-                amount = ld.round((promotion.data.trialLength / 30) * paymentPlan.price, 2);
-                break;
-            default:
-                log.warn('Dont know how to get amount for promotion type %1 (id %2)',
-                         promotion.type, promotion.id);
-                return q();
+        case 'signupReward':
+            amount = promotion.data.rewardAmount;
+            break;
+        case 'freeTrial':
+            // Calculate the amount of credit by prorating the monthly price across each day of
+            // the trial (assuming a month is 30 days.)
+            amount = ld.round((promotion.data.trialLength / 30) * paymentPlan.price, 2);
+            break;
+        default:
+            log.warn('Dont know how to get amount for promotion type %1 (id %2)',
+                     promotion.type, promotion.id);
+            return q();
         }
-        
+
         return requestUtils.makeSignedRequest(appCreds, 'post', {
             url: config.cwrx.api.root + config.cwrx.api.transactions.endpoint,
             json: {
@@ -57,7 +57,7 @@ module.exports = function(config) {
                     reason: { code: resp.response.statusCode, body: resp.body }
                 });
             }
-        
+
             log.info('Created transaction %1 (amount = %2) for promotion %3 for org %4',
                      resp.body.id, resp.body.amount, promotion.id, org.id);
         })

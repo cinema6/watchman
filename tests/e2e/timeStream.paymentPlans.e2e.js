@@ -1,7 +1,5 @@
 'use strict';
 
-/* jshint camelcase:false */
-
 var JsonProducer = require('rc-kinesis').JsonProducer;
 var q = require('q');
 var testUtils = require('cwrx/test/e2e/testUtils.js');
@@ -149,7 +147,7 @@ describe('timeStream payment plan billing', function() {
             status: 'active',
             name: 'The Best Org',
             paymentPlanId: getPaymentPlanId(),
-            paymentPlanStart: moment().format(),
+            paymentPlanStart: moment().format()
         }].concat(Array.apply([], new Array(25)).map(function() {
             var id = uuid.createUuid();
 

@@ -1,7 +1,5 @@
 'use strict';
 
-/* jshint camelcase:false */
-
 var JsonProducer = require('rc-kinesis').JsonProducer;
 var q = require('q');
 var testUtils = require('cwrx/test/e2e/testUtils');
@@ -45,7 +43,7 @@ function wait(time) {
 
 describe('cwrxStream campaignCreated', function() {
     var producer, request, beeswax, mailman, hubspot;
-    var user, org, advertiser, promotions, containers, campaign, paymentPlan;
+    var user, org, advertiser, promotions, containers, campaign;
 
     function api(endpoint) {
         return resolveURL(API_ROOT, endpoint);
@@ -104,7 +102,7 @@ describe('cwrxStream campaignCreated', function() {
             status: 'active',
             name: 'The Best Org',
             paymentPlanId: Object.keys(paymentPlans)[0],
-            paymentPlanStart: moment().format(),
+            paymentPlanStart: moment().format()
         }]).then(function makeUser() {
             return testUtils.resetCollection('users', [{
                 id: userId,
@@ -402,8 +400,6 @@ describe('cwrxStream campaignCreated', function() {
             user = arguments[0];
             org = arguments[1];
             advertiser = arguments[2];
-
-            paymentPlan = paymentPlans[org.paymentPlanId];
 
             campaign = {
                 id: createId('cam'),

@@ -1,7 +1,5 @@
 'use strict';
 
-/* jshint maxlen:false */
-
 var Q = require('q');
 var fs = require('fs');
 var handlebars = require('handlebars');
@@ -128,7 +126,7 @@ describe('campaign_email.js', function() {
             { Name: 'facebook-round-icon.png', Content: 'abcdef', ContentType: 'image/png', ContentID: 'cid:facebookRoundIcon' },
             { Name: 'twitter-round-icon.png', Content: 'abcdef', ContentType: 'image/png', ContentID: 'cid:twitterRoundIcon' },
             { Name: 'linkedin-round-icon.png', Content: 'abcdef', ContentType: 'image/png', ContentID: 'cid:linkedinRoundIcon' },
-            { Name: 'website-round-icon.png', Content: 'abcdef', ContentType: 'image/png', ContentID: 'cid:websiteRoundIcon' },
+            { Name: 'website-round-icon.png', Content: 'abcdef', ContentType: 'image/png', ContentID: 'cid:websiteRoundIcon' }
         ];
         self.email = self.emailFactory(self.config);
         self.mockTemplate = jasmine.createSpy('mockTemplate()').and.returnValue('compiled template');
@@ -1085,7 +1083,7 @@ describe('campaign_email.js', function() {
                             type: 'creditCard',
                             cardType: 'Visa',
                             cardholderName: 'Johnny Testmonkey',
-                            last4: '1234',
+                            last4: '1234'
                         },
                         date: 'Monday, April 04, 2016',
                         billingEndDate: 'Tuesday, May 03, 2016',
@@ -1158,7 +1156,7 @@ describe('campaign_email.js', function() {
                             type: 'creditCard',
                             cardType: 'Visa',
                             cardholderName: 'Johnny Testmonkey',
-                            last4: '1234',
+                            last4: '1234'
                         },
                         date: 'Monday, April 04, 2016',
                         billingEndDate: 'Tuesday, May 03, 2016',
@@ -1220,7 +1218,7 @@ describe('campaign_email.js', function() {
                             type: 'creditCard',
                             cardType: 'Visa',
                             cardholderName: 'Johnny Testmonkey',
-                            last4: '1234',
+                            last4: '1234'
                         },
                         date: 'Monday, April 04, 2016',
                         billingEndDate: 'Tuesday, May 03, 2016',
@@ -2284,8 +2282,8 @@ describe('campaign_email.js', function() {
                     TemplateId: 'initializedShowcaseCampaign-template-id',
                     TemplateModel: {
                         beeswaxCampaignURI: 'https://www.link.com/beeswax_advertiser/beeswax_id',
-                    	beeswaxCampaignId: 'beeswax_id',
-                    	campName: 'Amazing Campaign'
+                        beeswaxCampaignId: 'beeswax_id',
+                        campName: 'Amazing Campaign'
                     },
                     InlineCss: true,
                     From: 'e2eSender@fake.com',

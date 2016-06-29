@@ -59,9 +59,7 @@ describe('submit_form', function() {
                         firstname: 'John',
                         lastname: 'Smith',
                         email: 'JohnSmith@fake.com',
-                        /* jshint camelcase:false */
                         hs_context: '{"hutk":"chocolate-chip"}'
-                        /* jshint camelcase:true */
                     }
                 }).slice(1)
             });
@@ -83,9 +81,7 @@ describe('submit_form', function() {
                         firstname: 'John',
                         lastname: 'Smith',
                         email: 'JohnSmith@fake.com',
-                        /* jshint camelcase:false */
                         hs_context: '{}'
-                        /* jshint camelcase:true */
                     }
                 }).slice(1)
             });
@@ -111,9 +107,7 @@ describe('submit_form', function() {
                         lastname: 'Smith',
                         email: 'JohnSmith@fake.com',
                         foo: 'bar',
-                        /* jshint camelcase:false */
                         hs_context: '{}'
-                        /* jshint camelcase:true */
                     }
                 }).slice(1)
             });

@@ -2,13 +2,12 @@
 
 describe('(action factory) activate_payment_plan', function() {
     var JsonProducer, CwrxRequest;
-    var uuid, q, MockObjectStore, resolveURL, moment, ld, logger;
+    var uuid, q, resolveURL, moment, ld, logger;
     var factory;
 
     beforeAll(function() {
         uuid = require('rc-uuid');
         q = require('q');
-        MockObjectStore = require('../helpers/MockObjectStore');
         resolveURL = require('url').resolve;
         moment = require('moment');
         ld = require('lodash');

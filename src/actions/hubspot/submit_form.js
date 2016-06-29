@@ -33,9 +33,7 @@ module.exports = function factory() {
         if(data.hubspot && data.hubspot.hutk) {
             context.hutk = data.hubspot.hutk;
         }
-        /* jshint camelcase:false */
         body.hs_context = JSON.stringify(context);
-        /* jshint camelcase:true */
 
         return requestUtils.qRequest('post', {
             headers: {

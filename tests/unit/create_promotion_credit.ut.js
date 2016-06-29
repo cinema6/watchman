@@ -8,17 +8,16 @@ var actionFactory   = require('../../src/actions/create_promotion_credit.js');
 var uuid            = require('rc-uuid');
 
 describe('create_promotion_credit.js', function() {
-    var mockOptions, mockConfig, mockLog, event, transResp, createCredit;
+    var mockConfig, mockLog, event, transResp, createCredit;
 
     beforeEach(function() {
-        mockOptions = { };
         mockConfig = {
             appCreds: 'i am watchman',
             cwrx: {
                 api: {
                     root: 'http://test.com',
                     transactions: {
-                        endpoint: '/api/transactions',
+                        endpoint: '/api/transactions'
                     }
                 }
             }
@@ -28,7 +27,7 @@ describe('create_promotion_credit.js', function() {
                 org: {
                     id: 'o-1',
                     status: 'active',
-                    promotions: [{ id: 'pro-1', date: new Date('2016-04-07T19:39:43.671Z') }],
+                    promotions: [{ id: 'pro-1', date: new Date('2016-04-07T19:39:43.671Z') }]
                 },
                 promotion: {
                     id: 'pro-1',
@@ -37,7 +36,7 @@ describe('create_promotion_credit.js', function() {
                 }
             }
         };
-        
+
         mockLog = {
             trace : jasmine.createSpy('log.trace'),
             error : jasmine.createSpy('log.error'),
@@ -56,11 +55,11 @@ describe('create_promotion_credit.js', function() {
                 promotion: 'pro-1'
             }
         };
-        
+
         spyOn(requestUtils, 'makeSignedRequest').and.callFake(function(/*creds, method, opts*/) {
             return q(transResp);
         });
-        
+
         createCredit = actionFactory(mockConfig);
     });
 
@@ -120,7 +119,7 @@ describe('create_promotion_credit.js', function() {
             expect(mockLog.error).not.toHaveBeenCalled();
         }).then(done, done.fail);
     });
-    
+
     it('should warn and skip if the promotion type is unrecognized', function(done) {
         event.data.promotion.type = 'freeee money';
         createCredit(event).then(function() {

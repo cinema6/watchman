@@ -57,7 +57,7 @@ describe('cwrxStream', function() {
     beforeEach(function() {
         jasmine.DEFAULT_TIMEOUT_INTERVAL = 120000;
         var awsConfig = {
-            region: 'us-east-1',
+            region: 'us-east-1'
         };
         if(AWS_CREDS) {
             awsConfig.accessKeyId = AWS_CREDS.accessKeyId;
@@ -687,7 +687,6 @@ describe('cwrxStream', function() {
         });
 
         describe('with a promotion', function() {
-            /* jshint camelcase: false */
             var testOrg, testPromotions;
             beforeEach(function(done) {
                 mockUser.org = 'o-e2e-1';
@@ -814,8 +813,6 @@ describe('cwrxStream', function() {
                     expect(results.rows.length).toBe(0);
                 }).then(done, done.fail);
             });
-
-            /* jshint camelcase: true */
         });
 
         describe('in hubspot', function() {
@@ -918,8 +915,7 @@ describe('cwrxStream', function() {
                     target: 'showcase'
                 }
             }).then(function() {
-                mailman.once('Reelcontent Password Change Notice',
-                        function(msg) {
+                mailman.once('Reelcontent Password Change Notice', function(msg) {
                     expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                     var regex = /Terry, Just a quick note/;

@@ -87,7 +87,7 @@ describe('check_available_funds', function() {
         }));
         expect(CwrxRequest).toHaveBeenCalledWith('appCreds');
     });
-    
+
     describe('creates an action that', function() {
         beforeEach(function() {
             mockStreams.orgs.source.add([
@@ -125,7 +125,7 @@ describe('check_available_funds', function() {
                 });
             }).then(done, done.fail);
         });
-        
+
         it('should ignore campaigns without a budget', function(done) {
             mockStreams.campaigns['o-1'].source.add([
                 { id: 'cam-13', status: 'active', org: 'o-1', pricing: { dailyLimit: 10 } },
@@ -150,21 +150,21 @@ describe('check_available_funds', function() {
                 });
             }).then(done, done.fail);
         });
-        
+
         it('should handle multiple orgs', function(done) {
             mockStreams.orgs.source.add([
                 { id: 'o-2', status: 'active', name: 'org 2' },
                 { id: 'o-no-stats', status: 'active', name: 'no stats' },
                 { id: 'o-enough-balance', status: 'active', name: 'enough balance' },
                 { id: 'o-no-outstanding-budget', status: 'active', name: 'no stats' },
-                { id: 'o-no-campaigns', status: 'active', name: 'no campaigns' },
+                { id: 'o-no-campaigns', status: 'active', name: 'no campaigns' }
             ]);
             balanceResp['o-2'] = { balance: -200.1, outstandingBudget: 100.1, totalSpend: 1 };
             balanceResp['o-no-stats'] = null;
             balanceResp['o-enough-balance'] = { balance: 5000.1, outstandingBudget: 100.1, totalSpend: 1 };
             balanceResp['o-no-outstanding-budget'] = { balance: -200.1, outstandingBudget: 0, totalSpend: 1 };
             balanceResp['o-no-campaigns'] = { balance: -200.1, outstandingBudget: 100.1, totalSpend: 1 };
-            
+
             mockStreams.campaigns['o-2'] = new MockObjectStream();
             mockStreams.campaigns['o-2'].source.add([
                 { id: 'cam-o2-1', status: 'active', org: 'o-2', pricing: { budget: 100 } },
@@ -172,7 +172,7 @@ describe('check_available_funds', function() {
             ], true);
             mockStreams.campaigns['o-no-campaigns'] = new MockObjectStream();
             mockStreams.campaigns['o-no-campaigns'].source.add([], true);
-            
+
             action({}).then(function() {
                 expect(CwrxEntities.calls.count()).toBe(4);
                 expect(CwrxEntities).toHaveBeenCalledWith('https://apiroot.com/api/account/orgs', 'appCreds');
@@ -203,7 +203,7 @@ describe('check_available_funds', function() {
                 });
             }).then(done, done.fail);
         });
-        
+
         it('should handle the case where no orgs are fetched', function(done) {
             mockStreams.orgs.source.items = [];
             action({}).then(function() {
@@ -234,7 +234,7 @@ describe('check_available_funds', function() {
                     expect(orgIds[0]).toBe('o-' + String((idx * 50) + 1));
                     expect(orgIds[49]).toBe('o-' + String(((idx + 1) * 50)));
                 });
-                
+
                 expect(mockObjectStore.items.length).toBe(2);
                 expect(mockObjectStore.items[0]).toEqual({
                     type: 'campaignOutOfFunds',
@@ -246,7 +246,7 @@ describe('check_available_funds', function() {
                 });
             }).then(done, done.fail);
         });
-        
+
         it('should reject if fetching orgs fails', function(done) {
             mockStreams.orgs.source.fail(new Error('Orgs got a problem'));
             action({}).then(done.fail)
@@ -258,7 +258,7 @@ describe('check_available_funds', function() {
                 expect(mockObjectStore.items).toEqual([]);
             }).then(done, done.fail);
         });
-        
+
         it('should reject if fetching balances fails', function(done) {
             balanceResp = Q.reject(new Error('Accountant got a problem'));
             action({}).then(done.fail)
@@ -270,7 +270,7 @@ describe('check_available_funds', function() {
                 expect(mockObjectStore.items).toEqual([]);
             }).then(done, done.fail);
         });
-        
+
         it('should reject if fetching campaigns fails', function(done) {
             mockStreams.campaigns['o-1'].source.fail(new Error('Campaigns got a problem'));
             action({}).then(done.fail)
