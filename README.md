@@ -3,11 +3,28 @@
 Watchman is an event processor aimed at receiving and handling events both quickly and at scale. Watchman utilizes Amazon Kinesis to receive streams of events and event data. Utilizing a fleet of Kinesis Client Library Applications, events are processed by performing a list of actions associated with an event type. Actions are designed to be lightweight and modular so that Watchman functionality can be easily expanded, modified, and tested.
 
 ## Getting Started
+- Make sure you are using the version of Node specified in the `.nvmrc` file. If you are using nvm you can do `nvm use` or if you need to install `nvm install`
+- Install project dependencies with `npm install`
+- Create Kinesis streams for development with `grunt streams:create`. Your username will be appended to streams which are created.
+- Make sure you destroy streams when you are done developing with `grunt streams:destroy`. This will also destroy any created Dynamo tables which are a side effect of running KCL applications.
+- Create a `.rcAppCreds.json` file of the form:
 ```
-npm install          # Install project dependencies
-grunt streams:create # Create test streams for development
-vagrant up           # Bring up a Vagrant machine for testing
+{
+    "key": "WATCHMAN_DEC_APP_KEY",
+    "secret": "WATCHMAN_DEV_APP_SECRET"
+}
 ```
+- Create a `.secrets.json` file of the form:
+```
+{
+    "hubspot": {
+        "key": "HUBSPOT_KEY"
+    }
+}
+```
+- Do a `berks install` or `berks update`, removing your `Berksfile.lock` file if necessary
+- Bring up a Cwrx Vagrant machine
+- Bring up a Vagrant machine for testing with `vagrant up`
 
 ## Record Processor
 The record processor processes data from an Amazon Kinesis stream. It implements the interface defined by the aws-kcl package which handles commication with the Kinesis MultiLangDaemon. Records which arrive through a stream are parsed as JSON and are typically of the form:
@@ -38,17 +55,18 @@ An action is a module which is loaded and executed by the event processor. Actio
 
 var Q = require('q');
 
-module.exports = function(data, options, config) {
-    // data: the data hash from the event
-    // options: configured options for this action
-    // config: watchman configuration object
+module.exports = function(config) {
+    return event => {
+        // event.data: the data hash from the event
+        // event.options: configured options for this action
 
-    // Do stuff (usually async)
-    console.log('Hello Action');
+        // Do stuff (usually async)
+        console.log('Hello Action');
 
-    // Must return a promise
-    return Q.resolve();
-}
+        // Must return a promise
+        return Promise.resolve();
+    };
+};
 ```
 
 ## Configuring Watchman
@@ -56,13 +74,10 @@ The core watchman configuration consists of an eventHandlers property of the for
 ```
 {
     "eventHandlers": {
-        "eventName1": {
-            "actions": ["action1", "action2"]
-        },
-        "eventName2": {
+        "eventName": {
             "actions": [
                 {
-                    "name": "action3",
+                    "name": "action",
                     "options": {
                         "foo": "bar"
                     },
