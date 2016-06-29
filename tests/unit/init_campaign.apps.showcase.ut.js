@@ -1,8 +1,9 @@
+/* jshint camelcase: false */
 'use strict';
 
-describe('(action factory) showcase/apps/init_campaign', function() {
+fdescribe('(action factory) showcase/apps/init_campaign', function() {
     var q, uuid, resolveURL, ld, logger, showcaseFactories;
-    var JsonProducer, CwrxRequest;
+    var JsonProducer, CwrxRequest, BeeswaxClient;
     var factory;
 
     beforeAll(function() {
@@ -37,6 +38,15 @@ describe('(action factory) showcase/apps/init_campaign', function() {
         }(require('../../lib/CwrxRequest')));
         require.cache[require.resolve('../../lib/CwrxRequest')].exports = CwrxRequest;
 
+        delete require.cache[require.resolve('beeswax-client')];
+        BeeswaxClient = (function(BeeswaxClient) {
+            return jasmine.createSpy('BeeswaxClient()').and.callFake(function(creds) {
+                var beeswax = new BeeswaxClient(creds);
+                return beeswax;
+            });
+        }(require('beeswax-client')));
+        require.cache[require.resolve('beeswax-client')].exports = BeeswaxClient;
+        
         delete require.cache[require.resolve('../../src/actions/showcase/apps/init_campaign')];
         factory = require('../../src/actions/showcase/apps/init_campaign');
     });
@@ -55,13 +65,22 @@ describe('(action factory) showcase/apps/init_campaign', function() {
     describe('when called', function() {
         var config;
         var initCampaign;
-        var request, watchmanStream, log;
+        var request, watchmanStream, log, beeswax;
 
         beforeEach(function() {
             config = {
                 appCreds: {
                     key: 'watchman-dev',
                     secret: 'dwei9fhj3489ghr7834909r'
+                },
+                beeswax : {
+                    api: {
+                        root: 'http://33.33.33.10/'
+                    },
+                    creds : {
+                        email : 'bu@g.z',
+                        password : 'x'
+                    }
                 },
                 cwrx: {
                     api: {
@@ -71,6 +90,9 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                         },
                         campaigns: {
                             endpoint: '/api/campaigns'
+                        },
+                        advertisers: {
+                            endpoint: '/api/account/advertisers'
                         }
                     }
                 },
@@ -92,6 +114,7 @@ describe('(action factory) showcase/apps/init_campaign', function() {
             initCampaign = factory(config);
 
             request = CwrxRequest.calls.mostRecent().returnValue;
+            beeswax = BeeswaxClient.calls.mostRecent().returnValue;
             watchmanStream = JsonProducer.calls.mostRecent().returnValue;
         });
 
@@ -104,13 +127,19 @@ describe('(action factory) showcase/apps/init_campaign', function() {
             expect(CwrxRequest).toHaveBeenCalledWith(config.appCreds);
         });
 
+        it('should create a BeeswaxClient', function() {
+            expect(BeeswaxClient).toHaveBeenCalledWith({ 
+                apiRoot : config.beeswax.api.root, creds : config.beeswax.creds 
+            });
+        });
+
         it('should create a JsonProducer', function() {
             expect(JsonProducer).toHaveBeenCalledWith(config.kinesis.producer.stream, config.kinesis.producer);
         });
 
         describe('the action', function() {
-            var data, options, event;
-            var postExternalCampaignDeferred;
+            var data, options, event, advertiser;
+            var getAdvertiserDeferred, putAdvertiserDeferred, bwCreateAdvertiserDeferred;
             var success, failure;
 
             beforeEach(function(done) {
@@ -238,11 +267,6 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                             duration: 15,
                             slideCount: 3,
                             cardType: 'showcase-app'
-                        },
-                        threeHundredByTwoFifty: {
-                            duration: 10,
-                            slideCount: 2,
-                            cardType: 'showcase-app--small'
                         }
                     },
                     placement: {
@@ -254,87 +278,146 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                                 branding: { value: 'showcase-app--interstitial' },
                                 uuid: { value: '{{DEVICE_ID}}', inTag: true }
                             }
-                        },
-                        threeHundredByTwoFifty: {
-                            tagType: 'display',
-                            tagParams: {
-                                container: { value: 'beeswax' },
-                                type: { value: 'mobile-card' },
-                                branding: { value: 'showcase-app--300x250' },
-                                uuid: { value: '{{DEVICE_ID}}', inTag: true }
-                            }
                         }
                     }
                 };
                 event = { data: data, options: options };
+                
+                advertiser = {
+                    id : data.campaign.advertiserId,
+                    name : 'ACME TNT',
+                    externalIds : { beeswax : 1 }
+                };
 
                 success = jasmine.createSpy('success()');
                 failure = jasmine.createSpy('failure()');
+                getAdvertiserDeferred =
+                    putAdvertiserDeferred =
+                    bwCreateAdvertiserDeferred = undefined;
 
-                spyOn(request, 'post').and.returnValue((postExternalCampaignDeferred = q.defer()).promise);
+                spyOn(request, 'get').and.callFake(function(opts){
+                    if(opts.url.match(/\/api\/account\/advertisers/)){
+                        return (getAdvertiserDeferred = q.defer()).promise;
+                    }
+                    return q.reject('Unexpected GET');
+                });
+
+                spyOn(beeswax.advertisers,'create')
+                    .and.returnValue((bwCreateAdvertiserDeferred = q.defer()).promise);
 
                 initCampaign(event).then(success, failure);
                 process.nextTick(done);
             });
+           
+            describe('ensuring the advertiser', function(){
+                beforeEach(function(){
+                    delete advertiser.externalIds;
+                    spyOn(request, 'put').and.callFake(function(opts){
+                        if(opts.url.match(/\/api\/account\/advertisers/)){
+                            return (putAdvertiserDeferred = q.defer()).promise;
+                        }
+                        return q.reject('Unexpected PUT');
+                    });
+                });
 
-            it('should create an external campaign', function() {
-                expect(request.post).toHaveBeenCalledWith({
-                    url: resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint + '/' + data.campaign.id + '/external/beeswax'),
-                    json: {}
+                describe('with no beeswax ids',function(){
+                    var updatedAdvert;
+                    beforeEach(function(done){
+                        bwCreateAdvertiserDeferred.resolve({ payload : {advertiser_id:1}});
+                        getAdvertiserDeferred.resolve([advertiser]);
+                        process.nextTick(done);
+                    });
+
+                    beforeEach(function(done){
+                        ld.assign(updatedAdvert,advertiser,{ externalIds: { beeswax : 1 }});
+                        putAdvertiserDeferred.resolve([updatedAdvert]);
+                        process.nextTick(done);
+                    });
+
+                    it('will attempt to create a beeswax advertiser',function(){
+                        expect(beeswax.advertisers.create).toHaveBeenCalledWith({
+                            advertiser_name : advertiser.name,
+                            alternative_id : advertiser.id,
+                            notes : 'Created by Showcase Apps Init Campaign.',
+                            active : true
+                        });
+                    });
+
+                    it('will attempt to update the rc advertiser',function(){
+                        expect(request.put).toHaveBeenCalledWith({
+                            url : 'http://33.33.33.10/api/account/advertisers/' +
+                                advertiser.id,
+                            json : { externalIds : { beeswax : 1 } }
+                        });
+                    });
+
+                });
+                
+                describe('with old beeswax id structure',function(){
+                    var updatedAdvert;
+                    beforeEach(function(done){
+                        advertiser.beeswaxIds = { advertiser : 2 };
+                        getAdvertiserDeferred.resolve([advertiser]);
+                        process.nextTick(done);
+                    });
+
+                    beforeEach(function(done){
+                        ld.assign(updatedAdvert,advertiser,{ externalIds: { beeswax : 1 }});
+                        putAdvertiserDeferred.resolve([updatedAdvert]);
+                        process.nextTick(done);
+                    });
+
+                    it('will not attempt to create a beeswax advertiser',function(){
+                        expect(beeswax.advertisers.create).not.toHaveBeenCalled();
+                    });
+
+                    it('will attempt to update the rc advertiser',function(){
+                        expect(request.put).toHaveBeenCalledWith({
+                            url : 'http://33.33.33.10/api/account/advertisers/' +
+                                advertiser.id,
+                            json : { externalIds : { beeswax : 2 } }
+                        });
+                    });
+
+                });
+
+                describe('with current beeswax id structure',function(){
+                    beforeEach(function(done){
+                        advertiser.externalIds = { beeswax : 3 };
+                        getAdvertiserDeferred.resolve([advertiser]);
+                        process.nextTick(done);
+                    });
+
+                    beforeEach(function(done){
+                        process.nextTick(done);
+                    });
+
+                    it('will not attempt to create a beeswax advertiser',function(){
+                        expect(beeswax.advertisers.create).not.toHaveBeenCalled();
+                    });
+
+                    it('will not attempt to update the rc advertiser',function(){
+                        expect(putAdvertiserDeferred).not.toBeDefined();
+                    });
+
                 });
             });
 
-            describe('if creating the external campaign fails', function() {
-                var reason;
-
-                beforeEach(function(done) {
-                    spyOn(request, 'put').and.returnValue(q.defer().promise);
-
-                    reason = new Error('I failed you...');
-                    postExternalCampaignDeferred.reject(reason);
-                    process.nextTick(done);
-                });
-
-                it('should not PUT anything', function() {
-                    expect(request.put).not.toHaveBeenCalled();
-                });
-
-                it('should log an error', function() {
-                    expect(log.error).toHaveBeenCalled();
-                });
-
-                it('should fulfill with undefined', function() {
-                    expect(success).toHaveBeenCalledWith(undefined);
-                });
-            });
-
-            describe('when the external campaign is created', function() {
-                var externalCampaign;
+            fdescribe('when the external campaign is created', function() {
                 var putCampaignDeferred;
 
                 beforeEach(function(done) {
-                    externalCampaign = {
-                        externalId: uuid.createUuid(),
-                        budget: 20,
-                        dailyLimit: 10
-                    };
-                    postExternalCampaignDeferred.fulfill([externalCampaign, { statusCode: 201 }]);
-
+                    getAdvertiserDeferred.resolve([advertiser]);
                     spyOn(request, 'put').and.returnValue((putCampaignDeferred = q.defer()).promise);
-
                     process.nextTick(done);
                 });
 
-                it('should add two cards to the campaign', function() {
+                fit('should add one card to the campaign', function() {
                     expect(request.put).toHaveBeenCalledWith({
                         url: resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint + '/' + data.campaign.id),
                         json: ld.assign({}, data.campaign, {
                             cards: data.campaign.cards.concat([
                                 ld.assign(showcaseFactories.app.createInterstitialFactory(options.card.interstitial)(data.campaign.product), {
-                                    user: data.campaign.user,
-                                    org: data.campaign.org
-                                }),
-                                ld.assign(showcaseFactories.app.createThreeHundredByTwoFiftyFactory(options.card.threeHundredByTwoFifty)(data.campaign.product), {
                                     user: data.campaign.user,
                                     org: data.campaign.org
                                 })
@@ -370,7 +453,7 @@ describe('(action factory) showcase/apps/init_campaign', function() {
 
                 describe('when the cards have been created', function() {
                     var postPlacementDeffereds;
-                    var campaign, interstitial, threeHundredByTwoFifty;
+                    var campaign, interstitial ;
 
                     beforeEach(function(done) {
                         request.post.calls.reset();
@@ -393,7 +476,6 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                             })
                         });
                         interstitial = campaign.cards[0];
-                        threeHundredByTwoFifty = campaign.cards[1];
 
                         putCampaignDeferred.fulfill([
                             campaign,
@@ -402,8 +484,8 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                         process.nextTick(done);
                     });
 
-                    it('should create two placements', function() {
-                        expect(request.post.calls.count()).toBe(2, 'Wrong number of placements created!');
+                    it('should create one placements', function() {
+                        expect(request.post.calls.count()).toBe(1, 'Wrong number of placements created!');
 
                         expect(request.post).toHaveBeenCalledWith({
                             url: resolveURL(config.cwrx.api.root, config.cwrx.api.placements.endpoint),
@@ -424,25 +506,6 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                                 thumbnail: interstitial.thumbs.small
                             }
                         });
-                        expect(request.post).toHaveBeenCalledWith({
-                            url: resolveURL(config.cwrx.api.root, config.cwrx.api.placements.endpoint),
-                            json: {
-                                label: 'Showcase--300x250 for App: "' + campaign.name + '"',
-                                tagType: options.placement.threeHundredByTwoFifty.tagType,
-                                tagParams: {
-                                    campaign: campaign.id,
-                                    card: threeHundredByTwoFifty.id,
-                                    container: 'beeswax',
-                                    type: 'mobile-card',
-                                    branding: 'showcase-app--300x250',
-                                    uuid: '{{DEVICE_ID}}'
-                                },
-                                showInTag: {
-                                    uuid: true
-                                },
-                                thumbnail: threeHundredByTwoFifty.thumbs.small
-                            }
-                        });
                     });
 
                     describe('if creating a placement fails', function() {
@@ -452,14 +515,7 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                             watchmanStream.produce.and.returnValue(q.defer().promise);
 
                             reason = new Error('I failed you...');
-                            postPlacementDeffereds[1].reject(reason);
-
-                            postPlacementDeffereds[0].fulfill([
-                                ld.assign({}, request.post.calls.all()[0].args[0].json, {
-                                    id: 'pl-' + uuid.createUuid()
-                                }),
-                                { statusCode: 201 }
-                            ]);
+                            postPlacementDeffereds[0].reject(reason);
 
                             process.nextTick(done);
                         });
@@ -482,7 +538,7 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                         var produceDeferred;
 
                         beforeEach(function(done) {
-                            expect(postPlacementDeffereds.length).toBe(2);
+                            expect(postPlacementDeffereds.length).toBe(1);
 
                             watchmanStream.produce.and.returnValue((produceDeferred = q.defer()).promise);
 
@@ -549,3 +605,4 @@ describe('(action factory) showcase/apps/init_campaign', function() {
         });
     });
 });
+/* jshint camelcase: true */

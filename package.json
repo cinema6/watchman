@@ -13,6 +13,7 @@
   "dependencies": {
     "aws-kcl": "^0.5.0",
     "aws-sdk": "^2.2.29",
+    "beeswax-client": "^0.4.0",
     "commander": "^2.9.0",
     "cwrx": "cinema6/cwrx#2b3b1d8",
     "handlebars": "^4.0.5",
