@@ -44,6 +44,11 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
                 :fileCache => {
                     :enabled => true
                 }
+            },
+            :gcc => {
+                :devtools => {
+                    :install => true
+                }
             }
         },
         :watchman => {
