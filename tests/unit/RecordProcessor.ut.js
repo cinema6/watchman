@@ -28,7 +28,7 @@ describe('RecordProcessor.js', function() {
             checkpoint: jasmine.createSpy('checkpoint()')
         };
         recordProcessor = new RecordProcessor(mockProcessor, '/pid/path', 'appName');
-        spyOn(fs, 'existsSync');
+        spyOn(fs, 'accessSync');
         spyOn(fs, 'unlinkSync');
         spyOn(fs, 'writeFileSync');
         spyOn(fs, 'readFileSync');
@@ -81,7 +81,7 @@ describe('RecordProcessor.js', function() {
 
         describe('pid handling', function() {
             it('should kill the process of an existing pid', function() {
-                fs.existsSync.and.returnValue(true);
+                fs.accessSync.and.returnValue({});
                 fs.readFileSync.and.returnValue(123);
                 initialize();
                 expect(process.kill).toHaveBeenCalledWith(123);
