@@ -7,6 +7,8 @@ fdescribe('(action factory) showcase/apps/init_campaign', function() {
     var factory;
 
     beforeAll(function() {
+        jasmine.clock().install();
+        jasmine.clock().mockDate(new Date(1453929767464)); //Wed Jan 27 2016 16:22:47 GMT-0500 (EST)
         q = require('q');
         uuid = require('rc-uuid');
         resolveURL = require('url').resolve;
@@ -49,6 +51,10 @@ fdescribe('(action factory) showcase/apps/init_campaign', function() {
         
         delete require.cache[require.resolve('../../src/actions/showcase/apps/init_campaign')];
         factory = require('../../src/actions/showcase/apps/init_campaign');
+    });
+
+    afterAll(function() {
+        jasmine.clock().uninstall();
     });
 
     beforeEach(function() {
@@ -139,7 +145,8 @@ fdescribe('(action factory) showcase/apps/init_campaign', function() {
 
         describe('the action', function() {
             var data, options, event, advertiser;
-            var getAdvertiserDeferred, putAdvertiserDeferred, bwCreateAdvertiserDeferred;
+            var getAdvertiserDeferred, putAdvertiserDeferred,
+                postPlacementDeferred, bwCreateAdvertiserDeferred, bwCreateCampaignDeferred;
             var success, failure;
 
             beforeEach(function(done) {
@@ -293,17 +300,23 @@ fdescribe('(action factory) showcase/apps/init_campaign', function() {
                 failure = jasmine.createSpy('failure()');
                 getAdvertiserDeferred =
                     putAdvertiserDeferred =
-                    bwCreateAdvertiserDeferred = undefined;
-
+                    postPlacementDeferred =
+                    bwCreateAdvertiserDeferred =
+                    bwCreateCampaignDeferred = undefined;
+                
                 spyOn(request, 'get').and.callFake(function(opts){
                     if(opts.url.match(/\/api\/account\/advertisers/)){
                         return (getAdvertiserDeferred = q.defer()).promise;
                     }
                     return q.reject('Unexpected GET');
                 });
-
-                spyOn(beeswax.advertisers,'create')
-                    .and.returnValue((bwCreateAdvertiserDeferred = q.defer()).promise);
+                
+                spyOn(request, 'post').and.callFake(function(opts){
+                    if(opts.url.match(/\/api\/placements/)){
+                        return (postPlacementDeferred = q.defer()).promise;
+                    }
+                    return q.reject('Unexpected GET');
+                });
 
                 initCampaign(event).then(success, failure);
                 process.nextTick(done);
@@ -318,6 +331,9 @@ fdescribe('(action factory) showcase/apps/init_campaign', function() {
                         }
                         return q.reject('Unexpected PUT');
                     });
+                    spyOn(beeswax.advertisers,'create')
+                        .and.returnValue((bwCreateAdvertiserDeferred = q.defer()).promise);
+
                 });
 
                 describe('with no beeswax ids',function(){
@@ -403,16 +419,59 @@ fdescribe('(action factory) showcase/apps/init_campaign', function() {
                 });
             });
 
-            fdescribe('when the external campaign is created', function() {
+            describe('creating the beeswax campaign',function(){
                 var putCampaignDeferred;
-
-                beforeEach(function(done) {
+                beforeEach(function(done){
                     getAdvertiserDeferred.resolve([advertiser]);
-                    spyOn(request, 'put').and.returnValue((putCampaignDeferred = q.defer()).promise);
+                    spyOn(beeswax.campaigns,'create')
+                        .and.returnValue((bwCreateCampaignDeferred = q.defer()).promise);
+                    spyOn(request, 'put').and.returnValue(
+                        (putCampaignDeferred = q.defer()).promise);
                     process.nextTick(done);
                 });
 
-                fit('should add one card to the campaign', function() {
+                beforeEach(function(done){
+                    bwCreateCampaignDeferred.resolve({ payload : { campaign_id : 5 } });
+                    process.nextTick(done);
+                });
+                
+                beforeEach(function(done){
+                    putCampaignDeferred.fulfill([
+                        { foo : 'bar', externalIds : { beeswax : 55 }},
+                        { statusCode: 200 }
+                    ]);
+                    process.nextTick(done);
+                });
+
+                it('creates a beeswax campaign',function(){
+                    expect(beeswax.campaigns.create).toHaveBeenCalledWith({
+                        advertiser_id : 1,
+                        alternative_id : data.campaign.id,
+                        campaign_name : 'This is the Name of My Product',
+                        start_date : '2016-01-27 00:00:00',
+                        active : false
+                    });
+                });
+            });
+
+            describe('when the external campaign is created', function() {
+                var putCampaignDeferred;
+                
+                beforeEach(function(done){
+                    getAdvertiserDeferred.resolve([advertiser]);
+                    spyOn(beeswax.campaigns,'create')
+                        .and.returnValue((bwCreateCampaignDeferred = q.defer()).promise);
+                    spyOn(request, 'put').and.returnValue(
+                        (putCampaignDeferred = q.defer()).promise);
+                    process.nextTick(done);
+                });
+
+                beforeEach(function(done){
+                    bwCreateCampaignDeferred.resolve({ payload : { campaign_id : 5 } });
+                    process.nextTick(done);
+                });
+                
+                it('should add one card to the campaign', function() {
                     expect(request.put).toHaveBeenCalledWith({
                         url: resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint + '/' + data.campaign.id),
                         json: ld.assign({}, data.campaign, {
@@ -421,7 +480,8 @@ fdescribe('(action factory) showcase/apps/init_campaign', function() {
                                     user: data.campaign.user,
                                     org: data.campaign.org
                                 })
-                            ])
+                            ]),
+                            externalIds : { beeswax : 5 }
                         })
                     });
                 });
@@ -443,7 +503,7 @@ fdescribe('(action factory) showcase/apps/init_campaign', function() {
                     });
 
                     it('should log an error', function() {
-                        expect(log.error).toHaveBeenCalled();
+                        expect(log.error).toHaveBeenCalledWith('Failed to initialize showcase (app) campaign(%1): %2',data.campaign.id,'[Error: I failed you...]');
                     });
 
                     it('should fulfill with undefined', function() {

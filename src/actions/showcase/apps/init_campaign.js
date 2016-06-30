@@ -13,8 +13,8 @@ var takeRight = require('lodash').takeRight;
 var unzip = require('lodash').unzip;
 var mapValues = require('lodash').mapValues;
 var pickBy = require('lodash').pickBy;
+var getVal = require('lodash').get;
 var q = require('q');
-var ld = require('lodash');
 
 var createInterstitialFactory = appFactories.createInterstitialFactory;
 
@@ -35,7 +35,6 @@ module.exports = function initCampaignFactory(config) {
         var data = event.data;
         var options = event.options;
         var campaign = data.campaign;
-        var campaignAdvertiser;
 
         var createInterstitial = createInterstitialFactory(
             options.card.interstitial
@@ -48,22 +47,27 @@ module.exports = function initCampaignFactory(config) {
             });
         }
 
-        log.trace('Creating external campaign for showcase (app) campaign(%1).', campaign.id);
+        log.trace('Looking up Advertiser (%1) for showcase (app) campaign(%2).',
+                campaign.advertiserId, campaign.id);
+
         return request.get({
             url : advertisersEndpoint + '/' + campaign.advertiserId 
         }).spread(function ensureBeeswaxAdvertiser(advertiser){
-            // The advertiser record has a Beeswax Id
-            if (ld.get(advertiser, 'externalIds.beeswax', undefined) !== undefined){
-                campaignAdvertiser = advertiser;
-                return campaignAdvertiser;
+            // The advertiser record has an externaIds hash with a Beeswax Id
+            if (getVal(advertiser, 'externalIds.beeswax', undefined) !== undefined){
+                log.trace('Advertiser (%1) has BeeswaxId (%2)',
+                    advertiser.id,advertiser.externalIds.beeswax);
+                return [advertiser];
             }
 
             return (function() {
                 // The advertiser record has a Beeswax Id in the wrong place
-                if (ld.get(advertiser, 'beeswaxIds.advertiser', undefined) !== undefined){
+                if (getVal(advertiser, 'beeswaxIds.advertiser', undefined) !== undefined){
                     return q([advertiser, advertiser.beeswaxIds.advertiser]);
                 }
 
+                log.info('Creating beeswax Advertiser for advertiser (%1).',
+                    advertiser.id);
                 // The advertiser record does not have a Beeswax Equivalent, lets create one.
                 return beeswax.advertisers.create({
                     advertiser_name : advertiser.name,
@@ -85,29 +89,37 @@ module.exports = function initCampaignFactory(config) {
                             beeswax : beeswaxId
                         }
                     }
-                }).spread(function(advertiser){
-                    campaignAdvertiser = advertiser;
-                    return campaignAdvertiser;
                 });
             });
-        }).spread(function createCards() {
+        }).spread(function createBeeswaxCampaign(advertiser) {
+            log.info('Initialize beeswax campaign for campaign (%1)',campaign.id);
+            return beeswax.campaigns.create({
+                advertiser_id: advertiser.externalIds.beeswax,
+                alternative_id : campaign.id,
+                campaign_name: campaign.name,
+                start_date: (new Date()).toISOString().substr(0,10) + ' 00:00:00',
+                active: false
+            }).then(function(result){
+                return result.payload;
+            });
+        }).then(function createCards(externalCampaign) {
+            log.trace('Updating campaign for %1 with cards and externalIds beeswax:%2',
+                campaign.id, externalCampaign.campaign_id);
             var interstitial = setupCard(createInterstitial(campaign.product));
 
-//            log.trace(
-//                'Created externalCampaign(%1) for showcase (app) campaign(%2).',
-//                externalCampaign.externalId, campaign.id
-//            );
-
-            log.trace('Creating cards for showcase (app) campaign(%1)', campaign.id);
             return request.put({
                 url: campaignsEndpoint + '/' + campaign.id,
                 json: assign({}, campaign, {
                     cards: campaign.cards.concat([
                         interstitial
-                    ])
+                    ]),
+                    externalIds : {
+                        beeswax : externalCampaign.campaign_id
+                    }
                 })
             });
         }).spread(function createPlacements(campaign) {
+            log.trace('campaignCards:',campaign.cards);
             var newCards = takeRight(campaign.cards, 1);
             var interstitial = newCards[0];
 
