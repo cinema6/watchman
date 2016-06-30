@@ -533,6 +533,26 @@ describe('cwrxStream', function() {
                     });
                 }).catch(done.fail);
             });
+
+            it('should indicate in Hubspot that this user is a paying customer', function(done) {
+                producer.produce({
+                    type: 'paymentMade',
+                    data: {
+                        payment: mockPayment,
+                        user: mockUser,
+                        balance: 9001.12,
+                        target: 'showcase'
+                    }
+                }).then(() => {
+                    return Promise.all([
+                        waitForTrue(() =>  this.hubspot.getContactByEmail(mockUser.email)),
+                        waitForEmails(['Your payment has been approved'])
+                    ]);
+                }).then(results => {
+                    const contact = results[0];
+                    expect(contact.properties.paying_customer.value).toBe('true');
+                }).then(done, done.fail);
+            });
         });
     });
 
