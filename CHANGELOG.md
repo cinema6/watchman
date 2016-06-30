@@ -1,8 +1,10 @@
 # Watchman
 
+## v1.1.0 (June 30, 2016)
 * *[v1.1.0-rc1]*
   * [FEATURE]: Indicate paying customers in Hubspot
   * [DEV]: Replace jshint with eslint
+* *[/v1.1.0-rc1]*
 
 ## v1.0.0 (June 27, 2016)
 * *[v1.0.0-rc2]*
