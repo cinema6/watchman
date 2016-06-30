@@ -52,7 +52,7 @@ describe('timeStream available funds check', function() {
 
     beforeAll(function(done) {
         var awsConfig = {
-            region: 'us-east-1',
+            region: 'us-east-1'
         };
         if(AWS_CREDS) {
             awsConfig.accessKeyId = AWS_CREDS.accessKeyId;
@@ -75,7 +75,7 @@ describe('timeStream available funds check', function() {
         var mockOrgs = [
             { id: 'o-1', status: 'active', name: 'org 1' },
             { id: 'o-2', status: 'active', name: 'org 2' },
-            { id: 'o-3', status: 'active', name: 'org 3' },
+            { id: 'o-3', status: 'active', name: 'org 3' }
         ];
         var mockTransactions = [
             // Negative balance for o-1
@@ -85,14 +85,14 @@ describe('timeStream available funds check', function() {
 
             // Positive balance for o-2
             creditRecord('o-2', 6000, 'pay-2'),
-            debitRecord('o-2', 1000, 1, 'cam-o2-666'),
+            debitRecord('o-2', 1000, 1, 'cam-o2-666')
         ];
         var mockCamps = [
             { id: 'cam-o1-1', org: 'o-1', status: 'active', pricing: { budget: 500 } },
             { id: 'cam-o1-2', org: 'o-1', status: 'active', pricing: { budget: 100 } },
             { id: 'cam-o1-3', org: 'o-1', status: 'paused', pricing: { budget: 500 } },
 
-            { id: 'cam-o2-1', org: 'o-2', status: 'active', pricing: { budget: 9000 } },
+            { id: 'cam-o2-1', org: 'o-2', status: 'active', pricing: { budget: 9000 } }
         ];
 
         return Q.all([
@@ -118,7 +118,7 @@ describe('timeStream available funds check', function() {
             { id: 'cam-o1-10', org: 'o-1', status: 'active', pricing: {} },
             { id: 'cam-o1-20', org: 'o-1', status: 'active' },
             { id: 'cam-o1-30', org: 'o-1', status: 'active', pricing: { budget: 600 } },
-            { id: 'cam-o1-40', org: 'o-1', status: 'active', pricing: { budget: 200 } },
+            { id: 'cam-o1-40', org: 'o-1', status: 'active', pricing: { budget: 200 } }
         ]).then(function() {
             return producer.produce({ type: 'tenMinutes', data: { date: new Date() } });
         }).then(function() {

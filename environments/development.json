@@ -522,6 +522,18 @@
                                     "options": {
                                         "type": "paymentMade"
                                     }
+                                },
+                                {
+                                    "name": "hubspot/update_user",
+                                    "options": {
+                                        "properties": {
+                                            "applications": "apps",
+                                            "paying_customer": "true"
+                                        }
+                                    },
+                                    "ifData": {
+                                        "target": "^showcase$"
+                                    }
                                 }
                             ]
                         },

@@ -1,7 +1,5 @@
 'use strict';
 
-/* jshint camelcase:false */
-
 var JsonProducer = require('rc-kinesis').JsonProducer;
 var q = require('q');
 var testUtils = require('cwrx/test/e2e/testUtils');

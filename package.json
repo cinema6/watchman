@@ -10,6 +10,9 @@
     "Scott Bouloutian <sbouloutian@reelcontent.com>"
   ],
   "license": "ISC",
+  "engines": {
+    "node": "4.4.7"
+  },
   "dependencies": {
     "aws-kcl": "^0.5.0",
     "aws-sdk": "^2.2.29",
@@ -31,13 +34,14 @@
   "devDependencies": {
     "beeswax-client": "^0.1.0",
     "braintree": "^1.37.1",
+    "eslint-plugin-jasmine": "^1.8.1",
     "grunt": "^0.4.5",
     "grunt-c6-util": "cinema6/c6-grunt-util#v0.8.3",
-    "grunt-contrib-jshint": "^0.11.3",
     "grunt-contrib-watch": "^0.6.1",
     "grunt-contrib-yuidoc": "^0.10.0",
     "grunt-exec": "^0.4.6",
     "grunt-jasmine-nodejs": "^1.4.3",
+    "gruntify-eslint": "^2.0.0",
     "load-grunt-config": "^0.19.1",
     "pg.js": "^4.1.1",
     "proxyquire": "^1.7.3",

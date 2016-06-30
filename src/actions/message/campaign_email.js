@@ -200,7 +200,7 @@ module.exports = function factory(config) {
 
                 return {
                     activationLink  : link,
-                    firstName       : data.user.firstName,
+                    firstName       : data.user.firstName
                 };
             },
             attachments: getAttachments
@@ -220,7 +220,7 @@ module.exports = function factory(config) {
             data: function(data) {
                 return {
                     dashboardLink  : emailConfig.dashboardLinks[data.target || 'selfie'],
-                    firstName      : data.user.firstName,
+                    firstName      : data.user.firstName
                 };
             },
             attachments: getAttachments
