@@ -5,6 +5,10 @@
   "scripts": {
     "preinstall": "sh ./scripts/preinstall.sh"
   },
+  "files": [
+    "src",
+    "lib"
+  ],
   "author": "ReelContent",
   "contributors": [
     "Scott Bouloutian <sbouloutian@reelcontent.com>"
@@ -16,6 +20,7 @@
   "dependencies": {
     "aws-kcl": "^0.5.0",
     "aws-sdk": "^2.2.29",
+    "beeswax-client": "^0.4.0",
     "commander": "^2.9.0",
     "cwrx": "cinema6/cwrx#2b3b1d8",
     "handlebars": "^4.0.5",
@@ -29,12 +34,15 @@
     "q": "^1.4.1",
     "rc-kinesis": "^1.1.0",
     "readable-stream": "^2.0.6",
+    "safe-buffer": "^5.0.1",
     "showcase-core": "^1.0.0"
   },
   "devDependencies": {
     "beeswax-client": "^0.1.0",
     "braintree": "^1.37.1",
+    "eslint": "^2.13.1",
     "eslint-plugin-jasmine": "^1.8.1",
+    "eslint-plugin-node": "^1.5.1",
     "grunt": "^0.4.5",
     "grunt-c6-util": "cinema6/c6-grunt-util#v0.8.3",
     "grunt-contrib-watch": "^0.6.1",

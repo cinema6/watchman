@@ -189,6 +189,9 @@
                             "campaignActive--app": "694541",
                             "promotionEnded--app": "722104"
                         }
+                    },
+                    "beeswax": {
+                        "apiRoot": "https://stingersbx.api.beeswax.com"
                     }
                 }
             },
@@ -417,6 +420,15 @@
                                         "previousState": "pending",
                                         "currentState": "active",
                                         "campaign.application": "^(studio|selfie)$"
+                                    }
+                                },
+                                {
+                                    "name": "showcase/apps/clean_up_campaign",
+                                    "options": {},
+                                    "ifData": {
+                                        "currentState": "canceled",
+                                        "campaign.application": "^showcase$",
+                                        "campaign.product.type": "^app$"
                                     }
                                 }
                             ]
