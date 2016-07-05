@@ -393,7 +393,8 @@ describe('(action factory) activate_payment_plan', function() {
                                             org: org,
                                             promotion: promotions[Object.keys(promotions)[0]],
                                             paymentPlan: config.paymentPlans[org.paymentPlanId],
-                                            target: options.target
+                                            target: options.target,
+                                            date: data.date
                                         }
                                     });
                                     expect(watchmanStream.produce).toHaveBeenCalledWith({
@@ -402,7 +403,8 @@ describe('(action factory) activate_payment_plan', function() {
                                             org: org,
                                             promotion: promotions[Object.keys(promotions)[2]],
                                             paymentPlan: config.paymentPlans[org.paymentPlanId],
-                                            target: options.target
+                                            target: options.target,
+                                            date: data.date
                                         }
                                     });
                                     expect(watchmanStream.produce.calls.count()).toBe(2, 'Incorrect number of events produced.');

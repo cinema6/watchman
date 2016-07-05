@@ -54,7 +54,8 @@ module.exports = function activatePaymentPlanFactory(config) {
                                 org: org,
                                 promotion: promotion,
                                 paymentPlan: paymentPlan,
-                                target: options.target
+                                target: options.target,
+                                date: now.format()
                             }
                         }).catch(function logError(reason) {
                             log.error(
