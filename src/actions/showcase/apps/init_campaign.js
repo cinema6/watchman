@@ -14,7 +14,6 @@ var pickBy = require('lodash').pickBy;
 var q = require('q');
 
 var createInterstitialFactory = appFactories.createInterstitialFactory;
-var createThreeHundredByTwoFiftyFactory = appFactories.createThreeHundredByTwoFiftyFactory;
 
 module.exports = function initCampaignFactory(config) {
     var log = logger.getLog();
@@ -31,9 +30,6 @@ module.exports = function initCampaignFactory(config) {
         var createInterstitial = createInterstitialFactory(
             options.card.interstitial
         );
-        var createThreeHundredByTwoFifty = createThreeHundredByTwoFiftyFactory(
-            options.card.threeHundredByTwoFifty
-        );
 
         function setupCard(card) {
             return assign(card, {
@@ -42,33 +38,17 @@ module.exports = function initCampaignFactory(config) {
             });
         }
 
-        log.trace('Creating external campaign for showcase (app) campaign(%1).', campaign.id);
-        return request.post({
-            url: campaignsEndpoint + '/' + campaign.id + '/external/beeswax',
-            json: {}
-        }).spread(function createCards(externalCampaign) {
-            var interstitial = setupCard(createInterstitial(campaign.product));
-            var threeHundredByTwoFifty = setupCard(createThreeHundredByTwoFifty(campaign.product));
-
-            log.trace(
-                'Created externalCampaign(%1) for showcase (app) campaign(%2).',
-                externalCampaign.externalId, campaign.id
-            );
-
-            log.trace('Creating cards for showcase (app) campaign(%1)', campaign.id);
-            return request.put({
-                url: campaignsEndpoint + '/' + campaign.id,
-                json: assign({}, campaign, {
-                    cards: campaign.cards.concat([
-                        interstitial,
-                        threeHundredByTwoFifty
-                    ])
-                })
-            });
+        log.trace('Creating cards for showcase (app) campaign(%1)', campaign.id);
+        return request.put({
+            url: campaignsEndpoint + '/' + campaign.id,
+            json: assign({}, campaign, {
+                cards: campaign.cards.concat([
+                    setupCard(createInterstitial(campaign.product))
+                ])
+            })
         }).spread(function createPlacements(campaign) {
-            var newCards = takeRight(campaign.cards, 2);
+            var newCards = takeRight(campaign.cards, 1);
             var interstitial = newCards[0];
-            var threeHundredByTwoFifty = newCards[1];
 
             function tagParams(options) {
                 return mapValues(options.tagParams, 'value');
@@ -79,14 +59,11 @@ module.exports = function initCampaignFactory(config) {
             }
 
             log.trace(
-                'Created cards([%1, %2]) for showcase (app) campaign(%3).',
-                interstitial.id, threeHundredByTwoFifty.id, campaign.id
+                'Created card([%1) for showcase (app) campaign(%2).',
+                interstitial.id, campaign.id
             );
 
-            log.trace(
-                'Creating placements for cards([%1, %2]).',
-                interstitial.id, threeHundredByTwoFifty.id
-            );
+            log.trace( 'Creating placements for card([%1]).', interstitial.id);
 
             return q.all([
                 {
@@ -97,15 +74,6 @@ module.exports = function initCampaignFactory(config) {
                     }),
                     showInTag: showInTag(options.placement.interstitial),
                     thumbnail: interstitial.thumbs.small
-                },
-                {
-                    label: 'Showcase--300x250 for App: "' + campaign.name + '"',
-                    tagType: options.placement.threeHundredByTwoFifty.tagType,
-                    tagParams: assign({}, tagParams(options.placement.threeHundredByTwoFifty), {
-                        card: threeHundredByTwoFifty.id
-                    }),
-                    showInTag: showInTag(options.placement.threeHundredByTwoFifty),
-                    thumbnail: threeHundredByTwoFifty.thumbs.small
                 }
             ].map(function(json) {
                 return request.post({
@@ -118,8 +86,8 @@ module.exports = function initCampaignFactory(config) {
                 });
             })).then(unzip).spread(function produceRecord(placements) {
                 log.trace(
-                    'Created placements for cards([%1 => %2, %3 => %4]).',
-                    newCards[0].id, placements[0].id, newCards[1].id, placements[1].id
+                    'Created placements for card([%1 => %2]).',
+                    newCards[0].id, placements[0].id
                 );
 
                 log.trace(
