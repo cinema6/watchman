@@ -559,7 +559,7 @@
                                     },
                                     "ifData": {
                                         "transaction.sign": "^1$",
-                                        "transaction.description": "\"target\"\\s*:\\s*\"showcase\""
+                                        "transaction.application": "^showcase$"
                                     }
                                 }
                             ]
