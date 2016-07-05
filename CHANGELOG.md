@@ -1,5 +1,18 @@
 # Watchman
 
+* *[v1.2.0-rc1]*
+  * [FEATURE]: Deactivate line items and campaigns in beeswax when a
+    showcase (apps) campaign is canceled
+  * ** Extra Deployment Steps**:
+    * Deploy watchman cookbook `v2.1.0`
+    * Update watchman environments
+
+## v1.1.0 (June 30, 2016)
+* *[v1.1.0-rc1]*
+  * [FEATURE]: Indicate paying customers in Hubspot
+  * [DEV]: Replace jshint with eslint
+* *[/v1.1.0-rc1]*
+
 ## v1.0.0 (June 27, 2016)
 * *[v1.0.0-rc2]*
   * [FIX]: Use Node v4.4.7

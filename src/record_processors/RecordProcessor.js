@@ -4,6 +4,11 @@ var Q = require('q');
 var fs = require('fs');
 var logger = require('cwrx/lib/logger.js');
 var path = require('path');
+const Buffer = require('safe-buffer').Buffer;
+
+function fileExists(path) {
+    try { return !!fs.accessSync(path); } catch (e) { return false; }
+}
 
 /**
 * The record processor must provide three functions:
@@ -61,7 +66,7 @@ RecordProcessor.prototype = {
         // Handle pid files
         var pidFile = path.resolve(this.pidPath,
             this.appName + '-' + this.shardId + '.pid');
-        if(fs.existsSync(pidFile)) {
+        if(fileExists(pidFile)) {
             var oldPid = parseInt(fs.readFileSync(pidFile, {
                 encoding: 'utf-8'
             }));
@@ -119,7 +124,7 @@ RecordProcessor.prototype = {
         log.info('[%1] Processing %2 records in shard %3', self.name, records.length, self.shardId);
         Q.allSettled(records.map(function(record) {
             return Q.resolve().then(function() {
-                var data = new Buffer(record.data, 'base64').toString();
+                var data = Buffer.from(record.data, 'base64').toString();
                 var json = JSON.parse(data);
                 var partitionKey = record.partitionKey;
                 var sequenceNumber = record.sequenceNumber;

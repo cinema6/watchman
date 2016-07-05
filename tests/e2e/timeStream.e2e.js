@@ -18,7 +18,7 @@ describe('timeStream', function() {
 
     beforeAll(function(done) {
         var awsConfig = {
-            region: 'us-east-1',
+            region: 'us-east-1'
         };
         if(AWS_CREDS) {
             awsConfig.accessKeyId = AWS_CREDS.accessKeyId;
@@ -396,7 +396,7 @@ describe('timeStream', function() {
         describe('when an active, paused, or outOfBudget campaign has reached its end date', function() {
             beforeEach(function(done) {
                 var promises = [
-                    waitForStatus(['e2e-cam-01', 'e2e-cam-02', 'e2e-cam-07', 'e2e-cam-09'], 'expired'),
+                    waitForStatus(['e2e-cam-01', 'e2e-cam-02', 'e2e-cam-07', 'e2e-cam-09'], 'expired')
                 ];
                 Q.all(promises).then(done, done.fail);
             });
@@ -426,7 +426,7 @@ describe('timeStream', function() {
         describe('when an active or paused campaign has reached its budget', function() {
             beforeEach(function(done) {
                 var promises = [
-                    waitForStatus(['e2e-cam-05', 'e2e-cam-06', 'e2e-cam-10'], 'outOfBudget'),
+                    waitForStatus(['e2e-cam-05', 'e2e-cam-06', 'e2e-cam-10'], 'outOfBudget')
                 ];
                 Q.all(promises).then(done, done.fail);
             });

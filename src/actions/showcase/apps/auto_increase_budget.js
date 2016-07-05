@@ -72,9 +72,9 @@ module.exports = function autoIncreaseBudgetFactory(config) {
                         json: {
                             budgetImpressions: (externalCampaign.budgetImpressions || 0) +
                                 externalImpressionPortion,
-                                dailyLimitImpressions: paymentPlan.dailyImpressionLimit,
-                                budget: null,
-                                dailyLimit: null
+                            dailyLimitImpressions: paymentPlan.dailyImpressionLimit,
+                            budget: null,
+                            dailyLimit: null
                         }
                     }).spread(function logSuccess(newExternalCampaign) {
                         log.info(

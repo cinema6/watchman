@@ -265,7 +265,7 @@ describe('(action factory) charge_payment_plan', function() {
 
                 describe('with a StatusCodeError', function() {
                     [500, 501, 504, 505].forEach(function(statusCode) {
-                        describe('of ' + statusCode, function() {
+                        describe(`of ${statusCode}`, function() {
                             beforeEach(function(done) {
                                 reason = new Error(statusCode + ' - INTERNAL ERROR');
                                 reason.name = 'StatusCodeError';
@@ -286,7 +286,7 @@ describe('(action factory) charge_payment_plan', function() {
                     });
 
                     [400, 404, 403].forEach(function(statusCode) {
-                        describe('of ' + statusCode, function() {
+                        describe(`of ${statusCode}`, function() {
                             var produceDeferred;
 
                             beforeEach(function(done) {

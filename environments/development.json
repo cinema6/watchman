@@ -189,6 +189,9 @@
                             "campaignActive--app": "694541",
                             "promotionEnded--app": "722104"
                         }
+                    },
+                    "beeswax": {
+                        "apiRoot": "https://stingersbx.api.beeswax.com"
                     }
                 }
             },
@@ -418,6 +421,15 @@
                                         "currentState": "active",
                                         "campaign.application": "^(studio|selfie)$"
                                     }
+                                },
+                                {
+                                    "name": "showcase/apps/clean_up_campaign",
+                                    "options": {},
+                                    "ifData": {
+                                        "currentState": "canceled",
+                                        "campaign.application": "^showcase$",
+                                        "campaign.product.type": "^app$"
+                                    }
                                 }
                             ]
                         },
@@ -521,6 +533,18 @@
                                     "name": "message/campaign_email",
                                     "options": {
                                         "type": "paymentMade"
+                                    }
+                                },
+                                {
+                                    "name": "hubspot/update_user",
+                                    "options": {
+                                        "properties": {
+                                            "applications": "apps",
+                                            "paying_customer": "true"
+                                        }
+                                    },
+                                    "ifData": {
+                                        "target": "^showcase$"
                                     }
                                 }
                             ]

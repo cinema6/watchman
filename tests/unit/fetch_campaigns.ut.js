@@ -1,7 +1,5 @@
 'use strict';
 
-/* jshint maxlen:false */
-
 var JsonProducer = require('rc-kinesis').JsonProducer;
 var Q = require('q');
 var fetchCampaignsFactory = require('../../src/actions/fetch_campaigns.js');
@@ -341,8 +339,7 @@ describe('fetch_campaigns.js', function() {
             }).catch(done.fail);
         });
 
-        it('should resolve even if the campaigns fail to be produced into the stream',
-                function(done) {
+        it('should resolve even if the campaigns fail to be produced into the stream', function(done) {
             var campData = {
                 'cam-1': {
                     campaign: mockCampaigns[0],
@@ -414,8 +411,7 @@ describe('fetch_campaigns.js', function() {
             }).catch(done.fail);
         });
 
-        it('should be able to resolve with the total from the content range header',
-                function(done) {
+        it('should be able to resolve with the total from the content range header', function(done) {
             var mockResponse = {
                 response: {
                     headers: {
@@ -457,8 +453,7 @@ describe('fetch_campaigns.js', function() {
             }).catch(done.fail);
         });
 
-        it('should make requests to get campaigns and limit the number of campaigns it fetches',
-                function(done) {
+        it('should make requests to get campaigns and limit the number of campaigns it fetches', function(done) {
             fetchCampaignsFactory.__private__.getNumCampaigns.and.returnValue(Q.resolve(5));
             fetchCampaignsFactory.__private__.getCampaigns.and.returnValue(Q.resolve('campData'));
             fetchCampaigns({ data: mockData, options: mockOptions }).then(function() {

@@ -7,7 +7,7 @@ module.exports = {
             'Gruntfile.js',
             'scripts/**/*.js'
         ],
-        tasks: ['jshint', 'test:unit']
+        tasks: ['eslint', 'test:unit']
     },
     vagrant: {
         files: [
@@ -17,6 +17,6 @@ module.exports = {
             'Gruntfile.js',
             'scripts/**/*.js'
         ],
-        tasks: ['jshint', 'test:unit', 'exec:rsync']
+        tasks: ['eslint', 'test:unit', 'exec:rsync']
     }
 };
