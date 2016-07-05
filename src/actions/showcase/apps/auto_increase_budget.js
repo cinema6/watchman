@@ -78,7 +78,8 @@ module.exports = function factory(config) {
                         log.info(
                             'Increased budget of externalCampaign(%1): %2 => %3.',
                             externalCampaign.externalId,
-                            externalCampaign.budget, newExternalCampaign.budget
+                            externalCampaign.budgetImpressions,
+                            newExternalCampaign.budgetImpressions
                         );
                     })
                 ));
