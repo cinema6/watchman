@@ -9,13 +9,11 @@ var Mailman = testUtils.Mailman;
 var resolveURL = require('url').resolve;
 var uuid = require('rc-uuid');
 var moment = require('moment');
-var braintree = require('braintree');
 
 var API_ROOT = process.env.apiRoot;
 var APP_CREDS = JSON.parse(process.env.appCreds);
 var AWS_CREDS = JSON.parse(process.env.awsCreds);
 var TIME_STREAM = process.env.timeStream;
-var paymentPlans = require('../../environments/development.json').default_attributes.watchman.app.config.paymentPlans;
 
 function createId(prefix) {
     return prefix + '-' + uuid.createUuid();
@@ -40,16 +38,8 @@ function wait(time) {
 }
 
 describe('timeStream payment plan billing', function() {
-    var producer, request, mailman, cookies, gateway;
-    var user, org, paymentMethod, paymentPlan;
-
-    var getPaymentPlanId = (function() {
-        var paymentPlanIds = Object.keys(paymentPlans).slice(0, -1);
-
-        return function getPaymentPlanId() {
-            return ld.sample(paymentPlanIds);
-        };
-    }());
+    var producer, request, mailman, cookies;
+    var user, org, paymentMethod, paymentPlans, paymentPlan;
 
     var getValidPaymentNonce = (function() {
         var validNonces = [
@@ -98,6 +88,12 @@ describe('timeStream payment plan billing', function() {
         });
     }
 
+    function getPaymentPlanId() {
+        var paymentPlanIds = paymentPlans.slice(0, -1).map(paymentPlan => paymentPlan.id);
+
+        return ld.sample(paymentPlanIds);
+    }
+
     function updatePaymentMethod(nonce) {
         return request.post({
             url: api('/api/payments/methods'),
@@ -119,15 +115,6 @@ describe('timeStream payment plan billing', function() {
         }).spread(function(body) { return body; });
     }
 
-    function updatePaymentPlanStart(start) {
-        return request.put({
-            url: api('/api/account/orgs/' + org.id),
-            json: {
-                paymentPlanStart: start && start.format()
-            }
-        }).spread(function(body) { return body; });
-    }
-
     function updateNextPaymentDate(date) {
         return request.put({
             url: api('/api/account/orgs/' + org.id),
@@ -142,21 +129,71 @@ describe('timeStream payment plan billing', function() {
         var userId = createId('u');
         var policyId = createId('p');
 
-        return testUtils.resetCollection('orgs', [{
-            id: orgId,
-            status: 'active',
-            name: 'The Best Org',
-            paymentPlanId: getPaymentPlanId(),
-            paymentPlanStart: moment().format()
-        }].concat(Array.apply([], new Array(25)).map(function() {
-            var id = uuid.createUuid();
+        return testUtils.resetCollection('paymentPlans', [
+            {
+                label: 'Starter',
+                price: 49.99,
+                maxCampaigns: 1,
+                viewsPerMonth: 2000
+            },
+            {
+                label: 'Sub-starter',
+                price: 39.99,
+                maxCampaigns: 1,
+                viewsPerMonth: 1700
+            },
+            {
+                label: 'Low Tier',
+                price: 29.99,
+                maxCampaigns: 1,
+                viewsPerMonth: 1500
+            },
+            {
+                label: 'Value Plan',
+                price: 19.99,
+                maxCampaigns: 1,
+                viewsPerMonth: 1200
+            },
+            {
+                label: 'Cheapskate',
+                price: 9.99,
+                maxCampaigns: 1,
+                viewsPerMonth: 1000
+            },
+            {
+                label: 'MONEY DOLLAZ',
+                price: 2499,
+                maxCampaigns: 1000,
+                viewsPerMonth: 1000000
+            }
+        ].map(paymentPlan => ld.assign({}, paymentPlan, {
+            id: `pp-${uuid.createUuid()}`,
+            created: moment().format(),
+            lastUpdated: moment().format(),
+            status: 'active'
+        }))).then(function makeOrg() {
+            return request.get({
+                url: api('/api/payment-plans')
+            }).then(ld.property(0));
+        }).then(function(/*paymentPlans*/) {
+            paymentPlans = arguments[0];
 
-            return {
-                id: id,
+            return testUtils.resetCollection('orgs', [{
+                id: orgId,
                 status: 'active',
-                name: 'The Best Org -- ' + id
-            };
-        }))).then(function makePolicy() {
+                name: 'The Best Org',
+                paymentPlanId: getPaymentPlanId(),
+                paymentPlanStart: moment().format()
+            }].concat(Array.apply([], new Array(25)).map(function() {
+                var id = uuid.createUuid();
+
+                return {
+                    id: id,
+                    status: 'active',
+                    name: 'The Best Org -- ' + id
+                };
+            })));
+        }).then(function makePolicy() {
             return testUtils.resetCollection('policies', [{
                 id: policyId,
                 name: 'manageAllOrgs',
@@ -239,25 +276,6 @@ describe('timeStream payment plan billing', function() {
         }).then(ld.property('0'));
     }
 
-    function createPayment(amount) {
-        return request.post({
-            url: api('/api/payments'),
-            jar: cookies,
-            json: {
-                paymentMethod: paymentMethod.token,
-                amount: amount
-            }
-        }).spread(function(payment) {
-            return q.ninvoke(gateway.testing, 'settle', payment.id);
-        }).then(function() {
-            return waitUntil(function() {
-                return getMostRecentPayment().then(function(payment) {
-                    return payment.status === 'settled' && payment;
-                });
-            });
-        });
-    }
-
     beforeAll(function(done) {
         var awsConfig = ld.assign({ region: 'us-east-1' }, AWS_CREDS || {});
 
@@ -327,18 +345,13 @@ describe('timeStream payment plan billing', function() {
         };
 
         cookies = require('request').jar();
-        gateway = braintree.connect({
-            environment: braintree.Environment.Sandbox,
-            merchantId: 'ztrphcf283bxgn2f',
-            publicKey: 'rz2pht7gyn6d266b',
-            privateKey: '0a150dac004756370706a195e2bde296'
-        });
 
         q.all([
             testUtils.resetCollection('applications', [watchmanApp, cwrxApp]),
             testUtils.resetCollection('policies', []),
             testUtils.resetCollection('orgs', []),
-            testUtils.resetCollection('users', [])
+            testUtils.resetCollection('users', []),
+            testUtils.resetCollection('paymentPlans', [])
         ]).then(function() {
             return createUser();
         }).spread(function(/*user, org, paymentMethod*/) {
@@ -346,7 +359,7 @@ describe('timeStream payment plan billing', function() {
             org = arguments[1];
             paymentMethod = arguments[2];
 
-            paymentPlan = paymentPlans[org.paymentPlanId];
+            paymentPlan = ld.find(paymentPlans, { id: org.paymentPlanId });
         }).then(done, done.fail);
 
         getInvalidPaymentNonce();
@@ -366,138 +379,149 @@ describe('timeStream payment plan billing', function() {
         ]).then(done, done.fail);
     });
 
-    describe('if no payments have been made', function() {
-        describe('if the org has a nextPaymentDate', function() {
-            var today, payments, payment, transaction;
+    describe('if the org has a nextPaymentDate', function() {
+        var today, payments, payment, transaction;
 
-            beforeEach(function() {
-                today = moment();
+        beforeEach(function() {
+            today = moment();
+        });
+
+        describe('that is after today', function() {
+            beforeEach(function(done) {
+                updateNextPaymentDate(moment(today).add(1, 'day')).then(function(/*org*/) {
+                    org = arguments[0];
+
+                    return dailyEvent(today);
+                }).then(function() {
+                    return wait(10000);
+                }).then(function() {
+                    return getPayments();
+                }).then(function(/*payments*/) {
+                    payments = arguments[0];
+
+                    return getOrg();
+                }).then(function(/*org*/) {
+                    org = arguments[0];
+                }).then(done, done.fail);
             });
 
-            describe('that is after today', function() {
-                beforeEach(function(done) {
-                    updateNextPaymentDate(moment(today).add(1, 'day')).then(function(/*org*/) {
-                        org = arguments[0];
-
-                        return dailyEvent(today);
-                    }).then(function() {
-                        return wait(10000);
-                    }).then(function() {
-                        return getPayments();
-                    }).then(function(/*payments*/) {
-                        payments = arguments[0];
-
-                        return getOrg();
-                    }).then(function(/*org*/) {
-                        org = arguments[0];
-                    }).then(done, done.fail);
-                });
-
-                it('should not make a payment', function() {
-                    expect(payments.length).not.toBeGreaterThan(0, 'A payment was made.');
-                });
-
-                it('should not update the org\'s nextPaymentDate', function() {
-                    expect(org.nextPaymentDate).toBe(moment(today).add(1, 'day').format(), 'Org\'s nextPaymentDate was updated.');
-                });
+            it('should not make a payment', function() {
+                expect(payments.length).not.toBeGreaterThan(0, 'A payment was made.');
             });
 
-            describe('that is today', function() {
-                beforeEach(function(done) {
-                    updateNextPaymentDate(moment(today)).then(function(/*org*/) {
-                        org = arguments[0];
-
-                        return dailyEvent(today);
-                    }).then(function() {
-                        return getMostRecentPayment();
-                    }).then(function(/*payment*/) {
-                        payment = arguments[0];
-                    }).then(function() {
-                        return waitUntil(function() {
-                            return testUtils.pgQuery(
-                                'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC LIMIT 1',
-                                [org.id]
-                            ).then(function(result) {
-                                return result.rows.length > 0 && result;
-                            });
-                        });
-                    }).then(function(result) {
-                        transaction = result.rows[0];
-
-                        return waitUntil(function() {
-                            return getOrg().then(function(org) {
-                                return moment(org.nextPaymentDate).isSame(moment(today).add(1, 'month'), 'day') && org;
-                            });
-                        });
-                    }).then(function(/*org*/) {
-                        org = arguments[0];
-                    }).then(done, done.fail);
-                });
-
-                it('should make a payment for the amount of the payment plan', function() {
-                    expect(payment.amount).toBe(paymentPlan.price);
-                    expect(transaction.description).toBe(JSON.stringify({ eventType: 'credit', source: 'braintree', target: 'showcase', paymentPlanId: org.paymentPlanId }));
-                });
-
-                it('should update the org\'s nextPaymentDate', function() {
-                    var expected = moment(today).add(1, 'month');
-                    var actual = moment(org.nextPaymentDate);
-
-                    expect(actual.isSame(expected, 'day')).toBe(true, 'Expected ' + actual.format() + ' to be ' + expected.format());
-                });
-            });
-
-            describe('that is before today', function() {
-                beforeEach(function(done) {
-                    updateNextPaymentDate(moment(today).subtract(1, 'day')).then(function(/*org*/) {
-                        org = arguments[0];
-
-                        return dailyEvent(today);
-                    }).then(function() {
-                        return getMostRecentPayment();
-                    }).then(function(/*payment*/) {
-                        payment = arguments[0];
-                    }).then(function() {
-                        return waitUntil(function() {
-                            return testUtils.pgQuery(
-                                'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC LIMIT 1',
-                                [org.id]
-                            ).then(function(result) {
-                                return result.rows.length > 0 && result;
-                            });
-                        });
-                    }).then(function(result) {
-                        transaction = result.rows[0];
-
-                        return waitUntil(function() {
-                            return getOrg().then(function(org) {
-                                return moment(org.nextPaymentDate).isSame(moment(today).add(1, 'month'), 'day') && org;
-                            });
-                        });
-                    }).then(function(/*org*/) {
-                        org = arguments[0];
-                    }).then(done, done.fail);
-                });
-
-                it('should make a payment for the amount of the payment plan', function() {
-                    expect(payment.amount).toBe(paymentPlan.price);
-                    expect(transaction.description).toBe(JSON.stringify({ eventType: 'credit', source: 'braintree', target: 'showcase', paymentPlanId: org.paymentPlanId }));
-                });
-
-                it('should update the org\'s nextPaymentDate', function() {
-                    var expected = moment(today).add(1, 'month');
-                    var actual = moment(org.nextPaymentDate);
-
-                    expect(actual.isSame(expected, 'day')).toBe(true, 'Expected ' + actual.format() + ' to be ' + expected.format());
-                });
+            it('should not update the org\'s nextPaymentDate', function() {
+                expect(org.nextPaymentDate).toBe(moment(today).add(1, 'day').format(), 'Org\'s nextPaymentDate was updated.');
             });
         });
 
-        describe('and the org has no paymentPlanStart', function() {
+        describe('that is today', function() {
+            beforeEach(function(done) {
+                updateNextPaymentDate(moment(today)).then(function(/*org*/) {
+                    org = arguments[0];
+
+                    return dailyEvent(today);
+                }).then(function() {
+                    return getMostRecentPayment();
+                }).then(function(/*payment*/) {
+                    payment = arguments[0];
+                }).then(function() {
+                    return waitUntil(function() {
+                        return testUtils.pgQuery(
+                            'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC LIMIT 1',
+                            [org.id]
+                        ).then(function(result) {
+                            return result.rows.length > 0 && result;
+                        });
+                    });
+                }).then(function(result) {
+                    transaction = result.rows[0];
+
+                    return waitUntil(function() {
+                        return getOrg().then(function(org) {
+                            return moment(org.nextPaymentDate).isSame(moment(today).add(1, 'month'), 'day') && org;
+                        });
+                    });
+                }).then(function(/*org*/) {
+                    org = arguments[0];
+                }).then(done, done.fail);
+            });
+
+            it('should make a payment for the amount of the payment plan', function() {
+                expect(payment.amount).toBe(paymentPlan.price);
+                expect(payment.method.token).toBe(paymentMethod.token);
+
+                expect(transaction).toEqual(jasmine.objectContaining({
+                    application: 'showcase',
+                    paymentplan_id: paymentPlan.id,
+                    view_target: paymentPlan.viewsPerMonth
+                }));
+                expect(moment(transaction.cycle_start).format()).toEqual(today.format(), 'cycle_start is wrong');
+                expect(moment(transaction.cycle_end).format()).toEqual(moment(today).add(1, 'month').subtract(1, 'day').format(), 'cycle_end is wrong');
+            });
+
+            it('should update the org\'s nextPaymentDate', function() {
+                var expected = moment(today).add(1, 'month');
+                var actual = moment(org.nextPaymentDate);
+
+                expect(actual.isSame(expected, 'day')).toBe(true, 'Expected ' + actual.format() + ' to be ' + expected.format());
+            });
+        });
+
+        describe('that is before today', function() {
+            beforeEach(function(done) {
+                updateNextPaymentDate(moment(today).subtract(1, 'day')).then(function(/*org*/) {
+                    org = arguments[0];
+
+                    return dailyEvent(today);
+                }).then(function() {
+                    return getMostRecentPayment();
+                }).then(function(/*payment*/) {
+                    payment = arguments[0];
+                }).then(function() {
+                    return waitUntil(function() {
+                        return testUtils.pgQuery(
+                            'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC LIMIT 1',
+                            [org.id]
+                        ).then(function(result) {
+                            return result.rows.length > 0 && result;
+                        });
+                    });
+                }).then(function(result) {
+                    transaction = result.rows[0];
+
+                    return waitUntil(function() {
+                        return getOrg().then(function(org) {
+                            return moment(org.nextPaymentDate).isSame(moment(today).add(1, 'month'), 'day') && org;
+                        });
+                    });
+                }).then(function(/*org*/) {
+                    org = arguments[0];
+                }).then(done, done.fail);
+            });
+
+            it('should make a payment for the amount of the payment plan', function() {
+                expect(transaction).toEqual(jasmine.objectContaining({
+                    application: 'showcase',
+                    paymentplan_id: paymentPlan.id,
+                    view_target: paymentPlan.viewsPerMonth
+                }));
+                expect(moment(transaction.cycle_start).format()).toEqual(today.format(), 'cycle_start is wrong');
+                expect(moment(transaction.cycle_end).format()).toEqual(moment(today).add(1, 'month').subtract(1, 'day').format(), 'cycle_end is wrong');
+            });
+
+            it('should update the org\'s nextPaymentDate', function() {
+                var expected = moment(today).add(1, 'month');
+                var actual = moment(org.nextPaymentDate);
+
+                expect(actual.isSame(expected, 'day')).toBe(true, 'Expected ' + actual.format() + ' to be ' + expected.format());
+            });
+        });
+
+        describe('and the org has no nextPaymentDate', function() {
             var payments;
 
             beforeEach(function(done) {
-                updatePaymentPlanStart(null).then(function() {
+                updateNextPaymentDate(null).then(function() {
                     return dailyEvent(moment().add(3, 'hours'));
                 }).then(function() {
                     return wait(5000);
@@ -517,303 +541,36 @@ describe('timeStream payment plan billing', function() {
             });
 
             it('should not give the org a nextPaymentDate', function() {
-                expect(org.nextPaymentDate).not.toBeDefined();
+                expect(org.nextPaymentDate).not.toBeTruthy();
             });
         });
 
-        describe('and the org\'s paymentPlanStart is in the future', function() {
-            var payments;
+        describe('if the user\'s card is declined', function() {
+            var email;
 
             beforeEach(function(done) {
-                updatePaymentPlanStart(moment().startOf('day').add(1, 'day')).then(function() {
-                    return dailyEvent(moment().startOf('day').add(3, 'hours'));
-                }).then(function() {
-                    return waitUntil(function() {
-                        return getOrg().then(function(org) {
-                            return !!org.nextPaymentDate;
-                        });
-                    });
-                }).then(function() {
-                    return getPayments();
-                }).then(function(/*payments*/) {
-                    payments = arguments[0];
+                var invalidPlan = paymentPlans.slice(-1)[0]; // Get the last payment plan, whose amount will cause a failure.
 
-                    return getOrg();
-                }).then(function(/*org*/) {
-                    org = arguments[0];
+                getMail('We Hit a Snag').then(function(/*email*/) {
+                    email = arguments[0];
                 }).then(done, done.fail);
 
-            });
+                updatePaymentPlan(invalidPlan.id).then(function() {
+                    return updateNextPaymentDate(moment());
+                }).then(function(/*org*/) {
+                    org = arguments[0];
+                    paymentPlan = invalidPlan;
 
-            it('should not make a payment', function() {
-                expect(payments.length).not.toBeGreaterThan(0, 'A payment was made.');
-            });
-
-            it('should give the org a nextPaymentDate', function() {
-                var expected = moment(org.paymentPlanStart);
-                var actual = moment(org.nextPaymentDate);
-
-                expect(actual.isSame(expected, 'day')).toBe(true, 'Expected ' + actual.format() + ' to be ' + expected.format());
-            });
-        });
-
-        describe('and the org\'s paymentPlanStart is today', function() {
-            var payment, transaction;
-
-            beforeEach(function(done) {
-                updatePaymentPlanStart(moment()).then(function() {
                     return dailyEvent(moment().add(3, 'hours'));
-                }).then(function() {
-                    return getMostRecentPayment();
-                }).then(function(/*payment*/) {
-                    payment = arguments[0];
-                }).then(function() {
-                    return waitUntil(function() {
-                        return testUtils.pgQuery(
-                            'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC LIMIT 1',
-                            [org.id]
-                        ).then(function(result) {
-                            return result.rows.length > 0 && result;
-                        });
-                    });
-                }).then(function(result) {
-                    transaction = result.rows[0];
-
-                    return waitUntil(function() {
-                        return getOrg().then(function(org) {
-                            return moment(org.nextPaymentDate).isSame(moment().add(3, 'hours').add(1, 'month'), 'day') && org;
-                        });
-                    });
-                }).then(function(/*org*/) {
-                    org = arguments[0];
-                }).then(done, done.fail);
+                }).catch(done.fail);
             });
 
-            it('should make a payment for the amount of the payment plan', function() {
-                expect(payment.amount).toBe(paymentPlan.price);
-                expect(transaction.description).toBe(JSON.stringify({ eventType: 'credit', source: 'braintree', target: 'showcase', paymentPlanId: org.paymentPlanId }));
+            it('should send the user an email', function() {
+                expect(email.text).toContain('PLEASE CHECK YOUR PAYMENT METHOD');
+                expect(email.from[0].address.toLowerCase()).toBe('support@cinema6.com');
+                expect(email.to[0].address.toLowerCase()).toBe(user.email);
+                expect(moment(email.date).isAfter(moment().subtract(1, 'minute'))).toBe(true, 'Email is too old.');
             });
-
-            it('should update the org\'s nextPaymentDate', function() {
-                var expected = moment().add(3, 'hours').add(1, 'month');
-                var actual = moment(org.nextPaymentDate);
-
-                expect(actual.isSame(expected, 'day')).toBe(true, 'Expected ' + actual.format() + ' to be ' + expected.format());
-            });
-        });
-
-        describe('and the org\'s paymentPlanStart was in the past', function() {
-            var payment, transaction;
-
-            beforeEach(function(done) {
-                updatePaymentPlanStart(moment().subtract(1, 'day')).then(function() {
-                    return dailyEvent(moment().add(3, 'hours'));
-                }).then(function() {
-                    return getMostRecentPayment();
-                }).then(function(/*payment*/) {
-                    payment = arguments[0];
-                }).then(function() {
-                    return waitUntil(function() {
-                        return testUtils.pgQuery(
-                            'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC LIMIT 1',
-                            [org.id]
-                        ).then(function(result) {
-                            return result.rows.length > 0 && result;
-                        });
-                    });
-                }).then(function(result) {
-                    transaction = result.rows[0];
-
-                    return waitUntil(function() {
-                        return getOrg().then(function(org) {
-                            return moment(org.nextPaymentDate).isSame(moment().add(3, 'hours').add(1, 'month'), 'day') && org;
-                        });
-                    });
-                }).then(function(/*org*/) {
-                    org = arguments[0];
-                }).then(done, done.fail);
-            });
-
-            it('should make a payment for the amount of the payment plan', function() {
-                expect(payment.amount).toBe(paymentPlan.price);
-                expect(transaction.description).toBe(JSON.stringify({ eventType: 'credit', source: 'braintree', target: 'showcase', paymentPlanId: org.paymentPlanId }));
-            });
-
-            it('should update the org\'s nextPaymentDate', function() {
-                var expected = moment().add(3, 'hours').add(1, 'month');
-                var actual = moment(org.nextPaymentDate);
-
-                expect(actual.isSame(expected, 'day')).toBe(true, 'Expected ' + actual.format() + ' to be ' + expected.format());
-            });
-        });
-    });
-
-    describe('if a payment was made', function() {
-        var today;
-
-        beforeEach(function(done) {
-            createPayment(ld.random(1, 500)).then(done, done.fail);
-        });
-
-        describe('less than a month ago', function() {
-            var payments;
-
-            beforeEach(function(done) {
-                today = moment().add(1, 'month').subtract(1, 'day');
-
-                dailyEvent(today).then(function() {
-                    return waitUntil(function() {
-                        return getOrg().then(function(org) {
-                            return !!org.nextPaymentDate;
-                        });
-                    });
-                }).then(function() {
-                    return getPayments();
-                }).then(function(/*payments*/) {
-                    payments = arguments[0];
-
-                    return getOrg();
-                }).then(function(/*org*/) {
-                    org = arguments[0];
-                }).then(done, done.fail);
-            });
-
-            it('should not create another payment', function() {
-                expect(payments.length).toBe(1, 'Another payment was created.');
-            });
-
-            it('should give the org a nextPaymentDate', function() {
-                var expected = moment(payments[0].createdAt).add(1, 'month');
-                var actual = moment(org.nextPaymentDate);
-
-                expect(actual.isSame(expected, 'day')).toBe(true, 'Expected ' + actual.format() + ' to be ' + expected.format());
-            });
-        });
-
-        describe('one month ago', function() {
-            var payments, transaction;
-
-            beforeEach(function(done) {
-                today = moment().add(1, 'month');
-
-                dailyEvent(today).then(function() {
-                    return waitUntil(function() {
-                        return getPayments().then(function(payments) {
-                            return payments.length > 1 && payments;
-                        });
-                    });
-                }).then(function(/*payments*/) {
-                    payments = arguments[0];
-                }).then(function() {
-                    return waitUntil(function() {
-                        return testUtils.pgQuery(
-                            'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC',
-                            [org.id]
-                        ).then(function(result) {
-                            return result.rows.length > 1 && result;
-                        });
-                    });
-                }).then(function(result) {
-                    transaction = result.rows[0];
-
-                    return waitUntil(function() {
-                        return getOrg().then(function(org) {
-                            return moment(org.nextPaymentDate).isSame(moment(today).add(1, 'month'), 'day') && org;
-                        });
-                    });
-                }).then(function(/*org*/) {
-                    org = arguments[0];
-                }).then(done, done.fail);
-            });
-
-            it('should create a payment', function() {
-                expect(payments.length).toBe(2, 'New payment not created.');
-                expect(payments[0].amount).toBe(paymentPlan.price);
-                expect(transaction.description).toBe(JSON.stringify({ eventType: 'credit', source: 'braintree', target: 'showcase', paymentPlanId: org.paymentPlanId }));
-            });
-
-            it('should update the org\'s nextPaymentDate', function() {
-                var expected = moment(today).add(1, 'month');
-                var actual = moment(org.nextPaymentDate);
-
-                expect(actual.isSame(expected, 'day')).toBe(true, 'Expected ' + actual.format() + ' to be ' + expected.format());
-            });
-        });
-
-        describe('over a month ago', function() {
-            var payments, transaction;
-
-            beforeEach(function(done) {
-                today = moment().add(1, 'month').add(1, 'day');
-
-                dailyEvent(today).then(function() {
-                    return waitUntil(function() {
-                        return getPayments().then(function(payments) {
-                            return payments.length > 1 && payments;
-                        });
-                    });
-                }).then(function(/*payments*/) {
-                    payments = arguments[0];
-                }).then(function() {
-                    return waitUntil(function() {
-                        return testUtils.pgQuery(
-                            'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC',
-                            [org.id]
-                        ).then(function(result) {
-                            return result.rows.length > 1 && result;
-                        });
-                    });
-                }).then(function(result) {
-                    transaction = result.rows[0];
-
-                    return waitUntil(function() {
-                        return getOrg().then(function(org) {
-                            return moment(org.nextPaymentDate).isSame(moment(today).add(1, 'month'), 'day') && org;
-                        });
-                    });
-                }).then(function(/*org*/) {
-                    org = arguments[0];
-                }).then(done, done.fail);
-            });
-
-            it('should create a payment', function() {
-                expect(payments.length).toBe(2, 'New payment not created.');
-                expect(payments[0].amount).toBe(paymentPlan.price);
-                expect(transaction.description).toBe(JSON.stringify({ eventType: 'credit', source: 'braintree', target: 'showcase', paymentPlanId: org.paymentPlanId }));
-            });
-
-            it('should update the org\'s nextPaymentDate', function() {
-                var expected = moment(today).add(1, 'month');
-                var actual = moment(org.nextPaymentDate);
-
-                expect(actual.isSame(expected, 'day')).toBe(true, 'Expected ' + actual.format() + ' to be ' + expected.format());
-            });
-        });
-    });
-
-    describe('if the user\'s card is declined', function() {
-        var email;
-
-        beforeEach(function(done) {
-            var invalidPlanId = Object.keys(paymentPlans).slice(-1)[0]; // Get the last configured payment plan, whose amount will cause a failure.
-
-            getMail('We Hit a Snag').then(function(/*email*/) {
-                email = arguments[0];
-            }).then(done, done.fail);
-
-            updatePaymentPlan(invalidPlanId).then(function(/*org*/) {
-                org = arguments[0];
-                paymentPlan = paymentPlans[invalidPlanId];
-
-                return dailyEvent(moment().add(3, 'hours'));
-            }).catch(done.fail);
-        });
-
-        it('should send the user an email', function() {
-            expect(email.text).toContain('PLEASE CHECK YOUR PAYMENT METHOD');
-            expect(email.from[0].address.toLowerCase()).toBe('support@cinema6.com');
-            expect(email.to[0].address.toLowerCase()).toBe(user.email);
-            expect(moment(email.date).isAfter(moment().subtract(1, 'minute'))).toBe(true, 'Email is too old.');
         });
     });
 });
