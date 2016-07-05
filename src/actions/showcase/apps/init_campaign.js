@@ -6,6 +6,7 @@ var CwrxRequest = require('../../../../lib/CwrxRequest');
 var JsonProducer = require('rc-kinesis').JsonProducer;
 var logger = require('cwrx/lib/logger');
 var resolveURL = require('url').resolve;
+var parseURL = require('url').parse;
 var inspect = require('util').inspect;
 var appFactories = require('showcase-core').factories.app;
 var assign = require('lodash').assign;
@@ -15,6 +16,8 @@ var mapValues = require('lodash').mapValues;
 var pickBy = require('lodash').pickBy;
 var getVal = require('lodash').get;
 var q = require('q');
+var path = require('path');
+var fs = require('fs');
 
 var createInterstitialFactory = appFactories.createInterstitialFactory;
 
@@ -30,11 +33,39 @@ module.exports = function initCampaignFactory(config) {
         apiRoot: config.beeswax.api.root,
         creds: config.beeswax.creds
     });
+    var appStoreToIABCats = function(asCats){
+        return (asCats || []).map(function(cat){
+            if (cat === 'Books')			 { return 'IAB1_1'; }   // (Books & Literature)
+            if (cat === 'Business')			 { return 'IAB3_4'; }   // (Business Software)
+            if (cat === 'Catalogs')			 { return 'IAB22'; }    // (Shopping)
+            if (cat === 'Education')	     { return 'IAB5'; }     // (Education)
+            if (cat === 'Entertainment')     { return 'IAB1'; }     // (Arts &Entertainment)
+            if (cat === 'Finance')			 { return 'IAB13'; }    // (Personal Finance)
+            if (cat === 'Food & Drink')	     { return 'IAB8'; }     // (Food & Drink)
+            if (cat === 'Games')			 { return 'IAB9_30'; }  // (Video & Comp. Games)
+            if (cat === 'Health & Fitness')  { return 'IAB7'; }     // (Health & Fitness)
+            if (cat === 'Lifestyle')	     { return 'IAB9'; }     // (Hobbies  & Interests)
+            if (cat === 'Medical')			 { return 'IAB7'; }     // (Health & Medicine)
+            if (cat === 'Music')			 { return 'IAB1_6'; }   // (Music)
+            if (cat === 'Navigation')	     { return 'IAB19'; }    // (Tech & Computing)
+            if (cat === 'News')			     { return 'IAB12'; }    // (News)
+            if (cat === 'Photo & Video')     { return 'IAB9_23'; }  // (Photography)
+            if (cat === 'Productivity')		 { return 'IAB3_4'; }   // (Business Software)
+            if (cat === 'Reference')		 { return 'IAB5'; }     // (Education)
+            if (cat === 'Social Networking') { return 'IAB24'; }    // (Uncategorized)
+            if (cat === 'Sports')			 { return 'IAB17'; }    // (Sports)
+            if (cat === 'Travel')			 { return 'IAB20'; }    // (Travel)
+            if (cat === 'Utilities')		 { return 'IAB19'; }    // (Tech & Computing)
+            if (cat === 'Weather')			 { return 'IAB15_10'; } // (Science-Weather)
+            return 'IAB24';     // (Uncategorized)
+        });
+    };
 
     return function initCampaign(event) {
         var data = event.data;
         var options = event.options;
         var campaign = data.campaign;
+        var campaignAdvertiser = null;
 
         var createInterstitial = createInterstitialFactory(
             options.card.interstitial
@@ -93,6 +124,7 @@ module.exports = function initCampaignFactory(config) {
             });
         }).spread(function createBeeswaxCampaign(advertiser) {
             log.info('Initialize beeswax campaign for campaign (%1)',campaign.id);
+            campaignAdvertiser = advertiser;
             return beeswax.campaigns.create({
                 advertiser_id: advertiser.externalIds.beeswax,
                 alternative_id : campaign.id,
@@ -154,11 +186,98 @@ module.exports = function initCampaignFactory(config) {
             ].map(function(json) {
                 return request.post({
                     url: placementsEndpoint,
+                    qs : { ext : false },
                     json: assign({}, json, {
                         tagParams: assign({}, json.tagParams, {
                             campaign: campaign.id
                         })
                     })
+                })
+                .spread(function uploadCreative(placement){
+                    if (placement.tagType !== 'mraid'){
+                        return placement;
+                    }
+
+                    var adUri = parseURL(campaign.product.uri);
+                    var creative = {
+                        advertiser_id : campaignAdvertiser.externalIds.beeswax,
+                        creative_type : 0,
+                        creative_template_id : 13,
+                        width: 320,
+                        height: 480,
+                        sizeless : true,
+                        secure: true,
+                        creative_name : 'MRAID: ' + campaign.product.name,
+                        creative_attributes : {
+                            mobile : { mraid_playable : [ true ] },
+                            technical : { 
+                                banner_mime : [
+                                    'text/javascript', 'application/javascript' 
+                                ], 
+                                tag_type : [ 3 ]
+                            },
+                            advertiser : {
+                                advertiser_domain : [adUri.protocol + '//' +
+                                    adUri.hostname ],
+                                landing_page_url: [adUri.protocol + '//' +
+                                    adUri.host + adUri.pathname],
+                                advertiser_category : 
+                                    appStoreToIABCats(campaign.product.categories)
+                            },
+                            video : { video_api: [ 3 ] }
+                        },
+                        creative_content: {},
+                        active : true
+                    };
+
+                    var templatePath = path.join(__dirname,
+                            '../../../../templates/beeswax/tags/mraid.html'),
+                        tagHtml = fs.readFileSync(templatePath, 'utf8'),
+                        opts = { placement: placement.id },
+                        thumbnailUrl;
+                    
+                    Object.keys(placement.showInTag || {}).forEach(function(key) {
+                        if (    placement.showInTag[key] === true && 
+                                !!placement.tagParams[key]) {
+                            opts[key] = placement.tagParams[key];
+                        }
+                    });
+                    creative.creative_content.TAG 
+                        = tagHtml.replace('%OPTIONS%', JSON.stringify(opts));
+                    
+                    (campaign.product.images || []).forEach(function(img){
+                        if (img.type === 'thumbnail') {
+                            thumbnailUrl = img.uri;
+                        }
+                    });
+
+                    if (!thumbnailUrl){
+                        log.warn('Can\'t find thumbnail in campaign %1 on placement %2',
+                            campaign.id, placement.id);
+                    }
+    
+                    return beeswax.uploadCreativeAsset({
+                        sourceUrl    : thumbnailUrl,
+                        advertiser_id: campaignAdvertiser.externalIds.beeswax
+                    })
+                    .then(function createCreative(asset){
+                        creative.creative_thumbnail_url = asset.path_to_asset;
+                        return beeswax.creatives.create(creative);
+                    })
+                    .then(function updatePlacement(result){
+                        return request.put({
+                            url: placementsEndpoint + '/' + placement.id,
+                            json: assign({}, {
+                                thumbnailSourceUrl : thumbnailUrl,
+                                externalIds : { beeswax : result.payload.creative_id }
+                            })
+                        });
+                    })
+                    .catch(function(e){
+                        log.warn('uploadCreative failed on placement %1 with: %2',
+                           placement.id, (e.message  ? e.message : inspect(e)));
+                        return [placement];
+                    });
                 });
             })).then(unzip).spread(function produceRecord(placements) {
                 log.trace(

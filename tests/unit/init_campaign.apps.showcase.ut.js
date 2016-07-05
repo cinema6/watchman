@@ -1,7 +1,7 @@
 /* jshint camelcase: false */
 'use strict';
 
-fdescribe('(action factory) showcase/apps/init_campaign', function() {
+xdescribe('(action factory) showcase/apps/init_campaign', function() {
     var q, uuid, resolveURL, ld, logger, showcaseFactories;
     var JsonProducer, CwrxRequest, BeeswaxClient;
     var factory;
@@ -146,7 +146,8 @@ fdescribe('(action factory) showcase/apps/init_campaign', function() {
         describe('the action', function() {
             var data, options, event, advertiser;
             var getAdvertiserDeferred, putAdvertiserDeferred,
-                postPlacementDeferred, bwCreateAdvertiserDeferred, bwCreateCampaignDeferred;
+                bwCreateAdvertiserDeferred, bwCreateCampaignDeferred,
+                bwCreateCreativeDeferred, bwUploadCreativeAssetDeferred;
             var success, failure;
 
             beforeEach(function(done) {
@@ -300,8 +301,9 @@ fdescribe('(action factory) showcase/apps/init_campaign', function() {
                 failure = jasmine.createSpy('failure()');
                 getAdvertiserDeferred =
                     putAdvertiserDeferred =
-                    postPlacementDeferred =
                     bwCreateAdvertiserDeferred =
+                    bwCreateCreativeDeferred =
+                    bwUploadCreativeAssetDeferred =
                     bwCreateCampaignDeferred = undefined;
                 
                 spyOn(request, 'get').and.callFake(function(opts){
@@ -311,12 +313,7 @@ fdescribe('(action factory) showcase/apps/init_campaign', function() {
                     return q.reject('Unexpected GET');
                 });
                 
-                spyOn(request, 'post').and.callFake(function(opts){
-                    if(opts.url.match(/\/api\/placements/)){
-                        return (postPlacementDeferred = q.defer()).promise;
-                    }
-                    return q.reject('Unexpected GET');
-                });
+                spyOn(request, 'post');
 
                 initCampaign(event).then(success, failure);
                 process.nextTick(done);
@@ -512,13 +509,21 @@ fdescribe('(action factory) showcase/apps/init_campaign', function() {
                 });
 
                 describe('when the cards have been created', function() {
-                    var postPlacementDeffereds;
+                    var postPlacementDeffereds, putPlacementDeffereds;
                     var campaign, interstitial ;
 
                     beforeEach(function(done) {
                         request.post.calls.reset();
+                        
+                        spyOn(beeswax.creatives,'create')
+                            .and.returnValue((bwCreateCreativeDeferred = q.defer()).promise);
+
+                        spyOn(beeswax,'uploadCreativeAsset')
+                            .and.returnValue((bwUploadCreativeAssetDeferred
+                                = q.defer()).promise);
 
                         postPlacementDeffereds = [];
+                        putPlacementDeffereds = [];
                         request.post.and.callFake(function() {
                             var deferred = q.defer();
 
@@ -544,11 +549,12 @@ fdescribe('(action factory) showcase/apps/init_campaign', function() {
                         process.nextTick(done);
                     });
 
-                    it('should create one placements', function() {
+                    it('should create one placement', function() {
                         expect(request.post.calls.count()).toBe(1, 'Wrong number of placements created!');
 
                         expect(request.post).toHaveBeenCalledWith({
                             url: resolveURL(config.cwrx.api.root, config.cwrx.api.placements.endpoint),
+                            qs : { ext : false },
                             json: {
                                 label: 'Showcase--Interstitial for App: "' + campaign.name + '"',
                                 tagType: options.placement.interstitial.tagType,
@@ -594,6 +600,130 @@ fdescribe('(action factory) showcase/apps/init_campaign', function() {
                     });
 
                     describe('when the placements have been created', function() {
+                        var placements;
+                        beforeEach(function(done) {
+                            expect(postPlacementDeffereds.length).toBe(1);
+                            placements = [];
+                            postPlacementDeffereds.forEach(function(deferred, index) {
+                                var placement = ld.assign({},
+                                        request.post.calls.all()[index].args[0].json, {
+                                            id: 'pl-' + uuid.createUuid()
+                                        });
+                                placements.push(placement);
+                                deferred.fulfill([placement, { statusCode: 201 }]);
+                            });
+                            process.nextTick(done);
+                        });
+
+                        it('calls uploadCreativeAsset',function(){
+                            expect(beeswax.uploadCreativeAsset).toHaveBeenCalledWith(
+                                { 
+                                    sourceUrl: 
+                                        'http://is1.mzstatic.com/image/thumb/Purple49/v4/df/4d/77/df4d77af-c3d8-671e-0bd2-a3ce288edbd5/source/512x512bb.jpg',
+                                    advertiser_id: 1 
+                                }
+                            );
+
+                        });
+
+                        describe('when uploadCreativeAsset fails',function(){
+                            beforeEach(function(done){
+                                bwUploadCreativeAssetDeferred.reject(
+                                    new Error('I failed!')
+                                );
+                                process.nextTick(done);
+                            });
+
+                            it('will log a warning, not create a creative, but continue',
+                                function(){
+                                    expect(log.warn).toHaveBeenCalledWith('uploadCreative failed on placement %1 with: %2', placements[0].id, 'I failed!');
+                                    expect(beeswax.creatives.create).not.toHaveBeenCalled();
+                                    expect(log.error).not.toHaveBeenCalled();
+                                    expect(watchmanStream.produce).toHaveBeenCalled();
+                                });
+
+                        });
+
+                        describe('when uploadCreativeAsset succeeds',function(){
+                            beforeEach(function(done){
+                                bwUploadCreativeAssetDeferred.resolve({
+                                    path_to_asset : '/x/y/z.jpg'
+                                });
+                                process.nextTick(done);
+                            });
+
+                            it('will continue to create the creative', function(){
+                                var arg = beeswax.creatives.create.calls.argsFor(0)[0];
+                                expect(arg.advertiser_id).toEqual(1);
+                                expect(arg.creative_name).toEqual('MRAID: iAnnotate 4 - read, markup and share PDFs and more');
+                                expect(arg.creative_attributes.advertiser).toEqual(
+                                    jasmine.objectContaining({
+                                        advertiser_domain: [ 'https://itunes.apple.com' ],
+                                        landing_page_url: [ 
+                                            'https://itunes.apple.com/us/app/iannotate-4-read-markup-share/id1093924230' 
+                                        ],
+                                        advertiser_category: [ 'IAB3_4', 'IAB3_4' ] 
+                                    })
+                                );
+
+                                expect(arg.creative_thumbnail_url).toEqual('/x/y/z.jpg');
+                            });
+
+                            describe('when create creative fails',function(){
+                                beforeEach(function(done){
+                                    bwCreateCreativeDeferred.reject(
+                                        new Error('I failed!')
+                                    );
+                                    process.nextTick(done);
+                                });
+
+                                it('will log a warning, but continue', function(){
+                                    expect(log.warn).toHaveBeenCalledWith(
+                                        'uploadCreative failed on placement %1 with: %2', placements[0].id, 'I failed!'
+                                    );
+                                    expect(log.error).not.toHaveBeenCalled();
+                                    expect(watchmanStream.produce).toHaveBeenCalled();
+                                });
+                            });
+                            
+                            describe('when create creative succeeds',function(){
+                                beforeEach(function(done){
+                                    request.put.calls.reset();
+                                    request.put.and.callFake(function() {
+                                        var deferred = q.defer();
+
+                                        putPlacementDeffereds.push(deferred);
+
+                                        return deferred.promise;
+                                    });
+                                    bwCreateCreativeDeferred.resolve({
+                                        payload : { creative_id : 44 }
+                                    });
+                                    process.nextTick(done);
+                                });
+
+                                beforeEach(function(done) {
+                                    expect(putPlacementDeffereds.length).toBe(1);
+                                    putPlacementDeffereds.forEach(function(deferred ) {
+                                        deferred.fulfill([{}, { statusCode: 201 }]);
+                                    });
+                                    process.nextTick(done);
+                                });
+
+                                it('will update the placement', function(){
+                                    expect(request.put).toHaveBeenCalledWith({
+                                        url : 'http://33.33.33.10/api/placements/' + placements[0].id,
+                                        json : {
+                                            thumbnailSourceUrl: 'http://is1.mzstatic.com/image/thumb/Purple49/v4/df/4d/77/df4d77af-c3d8-671e-0bd2-a3ce288edbd5/source/512x512bb.jpg',
+                                            externalIds : { beeswax : 44 }
+                                        }
+                                    }); 
+                                });
+                            });
+                        });
+                    });
+
+                    describe('when the placements have been updated', function() {
                         var placements;
                         var produceDeferred;
 
