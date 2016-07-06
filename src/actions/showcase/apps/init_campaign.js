@@ -49,11 +49,15 @@ module.exports = function factory(config) {
         log.trace('Creating cards for showcase (app) campaign(%1)', campaign.id);
         return request.put({
             url: campaignsEndpoint + '/' + campaign.id,
-            json: assign({}, campaign, {
+            json: {
+                conversionMultipliers: {
+                    internal: config.campaign.conversionMultipliers.internal,
+                    external: config.campaign.conversionMultipliers.external
+                },
                 cards: campaign.cards.concat([
                     setupCard(createInterstitial(campaign.product))
                 ])
-            })
+            }
         }).spread(campaign => {
             const newCards = takeRight(campaign.cards, 1);
             const interstitial = newCards[0];

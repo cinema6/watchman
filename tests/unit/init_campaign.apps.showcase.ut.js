@@ -81,6 +81,12 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                 },
                 beeswax: {
                     apiRoot: 'https://stingersbx.api.beeswax.com'
+                },
+                campaign: {
+                    conversionMultipliers: {
+                        internal: 1.10,
+                        external: 1.25
+                    }
                 }
             };
 
@@ -279,17 +285,21 @@ describe('(action factory) showcase/apps/init_campaign', function() {
             });
 
             describe('when the external campaign is created', function() {
-                it('should add one card to the campaign', function() {
+                it('should add one card and some conversion multipliers to the campaign', function() {
                     expect(request.put).toHaveBeenCalledWith({
                         url: resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint + '/' + data.campaign.id),
-                        json: ld.assign({}, data.campaign, {
+                        json: {
+                            conversionMultipliers: {
+                                internal: config.campaign.conversionMultipliers.internal,
+                                external: config.campaign.conversionMultipliers.external
+                            },
                             cards: data.campaign.cards.concat([
                                 ld.assign(showcaseFactories.app.createInterstitialFactory(options.card.interstitial)(data.campaign.product), {
                                     user: data.campaign.user,
                                     org: data.campaign.org
                                 })
                             ])
-                        })
+                        }
                     });
                 });
 
