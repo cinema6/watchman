@@ -190,7 +190,8 @@
                             "campaignSubmitted": "672810",
                             "initializedShowcaseCampaign": "672910",
                             "campaignActive--app": "694541",
-                            "promotionEnded--app": "722104"
+                            "promotionEnded--app": "722104",
+                            "weekOneStats--app": "736301"
                         }
                     },
                     "beeswax": {
@@ -277,11 +278,27 @@
                                     "ifData": {
                                         "org.paymentPlanId": "^pp-"
                                     }
+                                },
+                                {
+                                    "name": "check_weekiversary"
                                 }
                             ]
                         },
                         "hourly_campaignPulse": {
                             "actions": ["check_expiry"]
+                        },
+                        "campaign_weekiversary": {
+                            "actions": [
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "stats"
+                                    },
+                                    "ifData": {
+                                        "campaign.application": "^showcase$"
+                                    }
+                                }
+                            ]
                         },
                         "paymentPlanWillStart": {
                             "actions": [
