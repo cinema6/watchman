@@ -1,21 +1,21 @@
 'use strict';
 
-var Q = require('q');
-var fs = require('fs');
-var handlebars = require('handlebars');
-var htmlToText = require('html-to-text');
-var logger = require('cwrx/lib/logger.js');
-var nodemailer = require('nodemailer');
-var path = require('path');
-var postmark = require('postmark');
-var proxyquire = require('proxyquire').noCallThru();
-var requestUtils = require('cwrx/lib/requestUtils.js');
-var uuid = require('rc-uuid');
-var resolveURL = require('url').resolve;
+const Q = require('q');
+const fs = require('fs');
+const handlebars = require('handlebars');
+const htmlToText = require('html-to-text');
+const logger = require('cwrx/lib/logger.js');
+const nodemailer = require('nodemailer');
+const path = require('path');
+const postmark = require('postmark');
+const proxyquire = require('proxyquire').noCallThru();
+const requestUtils = require('cwrx/lib/requestUtils.js');
+const uuid = require('rc-uuid');
+const resolveURL = require('url').resolve;
 
 describe('campaign_email.js', function() {
     beforeEach(function() {
-        var self = this;
+        const self = this;
         self.event = {
             data: { campaign: { } },
             options: {
@@ -23,7 +23,10 @@ describe('campaign_email.js', function() {
             }
         };
         self.mockLog = {
-            warn: jasmine.createSpy('warn()')
+            trace: jasmine.createSpy('trace()'),
+            info: jasmine.createSpy('info()'),
+            warn: jasmine.createSpy('warn()'),
+            error: jasmine.createSpy('error()')
         };
         self.mockSesTransport = jasmine.createSpy('sesTransport()');
         self.mockTransport = {
@@ -31,8 +34,13 @@ describe('campaign_email.js', function() {
                 callback(null, null);
             })
         };
+        self.CwrxRequest = function() { };
+        self.CwrxRequest.prototype = {
+            get: jasmine.createSpy('')
+        };
         self.emailFactory = proxyquire('../../src/actions/message/campaign_email.js', {
-            'nodemailer-ses-transport': self.mockSesTransport
+            'nodemailer-ses-transport': self.mockSesTransport,
+            '../../../lib/CwrxRequest.js': self.CwrxRequest
         });
         self.config = {
             emails: {
@@ -71,6 +79,9 @@ describe('campaign_email.js', function() {
                     },
                     advertisers: {
                         endpoint: '/advertisers'
+                    },
+                    analytics: {
+                        endpoint: '/analytics'
                     }
                 }
             },
@@ -103,7 +114,8 @@ describe('campaign_email.js', function() {
                     campaignSubmitted: 'campaignSubmitted-template-id',
                     initializedShowcaseCampaign: 'initializedShowcaseCampaign-template-id',
                     'campaignActive--app': 'campaignActive--app-template-id',
-                    'promotionEnded--app': 'promotionEnded--app-template-id'
+                    'promotionEnded--app': 'promotionEnded--app-template-id',
+                    'weekOneStats--app': 'weekOneStats--app-template-id'
                 }
             },
             state: {
@@ -153,9 +165,10 @@ describe('campaign_email.js', function() {
             };
         });
         spyOn(htmlToText, 'fromString').and.returnValue('text');
-        spyOn(requestUtils, 'makeSignedRequest').and.returnValue(Q.resolve());
+        spyOn(requestUtils, 'makeSignedRequest').and.returnValue(Promise.resolve());
         spyOn(logger, 'getLog').and.returnValue(self.mockLog);
         spyOn(nodemailer, 'createTransport').and.returnValue(self.mockTransport);
+        //spyOn(self.CwrxRequest.prototype, 'get');
     });
 
     describe('the exported function', function() {
@@ -166,7 +179,7 @@ describe('campaign_email.js', function() {
 
         it('should be able to construct an action function', function() {
             expect(this.email).toEqual(jasmine.any(Function));
-            expect(this.email.name).toBe('action');
+            expect(this.email.name).toBe('');
         });
 
         it('should create the postmark client', function() {
@@ -195,82 +208,6 @@ describe('campaign_email.js', function() {
         });
     });
 
-    describe('email attachments', function() {
-        beforeEach(function() {
-            this.event.options.type = 'campaignExpired';
-            this.event.data.target = 'showcase';
-            this.event.options.to = 'somedude@fake.com';
-        });
-
-        describe('if there is an error checking the attachment', function() {
-            beforeEach(function(done) {
-                fs.stat.and.callFake(function(path, callback) {
-                    var error = /reelcontent-email-logo-white\.png/.test(path) ? 'epic fail' : null;
-                    callback(error, {
-                        isFile: function() {
-                            return true;
-                        }
-                    });
-                });
-                this.email(this.event).then(done, done.fail);
-            });
-
-            it('should warn', function() {
-                expect(this.mockLog.warn).toHaveBeenCalled();
-            });
-
-            it('should filter out the attachment', function() {
-                var attachments = this.mockTransport.sendMail.calls.mostRecent().args[0].attachments;
-                expect(attachments.length).toBe(4);
-            });
-        });
-
-        describe('if the attachment does not exist', function() {
-            beforeEach(function(done) {
-                fs.stat.and.callFake(function(path, callback) {
-                    var exists = /reelcontent-email-logo-white\.png/.test(path) ? false : true;
-                    callback(null, {
-                        isFile: function() {
-                            return exists;
-                        }
-                    });
-                });
-                this.email(this.event).then(done, done.fail);
-            });
-
-            it('should warn', function() {
-                expect(this.mockLog.warn).toHaveBeenCalled();
-            });
-
-            it('should filter out the attachment', function() {
-                var attachments = this.mockTransport.sendMail.calls.mostRecent().args[0].attachments;
-                expect(attachments.length).toBe(4);
-            });
-        });
-
-        describe('if the attachments exist', function() {
-            beforeEach(function(done) {
-                fs.stat.and.callFake(function(path, callback) {
-                    callback(null, {
-                        isFile: function() {
-                            return true;
-                        }
-                    });
-                });
-                this.email(this.event).then(done, done.fail);
-            });
-
-            it('should not warn', function() {
-                expect(this.mockLog.warn).not.toHaveBeenCalled();
-            });
-
-            it('should include them', function() {
-                var attachments = this.mockTransport.sendMail.calls.mostRecent().args[0].attachments;
-                expect(attachments.length).toBe(5);
-            });
-        });
-    });
-
     describe('getting the recipient of an email', function() {
         beforeEach(function() {
             this.event.options.type = 'campaignExpired';
@@ -293,7 +230,7 @@ describe('campaign_email.js', function() {
             });
 
             it('should email the specified email', function(done) {
-                var self = this;
+                const self = this;
                 self.event.options.to = 'somedude@fake.com';
                 self.email(self.event).then(function() {
                     expect(self.mockTransport.sendMail.calls.mostRecent().args[0].to).toBe('somedude@fake.com');
@@ -301,7 +238,7 @@ describe('campaign_email.js', function() {
             });
 
             it('should be able to compile the field with data', function(done) {
-                var self = this;
+                const self = this;
                 self.event.options.to = '{{oldEmail}}';
                 self.event.data.oldEmail = 'somedude@fake.com';
                 self.email(self.event).then(function() {
@@ -332,19 +269,18 @@ describe('campaign_email.js', function() {
 
             describe('the request for the user', function() {
                 it('should be made correctly', function(done) {
-                    this.email(this.event).finally(function() {
+                    this.email(this.event).then(done.fail, () => {
                         expect(requestUtils.makeSignedRequest).toHaveBeenCalledWith('appCreds', 'get', {
                             fields: 'email,firstName',
                             json: true,
                             url: 'https://root/users/u-123'
                         });
-                        done();
-                    });
+                    }).then(done, done.fail);
                 });
 
                 describe('when it responds with a 200', function() {
                     beforeEach(function(done) {
-                        requestUtils.makeSignedRequest.and.returnValue(Q.resolve({
+                        requestUtils.makeSignedRequest.and.returnValue(Promise.resolve({
                             response: {
                                 statusCode: 200
                             },
@@ -370,7 +306,7 @@ describe('campaign_email.js', function() {
 
                 describe('when it does not respond with a 200', function() {
                     beforeEach(function(done) {
-                        requestUtils.makeSignedRequest.and.returnValue(Q.resolve({
+                        requestUtils.makeSignedRequest.and.returnValue(Promise.resolve({
                             response: {
                                 statusCode: 500
                             },
@@ -387,11 +323,11 @@ describe('campaign_email.js', function() {
 
                 describe('when it fails', function() {
                     beforeEach(function() {
-                        requestUtils.makeSignedRequest.and.returnValue(Q.reject('epic fail'));
+                        requestUtils.makeSignedRequest.and.returnValue(Promise.reject('epic fail'));
                     });
 
                     it('should reject and not send the email', function(done) {
-                        var self = this;
+                        const self = this;
                         self.email(self.event).then(done.fail).catch(function(error) {
                             expect(error).toBe('epic fail');
                             expect(self.mockTransport.sendMail).not.toHaveBeenCalled();
@@ -459,7 +395,7 @@ describe('campaign_email.js', function() {
                         this.result = { response: this.response, body: this.body };
 
                         this.getUsersDeferred.fulfill(this.result);
-                        process.nextTick(done);
+                        setTimeout(done);
                     });
 
                     it('should send to the first user\'s email', function() {
@@ -491,7 +427,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should compile the email template', function(done) {
-            var self = this;
+            const self = this;
             self.event.options.type = 'campaignExpired';
             self.event.options.to = 'somedude@fake.com';
             fs.readFile.and.callFake(function(path, options, callback) {
@@ -506,8 +442,8 @@ describe('campaign_email.js', function() {
         });
 
         it('should lowercase links for the email text', function(done) {
-            var self = this;
-            var template = 'template content [HTTPS://WWW.ANGRY-MAD-LINK-RAWR.COM]';
+            const self = this;
+            const template = 'template content [HTTPS://WWW.ANGRY-MAD-LINK-RAWR.COM]';
             self.event.options.type = 'campaignExpired';
             self.event.options.to = 'somedude@fake.com';
             fs.readFile.and.callFake(function(path, options, callback) {
@@ -536,7 +472,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should be able to send using ses', function(done) {
-            var self = this;
+            const self = this;
             self.email(self.event).then(function() {
                 expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/campaignExpired.html'), { encoding: 'utf8' }, jasmine.any(Function));
                 expect(self.mockTemplate).toHaveBeenCalledWith({
@@ -599,7 +535,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should be able to send using ses', function(done) {
-            var self = this;
+            const self = this;
             self.email(self.event).then(function() {
                 expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/campaignOutOfBudget.html'), { encoding: 'utf8' }, jasmine.any(Function));
                 expect(self.mockTemplate).toHaveBeenCalledWith({
@@ -660,7 +596,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should be able to send using ses', function(done) {
-            var self = this;
+            const self = this;
             self.email(self.event).then(function() {
                 expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/campaignApproved.html'), { encoding: 'utf8' }, jasmine.any(Function));
                 expect(self.mockTemplate).toHaveBeenCalledWith({
@@ -717,7 +653,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should be able to send using ses', function(done) {
-            var self = this;
+            const self = this;
             self.email(self.event).then(function() {
                 expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/campaignUpdateApproved.html'), { encoding: 'utf8' }, jasmine.any(Function));
                 expect(self.mockTemplate).toHaveBeenCalledWith({
@@ -777,7 +713,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should be able to send using ses', function(done) {
-            var self = this;
+            const self = this;
             self.email(self.event).then(function() {
                 expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/campaignRejected.html'), { encoding: 'utf8' }, jasmine.any(Function));
                 expect(self.mockTemplate).toHaveBeenCalledWith({
@@ -839,7 +775,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should be able to send using ses', function(done) {
-            var self = this;
+            const self = this;
             self.email(self.event).then(function() {
                 expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/campaignUpdateRejected.html'), { encoding: 'utf8' }, jasmine.any(Function));
                 expect(self.mockTemplate).toHaveBeenCalledWith({
@@ -895,7 +831,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should be able to use the email of the user', function(done) {
-            var self = this;
+            const self = this;
             self.event.data.user = {
                 email: 'email@gmail.com'
             };
@@ -928,7 +864,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should be able to use the application key', function(done) {
-            var self = this;
+            const self = this;
             self.event.data.application = {
                 key: 'app-key'
             };
@@ -962,7 +898,7 @@ describe('campaign_email.js', function() {
 
         describe('the email subject', function() {
             it('should be able to use the company of the user', function(done) {
-                var self = this;
+                const self = this;
                 self.event.data.campaign = {
                     name: 'Nombre'
                 };
@@ -970,13 +906,13 @@ describe('campaign_email.js', function() {
                     company: 'Evil Corp'
                 };
                 self.email(self.event).then(function() {
-                    var subject = self.mockTransport.sendMail.calls.mostRecent().args[0].subject;
+                    const subject = self.mockTransport.sendMail.calls.mostRecent().args[0].subject;
                     expect(subject).toBe('New update request from Evil Corp for campaign "Nombre"');
                 }).then(done, done.fail);
             });
 
             it('should be able to use the name of the user', function(done) {
-                var self = this;
+                const self = this;
                 self.event.data.campaign = {
                     name: 'Nombre'
                 };
@@ -985,13 +921,13 @@ describe('campaign_email.js', function() {
                     lastName: 'Star'
                 };
                 self.email(self.event).then(function() {
-                    var subject = self.mockTransport.sendMail.calls.mostRecent().args[0].subject;
+                    const subject = self.mockTransport.sendMail.calls.mostRecent().args[0].subject;
                     expect(subject).toBe('New update request from Patrick Star for campaign "Nombre"');
                 }).then(done, done.fail);
             });
 
             it('should be able to use the key of an application', function(done) {
-                var self = this;
+                const self = this;
                 self.event.data.campaign = {
                     name: 'Nombre'
                 };
@@ -999,14 +935,14 @@ describe('campaign_email.js', function() {
                     key: 'app-key'
                 };
                 self.email(self.event).then(function() {
-                    var subject = self.mockTransport.sendMail.calls.mostRecent().args[0].subject;
+                    const subject = self.mockTransport.sendMail.calls.mostRecent().args[0].subject;
                     expect(subject).toBe('New update request from app-key for campaign "Nombre"');
                 }).then(done, done.fail);
             });
         });
 
         it('should be able to send using postmark', function(done) {
-            var self = this;
+            const self = this;
             self.event.data.user = {
                 email: 'email@gmail.com'
             };
@@ -1072,7 +1008,7 @@ describe('campaign_email.js', function() {
             });
 
             it('should handle payments from credit cards', function(done) {
-                var self = this;
+                const self = this;
                 self.email(self.event).then(function() {
                     expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/paymentReceipt.html'), { encoding: 'utf8' }, jasmine.any(Function));
                     expect(self.mockTemplate).toHaveBeenCalledWith({
@@ -1106,7 +1042,7 @@ describe('campaign_email.js', function() {
             });
 
             it('should handle payments from paypal accounts', function(done) {
-                var self = this;
+                const self = this;
                 self.event.data.payment.method = { type: 'paypal', email: 'johnny@moneybags.com' };
                 self.email(self.event).then(function() {
                     expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/paymentReceipt.html'), { encoding: 'utf8' }, jasmine.any(Function));
@@ -1145,7 +1081,7 @@ describe('campaign_email.js', function() {
             });
 
             it('should handle payments from credit cards', function(done) {
-                var self = this;
+                const self = this;
                 self.email(self.event).then(function() {
                     expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/paymentReceipt--app.html'), { encoding: 'utf8' }, jasmine.any(Function));
                     expect(self.mockTemplate).toHaveBeenCalledWith({
@@ -1175,7 +1111,7 @@ describe('campaign_email.js', function() {
             });
 
             it('should handle payments from paypal accounts', function(done) {
-                var self = this;
+                const self = this;
                 self.event.data.payment.method = { type: 'paypal', email: 'johnny@moneybags.com' };
                 self.email(self.event).then(function() {
                     expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/paymentReceipt--app.html'), { encoding: 'utf8' }, jasmine.any(Function));
@@ -1253,7 +1189,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should handle the possibility of a url without query params', function(done) {
-            var self = this;
+            const self = this;
             self.email(self.event).then(function() {
                 expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/activateAccount.html'), { encoding: 'utf8' }, jasmine.any(Function));
                 expect(self.mockTemplate).toHaveBeenCalledWith({
@@ -1276,7 +1212,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should handle the possibility of a url with query params', function(done) {
-            var self = this;
+            const self = this;
             self.config.emails.activationTargets.selfie = 'http://link.com?query=param';
             self.email(self.event).then(function() {
                 expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/activateAccount.html'), { encoding: 'utf8' }, jasmine.any(Function));
@@ -1305,7 +1241,7 @@ describe('campaign_email.js', function() {
             });
 
             it('should use the selfie template and data', function(done) {
-                var self = this;
+                const self = this;
                 self.email(self.event).then(function() {
                     expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/activateAccount.html'), { encoding: 'utf8' }, jasmine.any(Function));
                     expect(self.mockTemplate).toHaveBeenCalledWith({
@@ -1334,7 +1270,7 @@ describe('campaign_email.js', function() {
             });
 
             it('should use the showcase template and data', function(done) {
-                var self = this;
+                const self = this;
                 self.email(self.event).then(function() {
                     expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/activateAccount--app.html'), { encoding: 'utf8' }, jasmine.any(Function));
                     expect(self.mockTemplate).toHaveBeenCalledWith({
@@ -1356,18 +1292,18 @@ describe('campaign_email.js', function() {
         describe('the email subject', function() {
             describe('and the data has no target', function() {
                 it('should be a subject for selfie', function(done) {
-                    var self = this;
+                    const self = this;
                     self.email(self.event).then(function() {
-                        var subject = self.mockTransport.sendMail.calls.mostRecent().args[0].subject;
+                        const subject = self.mockTransport.sendMail.calls.mostRecent().args[0].subject;
                         expect(subject).toBe('Emma, Welcome to Reelcontent');
                     }).then(done, done.fail);
                 });
 
                 it('should be a different subject if the user has no first name', function(done) {
-                    var self = this;
+                    const self = this;
                     delete self.event.data.user.firstName;
                     self.email(self.event).then(function() {
-                        var subject = self.mockTransport.sendMail.calls.mostRecent().args[0].subject;
+                        const subject = self.mockTransport.sendMail.calls.mostRecent().args[0].subject;
                         expect(subject).toBe('Welcome to Reelcontent');
                     }).then(done, done.fail);
                 });
@@ -1379,18 +1315,18 @@ describe('campaign_email.js', function() {
                 });
 
                 it('should be a subject for selfie', function(done) {
-                    var self = this;
+                    const self = this;
                     self.email(self.event).then(function() {
-                        var subject = self.mockTransport.sendMail.calls.mostRecent().args[0].subject;
+                        const subject = self.mockTransport.sendMail.calls.mostRecent().args[0].subject;
                         expect(subject).toBe('Emma, Welcome to Reelcontent');
                     }).then(done, done.fail);
                 });
 
                 it('should be a different subject if the user has no first name', function(done) {
-                    var self = this;
+                    const self = this;
                     delete self.event.data.user.firstName;
                     self.email(self.event).then(function() {
-                        var subject = self.mockTransport.sendMail.calls.mostRecent().args[0].subject;
+                        const subject = self.mockTransport.sendMail.calls.mostRecent().args[0].subject;
                         expect(subject).toBe('Welcome to Reelcontent');
                     }).then(done, done.fail);
                 });
@@ -1402,18 +1338,18 @@ describe('campaign_email.js', function() {
                 });
 
                 it('should be a subject for selfie', function(done) {
-                    var self = this;
+                    const self = this;
                     self.email(self.event).then(function() {
-                        var subject = self.mockTransport.sendMail.calls.mostRecent().args[0].subject;
+                        const subject = self.mockTransport.sendMail.calls.mostRecent().args[0].subject;
                         expect(subject).toBe('Emma, Welcome to Reelcontent Apps');
                     }).then(done, done.fail);
                 });
 
                 it('should be a different subject if the user has no first name', function(done) {
-                    var self = this;
+                    const self = this;
                     delete self.event.data.user.firstName;
                     self.email(self.event).then(function() {
-                        var subject = self.mockTransport.sendMail.calls.mostRecent().args[0].subject;
+                        const subject = self.mockTransport.sendMail.calls.mostRecent().args[0].subject;
                         expect(subject).toBe('Welcome to Reelcontent Apps');
                     }).then(done, done.fail);
                 });
@@ -1464,7 +1400,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should be able to send using ses', function(done) {
-            var self = this;
+            const self = this;
             self.email(self.event).then(function() {
                 expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/chargePaymentPlanFailure.html'), { encoding: 'utf8' }, jasmine.any(Function));
                 expect(self.mockTemplate).toHaveBeenCalledWith({
@@ -1490,7 +1426,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should be able to send using postmark', function(done) {
-            var self = this;
+            const self = this;
             self.event.options.provider = 'postmark';
             self.email(self.event).then(function() {
                 expect(postmark.Client.prototype.sendEmailWithTemplate).toHaveBeenCalledWith({
@@ -1529,7 +1465,7 @@ describe('campaign_email.js', function() {
 
         describe('without a target', function() {
             it('should use the selfie template and data', function(done) {
-                var self = this;
+                const self = this;
                 self.email(self.event).then(function() {
                     expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/accountWasActivated.html'), { encoding: 'utf8' }, jasmine.any(Function));
                     expect(self.mockTemplate).toHaveBeenCalledWith({
@@ -1558,7 +1494,7 @@ describe('campaign_email.js', function() {
             });
 
             it('should use the selfie template and data', function(done) {
-                var self = this;
+                const self = this;
                 self.email(self.event).then(function() {
                     expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/accountWasActivated.html'), { encoding: 'utf8' }, jasmine.any(Function));
                     expect(self.mockTemplate).toHaveBeenCalledWith({
@@ -1587,7 +1523,7 @@ describe('campaign_email.js', function() {
             });
 
             it('should use the showcase template and data', function(done) {
-                var self = this;
+                const self = this;
                 self.email(self.event).then(function() {
                     expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/accountWasActivated--app.html'), { encoding: 'utf8' }, jasmine.any(Function));
                     expect(self.mockTemplate).toHaveBeenCalledWith({
@@ -1608,18 +1544,18 @@ describe('campaign_email.js', function() {
 
         describe('the email subject', function() {
             it('should include the user\'s name if it exists', function(done) {
-                var self = this;
+                const self = this;
                 self.email(self.event).then(function() {
-                    var subject = self.mockTransport.sendMail.calls.mostRecent().args[0].subject;
+                    const subject = self.mockTransport.sendMail.calls.mostRecent().args[0].subject;
                     expect(subject).toBe('Randy, Your Reelcontent Account Is Ready To Go');
                 }).then(done, done.fail);
             });
 
             it('should not include a name if one does not exist on the user', function(done) {
-                var self = this;
+                const self = this;
                 delete self.event.data.user.firstName;
                 self.email(self.event).then(function() {
-                    var subject = self.mockTransport.sendMail.calls.mostRecent().args[0].subject;
+                    const subject = self.mockTransport.sendMail.calls.mostRecent().args[0].subject;
                     expect(subject).toBe('Your Reelcontent Account Is Ready To Go');
                 }).then(done, done.fail);
             });
@@ -1661,7 +1597,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should work for selfie users', function(done) {
-            var self = this;
+            const self = this;
             self.email(self.event).then(function() {
                 expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/passwordChanged.html'), { encoding: 'utf8' }, jasmine.any(Function));
                 expect(self.mockTemplate).toHaveBeenCalledWith({
@@ -1687,7 +1623,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should work for showcase users', function(done) {
-            var self = this;
+            const self = this;
             self.event.data.target = 'showcase';
             self.email(self.event).then(function() {
                 expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/passwordChanged--app.html'), { encoding: 'utf8' }, jasmine.any(Function));
@@ -1746,7 +1682,7 @@ describe('campaign_email.js', function() {
 
         describe('for selfie campaigns', function() {
             it('should be able to compile when sending to the new email address', function(done) {
-                var self = this;
+                const self = this;
                 self.event.data.user = {
                     email: 'new-email@gmail.com',
                     firstName: 'Randy'
@@ -1775,7 +1711,7 @@ describe('campaign_email.js', function() {
             });
 
             it('should be able to compile when sending to the old email address', function(done) {
-                var self = this;
+                const self = this;
                 self.event.data.user = {
                     email: 'old-email@gmail.com',
                     firstName: 'Randy'
@@ -1810,7 +1746,7 @@ describe('campaign_email.js', function() {
             });
 
             it('should be able to compile when sending to the new email address', function(done) {
-                var self = this;
+                const self = this;
                 self.event.data.user = {
                     email: 'new-email@gmail.com',
                     firstName: 'Randy'
@@ -1835,7 +1771,7 @@ describe('campaign_email.js', function() {
             });
 
             it('should be able to compile when sending to the old email address', function(done) {
-                var self = this;
+                const self = this;
                 self.event.data.user = {
                     email: 'old-email@gmail.com',
                     firstName: 'Randy'
@@ -1901,7 +1837,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should be able to work with selfie users', function(done) {
-            var self = this;
+            const self = this;
             self.event.data.user.external = true;
             self.event.data.target = 'selfie';
             self.email(self.event).then(function() {
@@ -1927,7 +1863,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should be able to work with portal users', function(done) {
-            var self = this;
+            const self = this;
             self.event.data.target = 'portal';
             self.email(self.event).then(function() {
                 expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/failedLogins.html'), { encoding: 'utf8' }, jasmine.any(Function));
@@ -1952,7 +1888,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should be able to work with showcase users', function(done) {
-            var self = this;
+            const self = this;
             self.event.data.target = 'showcase';
             self.email(self.event).then(function() {
                 expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/failedLogins--app.html'), { encoding: 'utf8' }, jasmine.any(Function));
@@ -2012,7 +1948,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should work for targets that have query params', function(done) {
-            var self = this;
+            const self = this;
             self.event.data.target = 'selfie';
             self.email(self.event).then(function() {
                 expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/passwordReset.html'), { encoding: 'utf8' }, jasmine.any(Function));
@@ -2036,7 +1972,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should work for targets without query params', function(done) {
-            var self = this;
+            const self = this;
             self.event.data.target = 'portal';
             self.email(self.event).then(function() {
                 expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/passwordReset.html'), { encoding: 'utf8' }, jasmine.any(Function));
@@ -2060,7 +1996,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should work for showcase users', function(done) {
-            var self = this;
+            const self = this;
             self.event.data.target = 'showcase';
             self.email(self.event).then(function() {
                 expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/passwordReset--app.html'), { encoding: 'utf8' }, jasmine.any(Function));
@@ -2114,7 +2050,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should be able to send using ses to selfie targets', function(done) {
-            var self = this;
+            const self = this;
             self.email(self.event).then(function() {
                 expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/campaignActive.html'), { encoding: 'utf8' }, jasmine.any(Function));
                 expect(self.mockTemplate).toHaveBeenCalledWith({
@@ -2163,7 +2099,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should be able to send to showcase targets', function(done) {
-            var self = this;
+            const self = this;
             this.event.options.provider = 'postmark';
             this.event.data.target = 'showcase';
             this.event.data.campaign.application = 'showcase';
@@ -2202,7 +2138,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should be able to send using ses', function(done) {
-            var self = this;
+            const self = this;
             self.email(self.event).then(function() {
                 expect(fs.readFile).toHaveBeenCalledWith(path.join(__dirname, '../../templates/campaignSubmitted.html'), { encoding: 'utf8' }, jasmine.any(Function));
                 expect(self.mockTemplate).toHaveBeenCalledWith({
@@ -2263,7 +2199,7 @@ describe('campaign_email.js', function() {
                     }
                 }
             };
-            requestUtils.makeSignedRequest.and.returnValue(Q.resolve({
+            requestUtils.makeSignedRequest.and.returnValue(Promise.resolve({
                 response: {
                     statusCode: 200
                 },
@@ -2308,7 +2244,7 @@ describe('campaign_email.js', function() {
             this.event.data.org = {
                 id: 'o-123'
             };
-            requestUtils.makeSignedRequest.and.returnValue(Q.resolve({
+            requestUtils.makeSignedRequest.and.returnValue(Promise.resolve({
                 response: {
                     statusCode: 200
                 },
@@ -2322,7 +2258,7 @@ describe('campaign_email.js', function() {
         });
 
         it('should be able to be sent using postmark', function(done) {
-            var self = this;
+            const self = this;
             self.event.options.provider = 'postmark';
             self.email(this.event).then(function() {
                 expect(postmark.Client.prototype.sendEmailWithTemplate).toHaveBeenCalledWith({
@@ -2337,6 +2273,63 @@ describe('campaign_email.js', function() {
                     Tag: 'promotionEnded--app',
                     TrackOpens: true,
                     Attachments: self.showcasePostmarkAttachments
+                }, jasmine.any(Function));
+            }).then(done, done.fail);
+        });
+    });
+
+    describe('sending stats emails', function() {
+        beforeEach(function() {
+            this.event.options.type = 'stats';
+            this.event.options.provider = 'postmark';
+            this.event.data.user = {
+                email: 'somedude@fake.com',
+                firstName: 'Charlie'
+            };
+            this.event.data.week = 2;
+            this.event.data.campaign = {
+                id: 'cam-123',
+                created: 'Sun Jun 12 2016 00:00:00 GMT-0500 (EST)'
+            };
+        });
+
+        it('should be able to send', function(done) {
+            this.CwrxRequest.prototype.get.and.returnValue(Promise.resolve([{
+                daily_7: [
+                    {'date':'2016-06-26','views':270,'users':210,'clicks':15,'installs':0,'launches':0},
+                    {'date':'2016-06-27','views':283,'users':221,'clicks':16,'installs':0,'launches':0},
+                    {'date':'2016-06-28','views':245,'users':195,'clicks':3,'installs':0,'launches':0},
+                    {'date':'2016-06-29','views':433,'users':395,'clicks':50,'installs':0,'launches':0},
+                    {'date':'2016-06-30','views':250,'users':200,'clicks':13,'installs':0,'launches':0},
+                    {'date':'2016-07-01','views':125,'users':175,'clicks':3,'installs':0,'launches':0},
+                    {'date':'2016-07-02','views':193,'users':125,'clicks':15,'installs':0,'launches':0}
+                ]
+            }]));
+
+            this.email(this.event).then(() => {
+                expect(this.CwrxRequest.prototype.get).toHaveBeenCalledWith('https://root/analytics/campaigns/showcase/apps/cam-123');
+                expect(postmark.Client.prototype.sendEmailWithTemplate).toHaveBeenCalledWith({
+                    TemplateId: 'weekOneStats--app-template-id',
+                    TemplateModel: {
+                        firstName: 'Charlie',
+                        startDate: 'Jun 26, 2016',
+                        endDate: 'Jul 2, 2016',
+                        views: 1521,
+                        clicks: 115,
+                        ctr: 7.56,
+                        dashboardLink: 'showcase dashboard link'
+                    },
+                    InlineCss: true,
+                    From: 'e2eSender@fake.com',
+                    To: 'somedude@fake.com',
+                    Tag: 'weekOneStats--app',
+                    TrackOpens: true,
+                    Attachments: this.showcasePostmarkAttachments.concat({
+                        Name: 'stats_week_2.png',
+                        Content: jasmine.any(String),
+                        ContentType: 'image/png',
+                        ContentID: 'cid:stats'
+                    })
                 }, jasmine.any(Function));
             }).then(done, done.fail);
         });
