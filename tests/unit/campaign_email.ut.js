@@ -40,7 +40,8 @@ describe('campaign_email.js', function() {
         };
         self.emailFactory = proxyquire('../../src/actions/message/campaign_email.js', {
             'nodemailer-ses-transport': self.mockSesTransport,
-            '../../../lib/CwrxRequest.js': self.CwrxRequest
+            '../../../lib/CwrxRequest.js': self.CwrxRequest,
+            'cwrx/lib/requestUtils.js': requestUtils
         });
         self.config = {
             emails: {
@@ -350,7 +351,7 @@ describe('campaign_email.js', function() {
                 requestUtils.makeSignedRequest.calls.reset();
 
                 this.email(this.event).then(this.success, this.failure);
-                process.nextTick(done);
+                setTimeout(done);
             });
 
             it('should make a request for the org\'s users', function() {
@@ -364,7 +365,7 @@ describe('campaign_email.js', function() {
                 beforeEach(function(done) {
                     this.reason = new Error('Something bad happened.');
                     this.getUsersDeferred.reject(this.reason);
-                    process.nextTick(done);
+                    setTimeout(done);
                 });
 
                 it('should reject the Promise', function() {
@@ -380,7 +381,7 @@ describe('campaign_email.js', function() {
                         this.result = { response: this.response, body: this.body };
 
                         this.getUsersDeferred.fulfill(this.result);
-                        process.nextTick(done);
+                        setTimeout(done);
                     });
 
                     it('should reject the Promise', function() {

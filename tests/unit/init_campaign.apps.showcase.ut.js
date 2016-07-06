@@ -1,5 +1,7 @@
 'use strict';
 
+const proxyquire = require('proxyquire').noCallThru();
+
 describe('(action factory) showcase/apps/init_campaign', function() {
     var q, uuid, resolveURL, ld, logger, showcaseFactories;
     var JsonProducer, CwrxRequest;
@@ -13,32 +15,20 @@ describe('(action factory) showcase/apps/init_campaign', function() {
         logger = require('cwrx/lib/logger');
         showcaseFactories = require('showcase-core').factories;
 
-        delete require.cache[require.resolve('rc-kinesis')];
-        JsonProducer = (function(JsonProducer) {
-            return jasmine.createSpy('JsonProducer()').and.callFake(function(name, options) {
-                var producer = new JsonProducer(name, options);
-
-                spyOn(producer, 'produce').and.returnValue(q.defer().promise);
-
-                return producer;
-            });
-        }(require('rc-kinesis').JsonProducer));
-        require.cache[require.resolve('rc-kinesis')].exports.JsonProducer = JsonProducer;
-
-        delete require.cache[require.resolve('../../lib/CwrxRequest')];
-        CwrxRequest = (function(CwrxRequest) {
-            return jasmine.createSpy('CwrxRequest()').and.callFake(function(creds) {
-                var request = new CwrxRequest(creds);
-
-                spyOn(request, 'send').and.returnValue(q.defer().promise);
-
-                return request;
-            });
-        }(require('../../lib/CwrxRequest')));
-        require.cache[require.resolve('../../lib/CwrxRequest')].exports = CwrxRequest;
-
-        delete require.cache[require.resolve('../../src/actions/showcase/apps/init_campaign')];
-        factory = require('../../src/actions/showcase/apps/init_campaign');
+        JsonProducer = jasmine.createSpy('JsonProducer()').and.callFake(() => ({
+            produce: jasmine.createSpy('produce()').and.returnValue(q.defer().promise)
+        }));
+        CwrxRequest = jasmine.createSpy('CwrxRequest()').and.callFake(() => ({
+            send: jasmine.createSpy('send()').and.returnValue(q.defer().promise),
+            post: () => null,
+            put: () => null
+        }));
+        factory = proxyquire('../../src/actions/showcase/apps/init_campaign', {
+            'rc-kinesis': {
+                JsonProducer: JsonProducer
+            },
+            '../../../../lib/CwrxRequest': CwrxRequest
+        });
     });
 
     beforeEach(function() {

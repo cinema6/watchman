@@ -1,5 +1,7 @@
 'use strict';
 
+const proxyquire = require('proxyquire').noCallThru();
+
 describe('(action) fetch_orgs', function() {
     var fetchOrgsFactory, fetchOrgs;
     var CwrxEntities, JsonProducer;
@@ -7,39 +9,25 @@ describe('(action) fetch_orgs', function() {
     var config;
 
     beforeEach(function() {
-        Object.keys(require.cache).forEach(function(dep) {
-            delete require.cache[dep];
-        });
-
         MockObjectStream = require('../helpers/MockObjectStream');
         MockObjectStore = require('../helpers/MockObjectStore');
 
-        require('../../lib/CwrxEntities');
-        require('rc-kinesis');
-
-        CwrxEntities = jasmine.createSpy('CwrxEntities()').and.callFake(function() {
-            return new MockObjectStream();
+        JsonProducer = jasmine.createSpy('JsonProducer()').and.callFake(() => ({
+            createWriteStream: jasmine.createSpy('createWriteStream()').and.callFake(() => {
+                return new MockObjectStore();
+            })
+        }));
+        CwrxEntities = jasmine.createSpy('CwrxEntities()').and.callFake(() => new MockObjectStream());
+        fetchOrgsFactory = proxyquire('../../src/actions/fetch_orgs', {
+            'rc-kinesis': {
+                JsonProducer: JsonProducer
+            },
+            '../../lib/CwrxEntities': CwrxEntities
         });
-        require.cache[require.resolve('../../lib/CwrxEntities')].exports = CwrxEntities;
-
-        JsonProducer = (function(JsonProducer) {
-            return jasmine.createSpy('JsonProducer()').and.callFake(function(name, options) {
-                var producer = new JsonProducer(name, options);
-
-                spyOn(producer, 'createWriteStream').and.callFake(function() {
-                    return new MockObjectStore();
-                });
-
-                return producer;
-            });
-        }(require('rc-kinesis').JsonProducer));
-        require.cache[require.resolve('rc-kinesis')].exports.JsonProducer = JsonProducer;
 
         resolveURL = require('url').resolve;
         uuid = require('rc-uuid');
         ld = require('lodash');
-
-        fetchOrgsFactory = require('../../src/actions/fetch_orgs');
 
         config = {
             appCreds: {
