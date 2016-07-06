@@ -3,6 +3,7 @@
 * *[v1.2.0-rc1]*
   * [FEATURE]: Deactivate line items and campaigns in beeswax when a
     showcase (apps) campaign is canceled
+  * Change the format of the transactions/payments created for showcase
   * ** Extra Deployment Steps**:
     * Deploy watchman cookbook `v2.1.0`
     * Update watchman environments

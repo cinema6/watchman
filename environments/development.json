@@ -68,6 +68,9 @@
                             },
                             "advertisers": {
                                 "endpoint": "/api/account/advertisers"
+                            },
+                            "paymentPlans": {
+                                "endpoint": "/api/payment-plans"
                             }
                         }
                     },
@@ -268,7 +271,14 @@
                             ]
                         },
                         "noon_orgPulse": {
-                            "actions": ["check_payment_required"]
+                            "actions": [
+                                {
+                                    "name": "check_payment_required",
+                                    "ifData": {
+                                        "org.paymentPlanId": "^pp-"
+                                    }
+                                }
+                            ]
                         },
                         "hourly_campaignPulse": {
                             "actions": ["check_expiry"]
@@ -559,7 +569,7 @@
                                     },
                                     "ifData": {
                                         "transaction.sign": "^1$",
-                                        "transaction.description": "\"target\"\\s*:\\s*\"showcase\""
+                                        "transaction.application": "^showcase$"
                                     }
                                 }
                             ]

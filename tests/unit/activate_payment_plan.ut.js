@@ -1,9 +1,9 @@
 'use strict';
 
 describe('(action factory) activate_payment_plan', function() {
-    var JsonProducer, CwrxRequest;
-    var uuid, q, resolveURL, moment, ld, logger;
-    var factory;
+    let JsonProducer, CwrxRequest;
+    let uuid, q, resolveURL, moment, ld, logger;
+    let factory;
 
     beforeAll(function() {
         uuid = require('rc-uuid');
@@ -16,7 +16,7 @@ describe('(action factory) activate_payment_plan', function() {
         delete require.cache[require.resolve('rc-kinesis')];
         JsonProducer = (function(JsonProducer) {
             return jasmine.createSpy('JsonProducer()').and.callFake(function(name, options) {
-                var producer = new JsonProducer(name, options);
+                let producer = new JsonProducer(name, options);
 
                 spyOn(producer, 'produce').and.returnValue(q.defer().promise);
 
@@ -28,7 +28,7 @@ describe('(action factory) activate_payment_plan', function() {
         delete require.cache[require.resolve('../../lib/CwrxRequest')];
         CwrxRequest = (function(CwrxRequest) {
             return jasmine.createSpy('CwrxRequest()').and.callFake(function(creds) {
-                var request = new CwrxRequest(creds);
+                let request = new CwrxRequest(creds);
 
                 spyOn(request, 'send').and.returnValue(q.defer().promise);
                 spyOn(request, 'put').and.returnValue(q.defer().promise);
@@ -44,13 +44,12 @@ describe('(action factory) activate_payment_plan', function() {
 
     it('should exist', function() {
         expect(factory).toEqual(jasmine.any(Function));
-        expect(factory.name).toEqual('activatePaymentPlanFactory');
     });
 
     describe('when called', function() {
-        var config;
-        var activatePaymentPlan;
-        var watchmanStream, request, log;
+        let config;
+        let activatePaymentPlan;
+        let watchmanStream, request, log;
 
         beforeEach(function() {
             config = {
@@ -66,6 +65,9 @@ describe('(action factory) activate_payment_plan', function() {
                         },
                         promotions: {
                             endpoint: '/api/promotions'
+                        },
+                        paymentPlans: {
+                            endpoint: '/api/payment-plans'
                         }
                     }
                 },
@@ -89,18 +91,10 @@ describe('(action factory) activate_payment_plan', function() {
 
             watchmanStream = JsonProducer.calls.mostRecent().returnValue;
             request = CwrxRequest.calls.mostRecent().returnValue;
-
-            jasmine.clock().install();
-            jasmine.clock().mockDate();
-        });
-
-        afterEach(function() {
-            jasmine.clock().uninstall();
         });
 
         it('should return the action', function() {
             expect(activatePaymentPlan).toEqual(jasmine.any(Function));
-            expect(activatePaymentPlan.name).toBe('activatePaymentPlan');
         });
 
         it('should create a JsonProducer for watchman', function() {
@@ -112,9 +106,9 @@ describe('(action factory) activate_payment_plan', function() {
         });
 
         describe('the action', function() {
-            var data, options, event;
-            var getOrgDeferred;
-            var success, failure;
+            let data, options, event;
+            let getOrgDeferred;
+            let success, failure;
 
             beforeEach(function(done) {
                 data = {
@@ -135,7 +129,7 @@ describe('(action factory) activate_payment_plan', function() {
                 request.get.and.returnValue((getOrgDeferred = q.defer()).promise);
 
                 activatePaymentPlan(event).then(success, failure);
-                process.nextTick(done);
+                setTimeout(done);
             });
 
             it('should GET the campaign\'s org', function() {
@@ -145,12 +139,12 @@ describe('(action factory) activate_payment_plan', function() {
             });
 
             describe('if the org', function() {
-                var org, response;
+                let org, response;
 
                 beforeEach(function() {
                     org = {
                         id: data.campaign.org,
-                        paymentPlanId: Object.keys(config.paymentPlans)[0]
+                        paymentPlanId: `pp-${uuid.createUuid()}`
                     };
                     response = {
                         statusCode: 200
@@ -165,7 +159,7 @@ describe('(action factory) activate_payment_plan', function() {
                         request.get.calls.reset();
 
                         getOrgDeferred.fulfill([org, response]);
-                        process.nextTick(done);
+                        setTimeout(done);
                     });
 
                     it('should fulfill with undefined', function() {
@@ -192,7 +186,7 @@ describe('(action factory) activate_payment_plan', function() {
                         request.get.calls.reset();
 
                         getOrgDeferred.fulfill([org, response]);
-                        process.nextTick(done);
+                        setTimeout(done);
                     });
 
                     it('should fulfill with undefined', function() {
@@ -213,7 +207,7 @@ describe('(action factory) activate_payment_plan', function() {
                 });
 
                 describe('does not have a paymentPlanStart date', function() {
-                    var getPromotionsDeferred;
+                    let getPromotionsDeferred;
 
                     beforeEach(function() {
                         delete org.paymentPlanStart;
@@ -237,7 +231,7 @@ describe('(action factory) activate_payment_plan', function() {
                         }
                     ].forEach(function(testConfig) {
                         describe(testConfig.description, function() {
-                            var putOrgDeferred;
+                            let putOrgDeferred;
 
                             beforeEach(function(done) {
                                 testConfig.before();
@@ -246,7 +240,7 @@ describe('(action factory) activate_payment_plan', function() {
                                 request.put.and.returnValue((putOrgDeferred = q.defer()).promise);
 
                                 getOrgDeferred.fulfill([org, response]);
-                                process.nextTick(done);
+                                setTimeout(done);
                             });
 
                             it('should not get any promotions', function() {
@@ -266,7 +260,7 @@ describe('(action factory) activate_payment_plan', function() {
                             describe('when the org is updated', function() {
                                 beforeEach(function(done) {
                                     putOrgDeferred.fulfill([request.put.calls.mostRecent().args[0].json, { statusCode: 200 }]);
-                                    process.nextTick(done);
+                                    setTimeout(done);
                                 });
 
                                 it('should not produce an event', function() {
@@ -281,7 +275,7 @@ describe('(action factory) activate_payment_plan', function() {
                     });
 
                     describe('and has promotions', function() {
-                        var promotions;
+                        let promotions;
 
                         beforeEach(function(done) {
                             org.promotions = Array.apply([], new Array(3)).map(function() {
@@ -318,7 +312,7 @@ describe('(action factory) activate_payment_plan', function() {
                             };
 
                             getOrgDeferred.fulfill([org, response]);
-                            process.nextTick(done);
+                            setTimeout(done);
                         });
 
                         it('should request all of the org\'s promotions', function() {
@@ -329,13 +323,13 @@ describe('(action factory) activate_payment_plan', function() {
                         });
 
                         describe('if the promotions cannot be fetched', function() {
-                            var reason;
+                            let reason;
 
                             beforeEach(function(done) {
                                 reason = new Error('It went wrong.');
 
                                 getPromotionsDeferred.reject(reason);
-                                process.nextTick(done);
+                                setTimeout(done);
                             });
 
                             it('should reject the promise', function() {
@@ -352,7 +346,7 @@ describe('(action factory) activate_payment_plan', function() {
                         });
 
                         describe('when the promotions are fetched', function() {
-                            var putOrgDeferred;
+                            let putOrgDeferred;
 
                             beforeEach(function(done) {
                                 request.put.and.returnValue((putOrgDeferred = q.defer()).promise);
@@ -363,7 +357,7 @@ describe('(action factory) activate_payment_plan', function() {
                                     }),
                                     { statusCode: 200 }
                                 ]);
-                                process.nextTick(done);
+                                setTimeout(done);
                             });
 
                             it('should give the org a paymentPlanStart computed from the length of its freeTrial promotions', function() {
@@ -377,78 +371,110 @@ describe('(action factory) activate_payment_plan', function() {
                             });
 
                             describe('when the org is updated', function() {
-                                var produceDeferred;
+                                let getDeferred;
 
                                 beforeEach(function(done) {
-                                    watchmanStream.produce.and.returnValue((produceDeferred = q.defer()).promise);
+                                    request.get.calls.reset();
+                                    request.get.and.returnValue((getDeferred = q.defer()).promise);
 
                                     putOrgDeferred.fulfill([request.put.calls.mostRecent().args[0].json, { statusCode: 200 }]);
-                                    process.nextTick(done);
+                                    setTimeout(done);
                                 });
 
-                                it('should produce a record into the watchman stream', function() {
-                                    expect(watchmanStream.produce).toHaveBeenCalledWith({
-                                        type: 'promotionFulfilled',
-                                        data: {
-                                            org: org,
-                                            promotion: promotions[Object.keys(promotions)[0]],
-                                            paymentPlan: config.paymentPlans[org.paymentPlanId],
-                                            target: options.target
-                                        }
+                                it('should get the org\'s payment plan', function() {
+                                    expect(request.get).toHaveBeenCalledWith({
+                                        url: `${resolveURL(config.cwrx.api.root, config.cwrx.api.paymentPlans.endpoint)}/${org.paymentPlanId}`
                                     });
-                                    expect(watchmanStream.produce).toHaveBeenCalledWith({
-                                        type: 'promotionFulfilled',
-                                        data: {
-                                            org: org,
-                                            promotion: promotions[Object.keys(promotions)[2]],
-                                            paymentPlan: config.paymentPlans[org.paymentPlanId],
-                                            target: options.target
-                                        }
-                                    });
-                                    expect(watchmanStream.produce.calls.count()).toBe(2, 'Incorrect number of events produced.');
                                 });
 
-                                describe('if producing the record succeeds', function() {
+                                describe('when the paymentPlan is fetched', function() {
+                                    let produceDeferred;
+                                    let paymentPlan;
+
                                     beforeEach(function(done) {
-                                        produceDeferred.fulfill({
-                                            type: 'promotionFulfilled'
+                                        watchmanStream.produce.and.returnValue((produceDeferred = q.defer()).promise);
+
+                                        paymentPlan = {
+                                            label: 'Starter',
+                                            price: 49.99,
+                                            maxCampaigns: 1,
+                                            viewsPerMonth: 2000,
+                                            id: org.paymentPlanId,
+                                            created: '2016-07-05T14:18:29.642Z',
+                                            lastUpdated: '2016-07-05T14:28:57.336Z',
+                                            status: 'active'
+                                        };
+
+                                        getDeferred.resolve([paymentPlan, { statusCode: 200 }]);
+                                        setTimeout(done);
+                                    });
+
+                                    it('should produce a record into the watchman stream', function() {
+                                        expect(watchmanStream.produce).toHaveBeenCalledWith({
+                                            type: 'promotionFulfilled',
+                                            data: {
+                                                org: org,
+                                                promotion: promotions[Object.keys(promotions)[0]],
+                                                paymentPlan: paymentPlan,
+                                                target: options.target,
+                                                date: data.date
+                                            }
                                         });
-                                        process.nextTick(done);
+                                        expect(watchmanStream.produce).toHaveBeenCalledWith({
+                                            type: 'promotionFulfilled',
+                                            data: {
+                                                org: org,
+                                                promotion: promotions[Object.keys(promotions)[2]],
+                                                paymentPlan: paymentPlan,
+                                                target: options.target,
+                                                date: data.date
+                                            }
+                                        });
+                                        expect(watchmanStream.produce.calls.count()).toBe(2, 'Incorrect number of events produced.');
                                     });
 
-                                    it('should fulfill with undefined', function() {
-                                        expect(success).toHaveBeenCalledWith(undefined);
-                                    });
-                                });
+                                    describe('if producing the record succeeds', function() {
+                                        beforeEach(function(done) {
+                                            produceDeferred.fulfill({
+                                                type: 'promotionFulfilled'
+                                            });
+                                            setTimeout(done);
+                                        });
 
-                                describe('if producing the record fails', function() {
-                                    var reason;
-
-                                    beforeEach(function(done) {
-                                        reason = new Error('Something went wrong!');
-
-                                        produceDeferred.reject(reason);
-                                        process.nextTick(done);
+                                        it('should fulfill with undefined', function() {
+                                            expect(success).toHaveBeenCalledWith(undefined);
+                                        });
                                     });
 
-                                    it('should fulfill with undefined', function() {
-                                        expect(success).toHaveBeenCalledWith(undefined);
-                                    });
+                                    describe('if producing the record fails', function() {
+                                        let reason;
 
-                                    it('should log an error', function() {
-                                        expect(log.error).toHaveBeenCalled();
+                                        beforeEach(function(done) {
+                                            reason = new Error('Something went wrong!');
+
+                                            produceDeferred.reject(reason);
+                                            setTimeout(done);
+                                        });
+
+                                        it('should fulfill with undefined', function() {
+                                            expect(success).toHaveBeenCalledWith(undefined);
+                                        });
+
+                                        it('should log an error', function() {
+                                            expect(log.error).toHaveBeenCalled();
+                                        });
                                     });
                                 });
                             });
 
                             describe('if the org cannot be updated', function() {
-                                var reason;
+                                let reason;
 
                                 beforeEach(function(done) {
                                     reason = new Error('It failed!');
 
                                     putOrgDeferred.reject(reason);
-                                    process.nextTick(done);
+                                    setTimeout(done);
                                 });
 
                                 it('should reject the promise', function() {

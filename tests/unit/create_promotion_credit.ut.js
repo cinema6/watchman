@@ -1,14 +1,14 @@
 'use strict';
 
-var q               = require('q');
-var util            = require('util');
-var logger          = require('cwrx/lib/logger.js');
-var requestUtils    = require('cwrx/lib/requestUtils');
-var actionFactory   = require('../../src/actions/create_promotion_credit.js');
-var uuid            = require('rc-uuid');
+const q               = require('q');
+const util            = require('util');
+const logger          = require('cwrx/lib/logger.js');
+const requestUtils    = require('cwrx/lib/requestUtils');
+const actionFactory   = require('../../src/actions/create_promotion_credit.js');
+const moment          = require('moment');
 
 describe('create_promotion_credit.js', function() {
-    var mockConfig, mockLog, event, transResp, createCredit;
+    let mockConfig, mockLog, event, transResp, createCredit;
 
     beforeEach(function() {
         mockConfig = {
@@ -33,7 +33,8 @@ describe('create_promotion_credit.js', function() {
                     id: 'pro-1',
                     type: 'signupReward',
                     data: { rewardAmount: 50 }
-                }
+                },
+                date: moment().format()
             }
         };
 
@@ -85,7 +86,7 @@ describe('create_promotion_credit.js', function() {
                     amount: 50,
                     org: 'o-1',
                     promotion: 'pro-1',
-                    description: JSON.stringify({ eventType: 'credit', source: 'promotion' })
+                    application: event.data.target
                 }
             });
             expect(mockLog.warn).not.toHaveBeenCalled();
@@ -99,10 +100,21 @@ describe('create_promotion_credit.js', function() {
             id: 'pro-1',
             type: 'freeTrial',
             data: {
-                trialLength: 15
+                trialLength: 15,
+                paymentMethodRequired: false,
+                targetUsers: 1100
             }
         };
-        event.data.paymentPlan = { price: 49.51, id: 'pp-' + uuid.createUuid() };
+        event.data.paymentPlan = {
+            label: 'Starter',
+            price: 49.51,
+            maxCampaigns: 1,
+            viewsPerMonth: 2000,
+            id: 'pp-0Ekdsm05KVZ43Aqj',
+            created: '2016-07-05T14:18:29.642Z',
+            lastUpdated: '2016-07-05T14:28:57.336Z',
+            status: 'active'
+        };
         event.data.target = 'showcase';
 
         createCredit(event).then(function() {
@@ -112,7 +124,11 @@ describe('create_promotion_credit.js', function() {
                     amount: 24.76,
                     org: 'o-1',
                     promotion: 'pro-1',
-                    description: JSON.stringify({ eventType: 'credit', source: 'promotion', target: event.data.target, paymentPlanId: event.data.paymentPlan.id })
+                    application: event.data.target,
+                    paymentPlanId: event.data.paymentPlan.id,
+                    targetUsers: event.data.promotion.data.targetUsers,
+                    cycleStart: event.data.date,
+                    cycleEnd: moment(event.data.date).add(event.data.promotion.data.trialLength, 'days').format()
                 }
             });
             expect(mockLog.warn).not.toHaveBeenCalled();
@@ -134,13 +150,16 @@ describe('create_promotion_credit.js', function() {
         transResp = { response: { statusCode: 400 }, body: 'I got a problem with YOU' };
         createCredit(event).then(function() {
             expect(mockLog.error).toHaveBeenCalled();
-            expect(mockLog.error.calls.mostRecent().args).toContain(util.inspect({
-                message: 'Error creating transaction',
-                reason: {
+            expect(mockLog.error.calls.mostRecent().args).toContain(util.inspect((() => {
+                const error = new Error('Error creating transaction');
+
+                error.reason = {
                     code: 400,
                     body: 'I got a problem with YOU'
-                }
-            }));
+                };
+
+                return error;
+            })()));
             done();
         }).catch(done.fail);
     });

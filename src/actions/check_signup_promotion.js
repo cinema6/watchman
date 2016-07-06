@@ -94,7 +94,8 @@ module.exports = function(config) {
                         type: 'promotionFulfilled',
                         data: {
                             org: org,
-                            promotion: promotion
+                            promotion: promotion,
+                            date: event.data.date
                         }
                     });
                 }

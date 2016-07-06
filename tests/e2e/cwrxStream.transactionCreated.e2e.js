@@ -345,7 +345,11 @@ describe('cwrxStream transactionCreated', function() {
                 campaign: null,
                 braintreeId: null,
                 promotion: createId('pro'),
-                description: JSON.stringify({ target: 'showcase', paymentPlanId: 'pp-0Ek5Na02vCohpPgw' })
+                application: 'showcase',
+                paymentPlanId: 'pp-0Ek5Na02vCohpPgw',
+                targetUsers: 2000,
+                cycleStart: moment().format(),
+                cycleEnd: moment().add(1, 'month').subtract(1, 'day').format()
             };
 
             transactionCreatedEvent().then(function() {

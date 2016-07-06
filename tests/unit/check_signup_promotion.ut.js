@@ -7,6 +7,7 @@ var logger          = require('cwrx/lib/logger.js');
 var requestUtils    = require('cwrx/lib/requestUtils');
 var Status          = require('cwrx/lib/enums').Status;
 var actionFactory   = require('../../src/actions/check_signup_promotion.js');
+var moment          = require('moment');
 
 var FAKE_NOW = new Date('2016-02-10T17:25:38.555Z');
 
@@ -53,12 +54,17 @@ describe('check_signup_promotion.js', function() {
                 { type: 'freeTrial', fulfillImmediately: false }
             ]
         };
-        event = { data: { user: {
-            id: 'u-1',
-            org: 'o-1',
-            promotion: 'pro-signup-1',
-            status: 'active'
-        } } };
+        event = {
+            data: {
+                user: {
+                    id: 'u-1',
+                    org: 'o-1',
+                    promotion: 'pro-signup-1',
+                    status: 'active'
+                },
+                date: moment().format()
+            }
+        };
 
         mockLog = {
             trace : jasmine.createSpy('log.trace'),
@@ -160,7 +166,8 @@ describe('check_signup_promotion.js', function() {
                 type: 'promotionFulfilled',
                 data: {
                     promotion: mockPromotion,
-                    org: { id: 'o-1', name: 'test org', promotions: expectedArr }
+                    org: { id: 'o-1', name: 'test org', promotions: expectedArr },
+                    date: event.data.date
                 }
             });
             expect(mockLog.warn).not.toHaveBeenCalled();
@@ -187,7 +194,8 @@ describe('check_signup_promotion.js', function() {
                 type: 'promotionFulfilled',
                 data: {
                     promotion: mockPromotion,
-                    org: jasmine.objectContaining({ promotions: expectedArr })
+                    org: jasmine.objectContaining({ promotions: expectedArr }),
+                    date: event.data.date
                 }
             });
             expect(mockLog.warn).not.toHaveBeenCalled();
