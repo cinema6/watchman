@@ -8,10 +8,6 @@ describe('(action factory) charge_payment_plan', function() {
     let factory;
 
     beforeAll(function() {
-        Object.keys(require.cache).forEach(function(dep) {
-            delete require.cache[dep];
-        });
-
         q = require('q');
         uuid = require('rc-uuid');
         resolveURL = require('url').resolve;

@@ -1,44 +1,32 @@
 'use strict';
 
+const proxyquire = require('proxyquire').noCallThru();
+
 describe('(action factory) check_payment_required', function() {
     let JsonProducer, CwrxRequest;
     let uuid, q, resolveURL, moment, parseURL;
     let factory;
 
     beforeAll(function() {
-        Object.keys(require.cache).forEach(function(dep) {
-            delete require.cache[dep];
-        });
-
         uuid = require('rc-uuid');
         q = require('q');
         resolveURL = require('url').resolve;
         moment = require('moment');
         parseURL = require('url').parse;
 
-        JsonProducer = (function(JsonProducer) {
-            return jasmine.createSpy('JsonProducer()').and.callFake(function(name, options) {
-                let producer = new JsonProducer(name, options);
-
-                spyOn(producer, 'produce').and.returnValue(q.defer().promise);
-
-                return producer;
-            });
-        }(require('rc-kinesis').JsonProducer));
-        require.cache[require.resolve('rc-kinesis')].exports.JsonProducer = JsonProducer;
-
-        CwrxRequest = (function(CwrxRequest) {
-            return jasmine.createSpy('CwrxRequest()').and.callFake(function(creds) {
-                let request = new CwrxRequest(creds);
-
-                spyOn(request, 'send').and.returnValue(q.defer().promise);
-
-                return request;
-            });
-        }(require('../../lib/CwrxRequest')));
-        require.cache[require.resolve('../../lib/CwrxRequest')].exports = CwrxRequest;
-
-        factory = require('../../src/actions/check_payment_required');
+        JsonProducer = jasmine.createSpy('JsonProducer()').and.callFake(() => ({
+            produce: jasmine.createSpy('produce()').and.returnValue(q.defer().promise)
+        }));
+        CwrxRequest = jasmine.createSpy('CwrxRequest()').and.callFake(() => ({
+            send: jasmine.createSpy('send()').and.returnValue(q.defer().promise),
+            get: () => null
+        }));
+        factory = proxyquire('../../src/actions/check_payment_required', {
+            'rc-kinesis': {
+                JsonProducer: JsonProducer
+            },
+            '../../lib/CwrxRequest': CwrxRequest
+        });
     });
 
     it('should exist', function() {

@@ -50,6 +50,7 @@ module.exports = function(grunt) {
             var cwrxStream = options.cwrxStream;
             var mongoHost = grunt.option('dbHost') || options.mongoHost;
             var apiRoot = grunt.option('apiRoot') || options.apiRoot;
+            var watchmanHost = grunt.option('watchmanHost') || options.watchmanHost;
 
             initCloudFormation(auth, region);
 
@@ -72,6 +73,9 @@ module.exports = function(grunt) {
                                 break;
                             case 'cwrxStream':
                                 cwrxStream = output.OutputValue;
+                                break;
+                            case 'watchman':
+                                watchmanHost = output.OutputValue;
                                 break;
                             }
                         });
@@ -125,7 +129,9 @@ module.exports = function(grunt) {
                 process.env.timeStream = timeStream;
                 process.env.watchmanStream = watchmanStream;
                 process.env.cwrxStream = cwrxStream;
-                grunt.task.run('jasmine_nodejs:e2e');
+                process.env.watchmanHost = watchmanHost;
+
+                grunt.task.run(['exec:setup_e2e', 'jasmine_nodejs:e2e']);
                 done();
             }).catch(function(error) {
                 grunt.log.error(error);

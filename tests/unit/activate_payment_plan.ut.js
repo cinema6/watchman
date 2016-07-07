@@ -1,5 +1,7 @@
 'use strict';
 
+const proxyquire = require('proxyquire').noCallThru();
+
 describe('(action factory) activate_payment_plan', function() {
     let JsonProducer, CwrxRequest;
     let uuid, q, resolveURL, moment, ld, logger;
@@ -13,33 +15,20 @@ describe('(action factory) activate_payment_plan', function() {
         ld = require('lodash');
         logger = require('cwrx/lib/logger');
 
-        delete require.cache[require.resolve('rc-kinesis')];
-        JsonProducer = (function(JsonProducer) {
-            return jasmine.createSpy('JsonProducer()').and.callFake(function(name, options) {
-                let producer = new JsonProducer(name, options);
-
-                spyOn(producer, 'produce').and.returnValue(q.defer().promise);
-
-                return producer;
-            });
-        }(require('rc-kinesis').JsonProducer));
-        require.cache[require.resolve('rc-kinesis')].exports.JsonProducer = JsonProducer;
-
-        delete require.cache[require.resolve('../../lib/CwrxRequest')];
-        CwrxRequest = (function(CwrxRequest) {
-            return jasmine.createSpy('CwrxRequest()').and.callFake(function(creds) {
-                let request = new CwrxRequest(creds);
-
-                spyOn(request, 'send').and.returnValue(q.defer().promise);
-                spyOn(request, 'put').and.returnValue(q.defer().promise);
-                spyOn(request, 'get').and.returnValue(q.defer().promise);
-
-                return request;
-            });
-        }(require('../../lib/CwrxRequest')));
-        require.cache[require.resolve('../../lib/CwrxRequest')].exports = CwrxRequest;
-
-        factory = require('../../src/actions/activate_payment_plan');
+        JsonProducer = jasmine.createSpy('JsonProducer()').and.callFake(() => ({
+            produce: jasmine.createSpy('produce()').and.returnValue(q.defer().promise)
+        }));
+        CwrxRequest = jasmine.createSpy('CwrxRequest()').and.callFake(() => ({
+            send: jasmine.createSpy('send()').and.returnValue(q.defer().promise),
+            put: jasmine.createSpy('put()').and.returnValue(q.defer().promise),
+            get: jasmine.createSpy('get()').and.returnValue(q.defer().promise)
+        }));
+        factory = proxyquire('../../src/actions/activate_payment_plan.js', {
+            'rc-kinesis': {
+                JsonProducer: JsonProducer
+            },
+            '../../lib/CwrxRequest': CwrxRequest
+        });
     });
 
     it('should exist', function() {
