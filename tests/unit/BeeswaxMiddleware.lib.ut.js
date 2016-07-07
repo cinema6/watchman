@@ -2,7 +2,7 @@ fdescribe('BeeswaxMiddleware(config)', function() {
     'use strict';
 
     describe('instance:', function() {
-        var q, ld;
+        var url, q, ld;
         var BeeswaxClient, BeeswaxMiddleware, CwrxRequest;
         var middleWare, request, beeswax, advertiser, campaign, placements;
         var bwCreateAdvertiserDeferred, bwCreateCampaignDeferred,
@@ -17,6 +17,7 @@ fdescribe('BeeswaxMiddleware(config)', function() {
 
             q  = require('q');
             ld = require('lodash');
+            url = require('url');
 
             delete require.cache[require.resolve('../../lib/CwrxRequest')];
             CwrxRequest = (function(CwrxRequest) {
@@ -61,7 +62,7 @@ fdescribe('BeeswaxMiddleware(config)', function() {
                     name    : 'Revengus Extremis',
                     type    : 'app',
                     platform: 'iOS',
-                    categories : [ 'Productivity', 'Business' ]
+                    categories : [ 'Music', 'Business' ]
                 }
             };
 
@@ -118,6 +119,7 @@ fdescribe('BeeswaxMiddleware(config)', function() {
                 {
                     api: {
                         root: 'http://33.33.33.10/',
+                        tracking: 'http://audit.rc.com/pixel.gif',
                         placements:  { endpoint: '/api/placements' },
                         campaigns:   { endpoint: '/api/campaigns' },
                         advertisers: { endpoint: '/api/account/advertisers' }
@@ -187,8 +189,8 @@ fdescribe('BeeswaxMiddleware(config)', function() {
                 putAdvertiserDeferred.fulfill([updatedAdvert]);
 
                 request.put.and.callFake(function(opts){
-                   ld.assign(updatedAdvert,advertiser,opts.json);
-                   return putAdvertiserDeferred.promise;
+                    ld.assign(updatedAdvert,advertiser,opts.json);
+                    return putAdvertiserDeferred.promise;
                 });
 
                 process.nextTick(done);
@@ -313,8 +315,8 @@ fdescribe('BeeswaxMiddleware(config)', function() {
                 putCampaignDeferred.fulfill([updatedCampaign]);
 
                 request.put.and.callFake(function(opts){
-                   ld.assign(updatedCampaign,campaign,opts.json);
-                   return putCampaignDeferred.promise;
+                    ld.assign(updatedCampaign,campaign,opts.json);
+                    return putCampaignDeferred.promise;
                 });
 
                 process.nextTick(done);
@@ -350,20 +352,151 @@ fdescribe('BeeswaxMiddleware(config)', function() {
         });
 
         describe('method: createCreative',function(){
-            // upload thumbnail
-            // create creative
-            // update placement
+            describe('single placement',function(){
+                beforeEach(function(){
+                    placements.pop();
+                });
+               
+                describe('postive path',function(){
+                    var result, updatedPlacement;
 
-            it('handles a single placement',function(done){
-                placements.pop();
-                middleWare.createCreatives({
-                    campaign   : campaign,
-                    advertiser : advertiser,
-                    placements : placements
-                })
-                .then(done,done.fail);
+                    beforeEach(function(done){
+                        updatedPlacement = {};
+
+                        bwUploadAssetDeferred.resolve({
+                            path_to_asset : '/all/paths/lead/to/rome.jpg'    
+                        });
+                        bwCreateCreativeDeferred.resolve({ payload : { creative_id : 44 }});
+                        
+                        putPlacementDeferred.fulfill([updatedPlacement]);
+
+                        request.put.and.callFake(function(opts){
+                            var placement, id;
+                            if(opts.url.match(/\/api\/placements/)){
+                                id = url.parse(opts.url).pathname.split('/')[3];
+                                console.log('PARSED:',id);
+                                placement = ld.find(placements,
+                                    function(v) { return v.id === id });
+                                ld.assign(updatedPlacement,placement,opts.json);
+                                return putPlacementDeferred.promise;
+                            }
+
+                            return q.reject('Unexpected PUT');
+                        });
+                        middleWare.createCreatives({
+                            campaign   : campaign,
+                            advertiser : advertiser,
+                            placements : placements
+                        }).then(function(res){
+                            result = res;
+                        }).then(done,done.fail);
+                    });
+
+                    it('uploads the thumbnail',function(){
+                        expect(beeswax.uploadCreativeAsset).toHaveBeenCalledWith({
+                            advertiser_id : 100,
+                            sourceUrl     : 'http://is3.mzstatic.com/image/thumb/1.jpg'
+                        });
+                    });
+
+                    it('uploads a creative with the thumbnail',function(){
+                        expect(beeswax.creatives.create).toHaveBeenCalled();
+                        var req = beeswax.creatives.create.calls.argsFor(0)[0];
+                        expect(req.advertiser_id).toEqual(100);
+                        expect(req.creative_name).toEqual('MRAID Inter: Revengus Extremis');
+                        expect(req.creative_content.ADDITIONAL_PIXELS[0].PIXEL_URL)
+                            .toEqual(
+                                'http://audit.rc.com/pixel.gif?placement=p-1111111' +
+                                '&campaign=c-1234567&card=rc-1111111&container=beeswax&' +
+                                'event=impression&hostApp={{APP_BUNDLE}}&' +
+                                'network={{INVENTORY_SOURCE}}&cb={{CACHEBUSTER}}'
+                            );
+                        expect(req.creative_attributes.advertiser).toEqual({
+                            advertiser_domain : [ 'https://itunes.apple.com' ],
+                            landing_page_url: [ 
+                                'https://itunes.apple.com/us/app/revex/id1093924230'
+                            ], 
+                            advertiser_category: [ 'IAB1_6', 'IAB3_4' ]
+                        });
+                    });
+
+                    it('updates the placement with the beeswax creative_id',function(){
+                        expect(request.put).toHaveBeenCalledWith({
+                            url : 'http://33.33.33.10/api/placements/p-1111111',
+                            json : {
+                                externalIds : { beeswax : 44 }
+                            }
+                        });
+                    });
+
+                    it('returns the updated placements',function(){
+                        expect(result[0]).toEqual(
+                            jasmine.objectContaining(
+                                { id : 'p-1111111', externalIds : { beeswax : 44 }}
+                            )
+                        );
+                    });
+                });
+
+                describe('negative path',function(){
+                    it('does nothing if the placement is not for beeswax',function(done){
+                        placements[0].tagParams.container = 'other';
+                        middleWare.createCreatives({
+                            campaign   : campaign,
+                            advertiser : advertiser,
+                            placements : placements
+                        }).then(function(res){
+                            expect(beeswax.uploadCreativeAsset).not.toHaveBeenCalled();
+                            expect(beeswax.creatives.create).not.toHaveBeenCalled();
+                            expect(request.put).not.toHaveBeenCalled();
+                        }).then(done,done.fail);
+                    });
+
+                    it('does nothing if the placement tagType is not mraid',function(done){
+                        placements[0].tagType = 'other';
+                        middleWare.createCreatives({
+                            campaign   : campaign,
+                            advertiser : advertiser,
+                            placements : placements
+                        }).then(function(res){
+                            expect(beeswax.uploadCreativeAsset).not.toHaveBeenCalled();
+                            expect(beeswax.creatives.create).not.toHaveBeenCalled();
+                            expect(request.put).not.toHaveBeenCalled();
+                        }).then(done,done.fail);
+                    });
+
+                    it('bails if uploadCreativePlacement fails',function(done){
+                        bwUploadAssetDeferred.reject(new Error('Fail.'));
+                        middleWare.createCreatives({
+                            campaign   : campaign,
+                            advertiser : advertiser,
+                            placements : placements
+                        }).then(done.fail, function(e){
+                            expect(beeswax.uploadCreativeAsset).toHaveBeenCalled();
+                            expect(e.message).toEqual('Fail.');
+                            expect(beeswax.creatives.create).not.toHaveBeenCalled();
+                            expect(request.put).not.toHaveBeenCalled();
+                        }).then(done,done.fail);
+                    });
+
+                    it('bails if creatives.create fails',function(done){
+                        bwUploadAssetDeferred.resolve({
+                            path_to_asset : '/all/paths/lead/to/rome.jpg'    
+                        });
+                        bwCreateCreativeDeferred.reject(new Error('Fail.'));
+                        middleWare.createCreatives({
+                            campaign   : campaign,
+                            advertiser : advertiser,
+                            placements : placements
+                        }).then(done.fail, function(e){
+                            expect(e.message).toEqual('Fail.');
+                            expect(beeswax.uploadCreativeAsset).toHaveBeenCalled();
+                            expect(beeswax.creatives.create).toHaveBeenCalled();
+                            expect(request.put).not.toHaveBeenCalled();
+                        }).then(done,done.fail);
+                    });
+                });
             });
-
         });
 
         describe('method: initShowcaseAppsCampaign',function(){
@@ -379,13 +512,13 @@ fdescribe('BeeswaxMiddleware(config)', function() {
 
                 request.put.and.callFake(function(opts){
                     if(opts.url.match(/\/api\/account\/advertisers/)){
-                       ld.assign(updatedAdvert,advertiser,opts.json);
-                       return putAdvertiserDeferred.promise;
+                        ld.assign(updatedAdvert,advertiser,opts.json);
+                        return putAdvertiserDeferred.promise;
                     }
                     
                     if(opts.url.match(/\/api\/campaigns/)){
-                       ld.assign(updatedCampaign,campaign,opts.json);
-                       return putCampaignDeferred.promise;
+                        ld.assign(updatedCampaign,campaign,opts.json);
+                        return putCampaignDeferred.promise;
                     }
 
                     return q.reject('Unexpected PUT');
