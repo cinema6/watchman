@@ -24,6 +24,8 @@ module.exports = function factory(config) {
     );
     const request = new CwrxRequest(config.appCreds);
     const stream = new JsonProducer(config.kinesis.producer.stream, config.kinesis.producer);
+    const showcase = require('../../../../lib/showcase')(config);
+
     const campaignsEndpoint = resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint);
     const placementsEndpoint = resolveURL(
         config.cwrx.api.root,
@@ -107,21 +109,23 @@ module.exports = function factory(config) {
                     campaign: campaign,
                     placements: placements
                 });
-            }).then(bwResponse => {
-                log.trace(
-                    'Producing "initializedShowcaseCampaign" for showcase (app) campaign(%1).',
-                    bwResponse.campaign.id
-                );
+            }).then(bwResponse => (
+                showcase.rebalance(bwResponse.campaign.org).then(() => {
+                    log.trace(
+                        'Producing "initializedShowcaseCampaign" for showcase (app) campaign(%1).',
+                        campaign.id
+                    );
 
-                return stream.produce({
-                    type: 'initializedShowcaseCampaign',
-                    data: {
-                        campaign: bwResponse.campaign,
-                        placements: bwResponse.placements,
-                        date: data.date
-                    }
-                });
-            });
+                    return stream.produce({
+                        type: 'initializedShowcaseCampaign',
+                        data: {
+                            campaign: bwResponse.campaign,
+                            placements: bwResponse.placements,
+                            date: data.date
+                        }
+                    });
+                })
+            ));
         }).tap(() => (
             log.info('Successfully initialized showcase (app) campaign(%1).', campaign.id)
         )).catch(reason => log.error(

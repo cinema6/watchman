@@ -9,7 +9,7 @@ const logger = require('cwrx/lib/logger');
 const showcaseFactories = require('showcase-core').factories;
 
 describe('(action factory) showcase/apps/init_campaign', function() {
-    let JsonProducer, CwrxRequest, BeeswaxMiddleware;
+    let JsonProducer, CwrxRequest, BeeswaxMiddleware, showcaseLib;
     let factory;
 
     beforeAll(function() {
@@ -23,15 +23,24 @@ describe('(action factory) showcase/apps/init_campaign', function() {
         }));
 
         BeeswaxMiddleware = jasmine.createSpy('BeeswaxMiddleware()').and.callFake(() => ({
-            initShowcaseAppsCampaign : () => null
+            initShowcaseAppsCampaign: () => null
         }));
+
+        showcaseLib = (showcaseLib => jasmine.createSpy('showcase()').and.callFake(config => {
+            const showcase = showcaseLib(config);
+
+            spyOn(showcase, 'rebalance');
+
+            return showcase;
+        }))(require('../../lib/showcase'));
 
         factory = proxyquire('../../src/actions/showcase/apps/init_campaign', {
             'rc-kinesis': {
                 JsonProducer
             },
             '../../../../lib/CwrxRequest': CwrxRequest,
-            '../../../../lib/BeeswaxMiddleware': BeeswaxMiddleware
+            '../../../../lib/BeeswaxMiddleware': BeeswaxMiddleware,
+            '../../../../lib/showcase': showcaseLib
         });
     });
 
@@ -42,7 +51,7 @@ describe('(action factory) showcase/apps/init_campaign', function() {
     describe('when called', function() {
         let config;
         let initCampaign;
-        let request, watchmanStream, log, beeswax;
+        let request, watchmanStream, log, beeswax, showcase;
 
         beforeEach(function() {
             config = {
@@ -53,7 +62,7 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                 cwrx: {
                     api: {
                         root: 'http://33.33.33.10/',
-                        advertisers : {
+                        advertisers: {
                             endpoint: '/api/advertisers'
                         },
                         placements: {
@@ -62,7 +71,13 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                         campaigns: {
                             endpoint: '/api/campaigns'
                         },
-                        tracking : 'https://audit.cinema6.com/pixel.gif'
+                        transactions: {
+                            endpoint: '/api/transactions'
+                        },
+                        analytics: {
+                            endpoint: '/api/analytics'
+                        },
+                        tracking: 'https://audit.cinema6.com/pixel.gif'
                     }
                 },
                 kinesis: {
@@ -102,6 +117,7 @@ describe('(action factory) showcase/apps/init_campaign', function() {
             request = CwrxRequest.calls.mostRecent().returnValue;
             watchmanStream = JsonProducer.calls.mostRecent().returnValue;
             beeswax = BeeswaxMiddleware.calls.mostRecent().returnValue;
+            showcase = showcaseLib.calls.mostRecent().returnValue;
         });
 
         it('should return the action Function', function() {
@@ -118,14 +134,17 @@ describe('(action factory) showcase/apps/init_campaign', function() {
 
         it('should create a BeeswaxMiddleware', function() {
             expect(BeeswaxMiddleware).toHaveBeenCalledWith( {
-                apiRoot : config.beeswax.apiRoot,
-                creds   : config.state.secrets.beeswax
+                apiRoot: config.beeswax.apiRoot,
+                creds  : config.state.secrets.beeswax
             },{
-                creds : config.appCreds,
-                api : config.cwrx.api
+                creds: config.appCreds,
+                api: config.cwrx.api
             });
         });
 
+        it('should create a showcase lib', function() {
+            expect(showcaseLib).toHaveBeenCalledWith(config);
+        });
 
         describe('the action', function() {
             let data, options, event;
@@ -345,7 +364,7 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                         });
 
                         campaign = request.put.calls.mostRecent().args[0].json;
-                        campaign = ld.assign({}, campaign, {
+                        campaign = ld.assign({}, data.campaign, {
                             cards: campaign.cards.map(function(card) {
                                 return ld.assign({}, card, {
                                     id: 'rc-' + createUuid()
@@ -366,7 +385,7 @@ describe('(action factory) showcase/apps/init_campaign', function() {
 
                         expect(request.post).toHaveBeenCalledWith({
                             url: resolveURL(config.cwrx.api.root, config.cwrx.api.placements.endpoint),
-                            qs : { ext : false },
+                            qs: { ext: false },
                             json: {
                                 label: 'Showcase--Interstitial for App: "' + campaign.name + '"',
                                 tagType: options.placement.interstitial.tagType,
@@ -436,8 +455,8 @@ describe('(action factory) showcase/apps/init_campaign', function() {
 
                         it('should call beeswax middleware',function(){
                             expect(beeswax.initShowcaseAppsCampaign).toHaveBeenCalledWith({
-                                campaign : campaign,
-                                placements : placements
+                                campaign: campaign,
+                                placements: placements
                             });
                         });
 
@@ -455,38 +474,42 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                         });
 
                         describe('when beeswax middleware succeeds', function() {
-                            let produceDeferred;
+                            let rebalanceDeferred, updatedCampaign, updatedPlacements;
 
                             beforeEach(function(done) {
                                 expect(postPlacementDeffereds.length).toBe(1);
 
-                                watchmanStream.produce.and.returnValue((produceDeferred = q.defer()).promise);
+                                showcase.rebalance.and.returnValue((rebalanceDeferred = q.defer()).promise);
+
+                                updatedCampaign = ld.assign({}, campaign, {
+                                    externalIds: {
+                                        beeswax: createUuid()
+                                    }
+                                });
+                                updatedPlacements = placements.map(placement => ld.assign({}, placement, {
+                                    externalIds: {
+                                        beeswax: createUuid()
+                                    }
+                                }));
+
                                 initShowcaseDeferred.resolve({
-                                    campaign : campaign,
-                                    placements : placements
+                                    campaign: updatedCampaign,
+                                    placements: updatedPlacements
                                 });
 
                                 setTimeout(done);
                             });
 
-                            it('should produce a initializedShowcaseCampaign record', function() {
-                                expect(watchmanStream.produce.calls.count()).toBe(1, 'Incorrect number of records produced!');
-                                expect(watchmanStream.produce).toHaveBeenCalledWith({
-                                    type: 'initializedShowcaseCampaign',
-                                    data: {
-                                        campaign: campaign,
-                                        placements: placements,
-                                        date: data.date
-                                    }
-                                });
+                            it('should rebalance the org', function() {
+                                expect(showcase.rebalance).toHaveBeenCalledWith(campaign.org);
                             });
 
-                            describe('if producing the record fails', function() {
+                            describe('if the rebalance fails', function() {
                                 let reason;
 
                                 beforeEach(function(done) {
                                     reason = new Error('I failed you...');
-                                    produceDeferred.reject(reason);
+                                    rebalanceDeferred.reject(reason);
                                     setTimeout(done);
                                 });
 
@@ -499,18 +522,59 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                                 });
                             });
 
-                            describe('when the record has been produced', function() {
+                            describe('when the rebalance is complete', function() {
+                                let produceDeferred;
+
                                 beforeEach(function(done) {
-                                    produceDeferred.fulfill(watchmanStream.produce.calls.mostRecent().args[0]);
+                                    watchmanStream.produce.and.returnValue((produceDeferred = q.defer()).promise);
+
+                                    rebalanceDeferred.resolve([campaign]);
                                     setTimeout(done);
                                 });
 
-                                it('should not log an error', function() {
-                                    expect(log.error).not.toHaveBeenCalled();
+                                it('should produce a initializedShowcaseCampaign record', function() {
+                                    expect(watchmanStream.produce.calls.count()).toBe(1, 'Incorrect number of records produced!');
+                                    expect(watchmanStream.produce).toHaveBeenCalledWith({
+                                        type: 'initializedShowcaseCampaign',
+                                        data: {
+                                            campaign: updatedCampaign,
+                                            placements: updatedPlacements,
+                                            date: data.date
+                                        }
+                                    });
                                 });
 
-                                it('should fulfill with undefined', function() {
-                                    expect(success).toHaveBeenCalledWith(undefined);
+                                describe('if producing the record fails', function() {
+                                    let reason;
+
+                                    beforeEach(function(done) {
+                                        reason = new Error('I failed you...');
+                                        produceDeferred.reject(reason);
+                                        setTimeout(done);
+                                    });
+
+                                    it('should log an error', function() {
+                                        expect(log.error).toHaveBeenCalled();
+                                    });
+
+                                    it('should fulfill with undefined', function() {
+                                        expect(success).toHaveBeenCalledWith(undefined);
+                                    });
+                                });
+
+                                describe('when the record has been produced', function() {
+                                    beforeEach(function(done) {
+                                        produceDeferred.fulfill(watchmanStream.produce.calls.mostRecent().args[0]);
+                                        setTimeout(done);
+                                    });
+
+                                    it('should not log an error', function() {
+                                        expect(log.error).not.toHaveBeenCalled();
+                                    });
+
+                                    it('should fulfill with undefined', function() {
+                                        expect(success).toHaveBeenCalledWith(undefined);
+                                    });
                                 });
                             });
                         });
