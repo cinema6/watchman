@@ -42,11 +42,9 @@ module.exports = data => {
             ]
         },
         options: {
-            responsive: true,
             legend: {
                 position: 'bottom'
             },
-            hoverMode: 'label',
             borderWidth: 2,
 
             stacked: true,
@@ -59,16 +57,14 @@ module.exports = data => {
                         },
                         ticks: {
                             callback: (date, index, dates) => {
-                                const isSmall = true;
                                 const is30Day = dates.length > 7;
 
                                 if (is30Day) {
-                                    return !isSmall || (index % 2 === 0) ?
+                                    return (index % 2 === 0) ?
                                         date.format('M/D') : ' ';
+                                } else {
+                                    return date.format('M/D');
                                 }
-
-                                return isSmall ? date.format('M/D') :
-                                    date.format('ddd M/D');
                             },
                             autoSkip: true,
                             maxRotation: 0
