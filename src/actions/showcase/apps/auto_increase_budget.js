@@ -6,7 +6,7 @@ const ld = require('lodash');
 const filter = ld.filter;
 const assign = ld.assign;
 const get = ld.get;
-const floor = ld.floor;
+const round = ld.round;
 const q = require('q');
 const Status = require('cwrx/lib/enums').Status;
 const logger = require('cwrx/lib/logger');
@@ -41,21 +41,34 @@ module.exports = function factory(config) {
             }
         }).spread(campaigns => {
             const appCampaigns = filter(campaigns, { product: { type: 'app' } });
-            // Split this transaction between all showcase (app) campaigns
-            const externalImpressionPortion = floor(
-                (transaction.amount / appCampaigns.length) * paymentPlan.impressionsPerDollar
-            );
-            const budgetPortion = (transaction.amount / appCampaigns.length);
+            const totalCampaigns = appCampaigns.length;
 
             return q.all(appCampaigns.map(campaign => {
                 const externalCampaign = get(campaign, 'externalCampaigns.beeswax', {});
+                const externalMultiplier = get(
+                    campaign,
+                    'conversionMultipliers.external',
+                    config.campaign.conversionMultipliers.external
+                );
+                const internalMultiplier = get(
+                    campaign,
+                    'conversionMultipliers.internal',
+                    config.campaign.conversionMultipliers.internal
+                );
+
+                const targetUsers = round(transaction.targetUsers / totalCampaigns);
+                const budget = round(transaction.amount / totalCampaigns, 2);
+                const budgetImpressions = targetUsers * externalMultiplier;
+                const cost = round(budget / (targetUsers * internalMultiplier), 3);
 
                 return request.put({
                     url: campaignsEndpoint + '/' + campaign.id,
                     json: assign({}, campaign, {
                         status: Status.Active,
                         pricing: assign({}, campaign.pricing, {
-                            budget: get(campaign, 'pricing.budget', 0) + budgetPortion,
+                            cost,
+                            model: 'cpv',
+                            budget: get(campaign, 'pricing.budget', 0) + budget,
                             dailyLimit: dailyLimit
                         })
                     })
@@ -63,8 +76,8 @@ module.exports = function factory(config) {
                     request.put({
                         url: campaignsEndpoint + '/' + campaign.id + '/external/beeswax',
                         json: {
-                            budgetImpressions: (externalCampaign.budgetImpressions || 0) +
-                                externalImpressionPortion,
+                            budgetImpressions: get(externalCampaign, 'budgetImpressions', 0) +
+                                budgetImpressions,
                             dailyLimitImpressions: paymentPlan.dailyImpressionLimit,
                             budget: null,
                             dailyLimit: null

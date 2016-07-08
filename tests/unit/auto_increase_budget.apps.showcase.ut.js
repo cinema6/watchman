@@ -2,7 +2,7 @@
 
 const Status = require('cwrx/lib/enums').Status;
 const moment = require('moment');
-const proxyquire = require('proxyquire').noCallThru();
+const proxyquire = require('proxyquire');
 
 describe('(action factory) showcase/apps/auto_increase_budget', function() {
     var q, uuid, resolveURL, ld, logger;
@@ -15,26 +15,34 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
         resolveURL = require('url').resolve;
         ld = require('lodash');
         logger = require('cwrx/lib/logger');
-
-        JsonProducer = jasmine.createSpy('JsonProducer()').and.callFake(() => ({
-            produce: jasmine.createSpy('produce()').and.returnValue(q.defer().promise)
-        }));
-        CwrxRequest = jasmine.createSpy('CwrxRequest()').and.callFake(() => ({
-            send: jasmine.createSpy('send()').and.returnValue(q.defer().promise),
-            get: () => null,
-            put: () => null
-        }));
-        factory = proxyquire('../../src/actions/showcase/apps/auto_increase_budget.js', {
-            'rc-kinesis': {
-                JsonProducer: JsonProducer
-            },
-            '../../../../lib/CwrxRequest': CwrxRequest
-        });
     });
 
     beforeEach(function() {
-        [JsonProducer, CwrxRequest].forEach(function(spy) {
-            spy.calls.reset();
+        JsonProducer = (function(JsonProducer) {
+            return jasmine.createSpy('JsonProducer()').and.callFake(function(name, options) {
+                const producer = new JsonProducer(name, options);
+
+                spyOn(producer, 'produce').and.returnValue(q.defer().promise);
+
+                return producer;
+            });
+        }(require('rc-kinesis').JsonProducer));
+
+        CwrxRequest = (function(CwrxRequest) {
+            return jasmine.createSpy('CwrxRequest()').and.callFake(function(creds) {
+                const request = new CwrxRequest(creds);
+
+                spyOn(request, 'send').and.returnValue(q.defer().promise);
+
+                return request;
+            });
+        }(require('../../lib/CwrxRequest')));
+
+        factory = proxyquire('../../src/actions/showcase/apps/auto_increase_budget', {
+            'rc-kinesis': {
+                JsonProducer
+            },
+            '../../../../lib/CwrxRequest': CwrxRequest
         });
     });
 
@@ -78,6 +86,12 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                 },
                 paymentPlans: {
                     [paymentPlan.id]: paymentPlan
+                },
+                campaign: {
+                    conversionMultipliers: {
+                        internal: 1.1,
+                        external: 1.25
+                    }
                 }
             };
 
@@ -190,19 +204,24 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                             pricing: {
                                 model: 'cpv',
                                 cost: 0.01,
-                                budget: 1,
+                                budget: 26,
                                 dailyLimit: 2
                             },
                             externalCampaigns: {
                                 beeswax: {
                                     externalId: uuid.createUuid(),
-                                    budgetImpressions: 200,
+                                    budgetImpressions: 1000,
                                     dailyLimitImpressions: 300
                                 }
                             },
+                            conversionMultipliers: {
+                                internal: 1.25,
+                                external: 1.50
+                            },
                             product: {
                                 type: 'app'
-                            }
+                            },
+                            targetUsers: 800
                         },
                         {
                             id: 'cam-' + uuid.createUuid(),
@@ -217,7 +236,8 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                             },
                             product: {
                                 type: 'app'
-                            }
+                            },
+                            targetUsers: 1200
                         },
                         {
                             id: 'cam-' + uuid.createUuid(),
@@ -258,14 +278,16 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                     setTimeout(done);
                 });
 
-                it('should update the bob campaign budgets', function() {
+                it('should update the bob campaign pricing', function() {
                     expect(request.put.calls.count()).toBe(2);
                     expect(request.put).toHaveBeenCalledWith({
                         url: resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint + '/' + campaigns[1].id),
                         json: ld.assign({}, campaigns[1], {
                             status: 'active',
                             pricing: ld.assign({}, campaigns[1].pricing, {
-                                budget: campaigns[1].pricing.budget + (data.transaction.amount / 2),
+                                model: 'cpv',
+                                cost: 0.020,
+                                budget: 51,
                                 dailyLimit: options.dailyLimit
                             })
                         })
@@ -275,7 +297,9 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                         json: ld.assign({}, campaigns[2], {
                             status: 'active',
                             pricing: {
-                                budget: (data.transaction.amount / 2),
+                                model: 'cpv',
+                                cost: 0.023,
+                                budget: 25,
                                 dailyLimit: options.dailyLimit
                             }
                         })
@@ -296,7 +320,7 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                         expect(request.put).toHaveBeenCalledWith({
                             url: resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint + '/' + campaigns[1].id + '/external/beeswax'),
                             json: {
-                                budgetImpressions: campaigns[1].externalCampaigns.beeswax.budgetImpressions + ld.floor((data.transaction.amount / 2) * paymentPlan.impressionsPerDollar),
+                                budgetImpressions: 2500,
                                 dailyLimitImpressions: paymentPlan.dailyImpressionLimit,
                                 budget: null,
                                 dailyLimit: null
@@ -305,7 +329,7 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                         expect(request.put).toHaveBeenCalledWith({
                             url: resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint + '/' + campaigns[2].id + '/external/beeswax'),
                             json: {
-                                budgetImpressions: campaigns[2].externalCampaigns.beeswax.budgetImpressions + ld.floor((data.transaction.amount / 2) * paymentPlan.impressionsPerDollar),
+                                budgetImpressions: 1250,
                                 dailyLimitImpressions: paymentPlan.dailyImpressionLimit,
                                 budget: null,
                                 dailyLimit: null
