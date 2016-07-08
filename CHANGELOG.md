@@ -6,9 +6,17 @@
   * [FIX]: init_campaign uses BeeswaxMiddleware to create beeswax advertiser,campaign, and creatives
   * [FIX]: removed 300x250 card / placement from init_campaigns. 
   * [FIX]: Updated code to expect more consistent property scheme for finding beeswax ids on c6 entities.. (<entity>.externalIds.beeswax).
+  * Change the logic for allocating funds/impressions to showcase
+    campaigns
+  * [FEATURE]: Reallocate funds/impressions when a showcase campaign is
+    added/removed
+  * All dependencies on the cwrx-beeswax integration have been removed
   * ** Extra Deployment Steps**:
     * Need to add tracking property to cwrx.api config (see environments/development.json)
-
+    * Update watchman environments
+    * Ensure watchman app can:
+      * Read all transactions
+      * Do whatever it wants with `campaign.pricing`
 
 ## v1.2.0 (July 12, 2016)
 * *[v1.2.0-rc1]*
