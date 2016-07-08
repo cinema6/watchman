@@ -17,7 +17,6 @@ var AWS_CREDS = JSON.parse(process.env.awsCreds);
 var CWRX_STREAM = process.env.cwrxStream;
 var SECRETS = JSON.parse(process.env.secrets);
 var HUBSPOT_API_KEY = SECRETS.hubspot.key;
-var paymentPlans = require('../../environments/development.json').default_attributes.watchman.app.config.paymentPlans;
 
 function createId(prefix) {
     return prefix + '-' + uuid.createUuid();
@@ -43,7 +42,7 @@ function wait(time) {
 
 describe('cwrxStream campaignCreated', function() {
     var producer, request, beeswax, mailman, hubspot;
-    var user, org, advertiser, promotions, containers, campaign;
+    var user, org, paymentPlan, advertiser, promotions, containers, campaign;
 
     function api(endpoint) {
         return resolveURL(API_ROOT, endpoint);
@@ -96,14 +95,26 @@ describe('cwrxStream campaignCreated', function() {
     function createUser() {
         var orgId = createId('o');
         var userId = createId('u');
+        var paymentPlanId = createId('pp');
 
-        return testUtils.resetCollection('orgs', [{
-            id: orgId,
-            status: 'active',
-            name: 'The Best Org',
-            paymentPlanId: Object.keys(paymentPlans)[0],
-            paymentPlanStart: moment().format()
-        }]).then(function makeUser() {
+        return testUtils.resetCollection('paymentPlans', [{
+            id: paymentPlanId,
+            label: 'Starter',
+            price: 39.99,
+            maxCampaigns: 1,
+            viewsPerMonth: 2000,
+            created: '2016-07-05T14:18:29.642Z',
+            lastUpdated: '2016-07-05T14:28:57.336Z',
+            status: 'active'
+        }]).then(function makeOrg() {
+            return testUtils.resetCollection('orgs', [{
+                id: orgId,
+                status: 'active',
+                name: 'The Best Org',
+                paymentPlanId: paymentPlanId,
+                paymentPlanStart: moment().format()
+            }]);
+        }).then(function makeUser() {
             return testUtils.resetCollection('users', [{
                 id: userId,
                 status: 'active',
@@ -148,7 +159,10 @@ describe('cwrxStream campaignCreated', function() {
                 }).then(ld.property(0)),
                 request.get({
                     url: api('/api/account/advertisers?org=' + orgId)
-                }).then(ld.property('0.0'))
+                }).then(ld.property('0.0')),
+                request.get({
+                    url: api(`/api/payment-plans/${paymentPlanId}`)
+                }).then(ld.property('0'))
             ]);
         });
     }
@@ -289,7 +303,8 @@ describe('cwrxStream campaignCreated', function() {
                 placements: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
                 advertisers: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
                 promotions: { read: 'all' },
-                transactions: { create: 'all' }
+                transactions: { create: 'all' },
+                paymentPlans: { read: 'all' }
             },
             entitlements: {
                 directEditCampaigns: true,
@@ -329,7 +344,9 @@ describe('cwrxStream campaignCreated', function() {
                 name: '10-Day Free Trial',
                 type: 'freeTrial',
                 data: {
-                    trialLength: 10
+                    trialLength: 10,
+                    paymentMethodRequired: false,
+                    targetUsers: 750
                 }
             },
             {
@@ -351,7 +368,9 @@ describe('cwrxStream campaignCreated', function() {
                 name: 'One Week Free Trial',
                 type: 'freeTrial',
                 data: {
-                    trialLength: 7
+                    trialLength: 7,
+                    paymentMethodRequired: false,
+                    targetUsers: 500
                 }
             }
         ];
@@ -396,10 +415,11 @@ describe('cwrxStream campaignCreated', function() {
             testUtils.resetCollection('containers', containers)
         ]).then(function() {
             return createUser();
-        }).spread(function(/*user, org, advertiser*/) {
+        }).spread(function(/*user, org, advertiser, paymentPlan*/) {
             user = arguments[0];
             org = arguments[1];
             advertiser = arguments[2];
+            paymentPlan = arguments[3];
 
             campaign = {
                 id: createId('cam'),
@@ -770,7 +790,7 @@ describe('cwrxStream campaignCreated', function() {
             beforeEach(function(done) {
                 now = moment();
 
-                updatePaymentPlan(Object.keys(paymentPlans)[1]).then(function() {
+                updatePaymentPlan(paymentPlan.id).then(function() {
                     return getOrg();
                 }).then(function(/*org*/) {
                     org = arguments[0];
@@ -858,8 +878,14 @@ describe('cwrxStream campaignCreated', function() {
                         campaign_id: null,
                         braintree_id: null,
                         promotion_id: promotions[2].id,
-                        description: JSON.stringify({ eventType: 'credit', source: 'promotion', target: 'showcase', paymentPlanId: org.paymentPlanId })
+                        application: 'showcase',
+                        paymentplan_id: paymentPlan.id,
+                        view_target: 500,
+                        cycle_start: jasmine.any(Date),
+                        cycle_end: jasmine.any(Date)
                     }));
+                    expect(moment(transactions[0].cycle_start).isSame(now, 'day')).toBe(true, 'cycle_start is not correct.');
+                    expect(moment(transactions[0].cycle_end).isSame(moment(now).add(7, 'days'), 'day')).toBe(true, 'cycle_end is not correct.');
 
                     expect(transactions[1]).toEqual(jasmine.objectContaining({
                         rec_key: jasmine.any(String),
@@ -873,8 +899,14 @@ describe('cwrxStream campaignCreated', function() {
                         campaign_id: null,
                         braintree_id: null,
                         promotion_id: promotions[0].id,
-                        description: JSON.stringify({ eventType: 'credit', source: 'promotion', target: 'showcase', paymentPlanId: org.paymentPlanId })
+                        application: 'showcase',
+                        paymentplan_id: paymentPlan.id,
+                        view_target: 750,
+                        cycle_start: jasmine.any(Date),
+                        cycle_end: jasmine.any(Date)
                     }));
+                    expect(moment(transactions[1].cycle_start).isSame(now, 'day')).toBe(true, 'cycle_start is not correct.');
+                    expect(moment(transactions[1].cycle_end).isSame(moment(now).add(10, 'days'), 'day')).toBe(true, 'cycle_end is not correct.');
                 });
             });
         });

@@ -1,55 +1,42 @@
 'use strict';
 
+const proxyquire = require('proxyquire').noCallThru();
+
 describe('(action factory) check_payment_required', function() {
-    var JsonProducer, CwrxRequest;
-    var uuid, q, resolveURL, moment, ld;
-    var factory;
+    let JsonProducer, CwrxRequest;
+    let uuid, q, resolveURL, moment, parseURL;
+    let factory;
 
     beforeAll(function() {
-        Object.keys(require.cache).forEach(function(dep) {
-            delete require.cache[dep];
-        });
-
         uuid = require('rc-uuid');
         q = require('q');
         resolveURL = require('url').resolve;
         moment = require('moment');
-        ld = require('lodash');
+        parseURL = require('url').parse;
 
-        JsonProducer = (function(JsonProducer) {
-            return jasmine.createSpy('JsonProducer()').and.callFake(function(name, options) {
-                var producer = new JsonProducer(name, options);
-
-                spyOn(producer, 'produce').and.returnValue(q.defer().promise);
-
-                return producer;
-            });
-        }(require('rc-kinesis').JsonProducer));
-        require.cache[require.resolve('rc-kinesis')].exports.JsonProducer = JsonProducer;
-
-        CwrxRequest = (function(CwrxRequest) {
-            return jasmine.createSpy('CwrxRequest()').and.callFake(function(creds) {
-                var request = new CwrxRequest(creds);
-
-                spyOn(request, 'send').and.returnValue(q.defer().promise);
-
-                return request;
-            });
-        }(require('../../lib/CwrxRequest')));
-        require.cache[require.resolve('../../lib/CwrxRequest')].exports = CwrxRequest;
-
-        factory = require('../../src/actions/check_payment_required');
+        JsonProducer = jasmine.createSpy('JsonProducer()').and.callFake(() => ({
+            produce: jasmine.createSpy('produce()').and.returnValue(q.defer().promise)
+        }));
+        CwrxRequest = jasmine.createSpy('CwrxRequest()').and.callFake(() => ({
+            send: jasmine.createSpy('send()').and.returnValue(q.defer().promise),
+            get: () => null
+        }));
+        factory = proxyquire('../../src/actions/check_payment_required', {
+            'rc-kinesis': {
+                JsonProducer: JsonProducer
+            },
+            '../../lib/CwrxRequest': CwrxRequest
+        });
     });
 
     it('should exist', function() {
         expect(factory).toEqual(jasmine.any(Function));
-        expect(factory.name).toEqual('checkPaymentRequiredFactory');
     });
 
     describe('when called', function() {
-        var config;
-        var checkPaymentRequired;
-        var watchmanStream, request;
+        let config;
+        let checkPaymentRequired;
+        let watchmanStream, request;
 
         beforeEach(function() {
             config = {
@@ -65,6 +52,9 @@ describe('(action factory) check_payment_required', function() {
                         },
                         orgs: {
                             endpoint: '/api/account/orgs'
+                        },
+                        paymentPlans: {
+                            endpoint: '/api/payment-plans'
                         }
                     }
                 },
@@ -89,7 +79,6 @@ describe('(action factory) check_payment_required', function() {
 
         it('should return the action', function() {
             expect(checkPaymentRequired).toEqual(jasmine.any(Function));
-            expect(checkPaymentRequired.name).toBe('checkPaymentRequired');
         });
 
         it('should create a JsonProducer for watchman', function() {
@@ -101,9 +90,9 @@ describe('(action factory) check_payment_required', function() {
         });
 
         describe('the action', function() {
-            var now, data, options, event;
-            var getPaymentsDeferred;
-            var result;
+            let success, failure;
+            let now, data, options, event;
+            let paymentMethod, paymentPlan;
 
             beforeEach(function() {
                 now = moment(new Date(2016, 3, 15));
@@ -111,22 +100,27 @@ describe('(action factory) check_payment_required', function() {
                 data = {
                     org: {
                         id: 'o-' + uuid.createUuid(),
-                        paymentPlanStart: now.format()
+                        paymentPlanStart: now.format(),
+                        paymentPlanId: 'pp-0Ek5Na02vCohpPgw'
                     },
                     date: now.format()
                 };
                 options = {};
                 event = { data: data, options: options };
 
-                spyOn(request, 'get').and.returnValue((getPaymentsDeferred = q.defer()).promise);
+                success = jasmine.createSpy('success()');
+                failure = jasmine.createSpy('failure()');
+
+                spyOn(request, 'get').and.returnValue(q.defer().promise);
             });
 
-            describe('if the org has no paymentPlanId', function() {
+            describe('if the org has no nextPaymentDate', function() {
                 beforeEach(function(done) {
-                    data.org.paymentPlanId = null;
+                    delete data.org.nextPaymentDate;
+                    data.org.paymentPlanId = 'pp-0Ek5Na02vCohpPgw';
 
-                    result = checkPaymentRequired(event);
-                    process.nextTick(done);
+                    checkPaymentRequired(event).then(success, failure);
+                    setTimeout(done);
                 });
 
                 it('should not fetch any payments', function() {
@@ -134,300 +128,120 @@ describe('(action factory) check_payment_required', function() {
                 });
 
                 it('should return a promise resolved to undefined', function() {
-                    expect(result.inspect().value).toBeUndefined();
-                    expect(result.inspect().state).toBe('fulfilled');
+                    expect(success).toHaveBeenCalledWith(undefined);
                 });
             });
 
-            describe('if the org has no paymentPlanStart', function() {
-                beforeEach(function(done) {
-                    delete data.org.paymentPlanStart;
-                    data.org.paymentPlanId = 'pp-0Ek5Na02vCohpPgw';
-
-                    result = checkPaymentRequired(event);
-                    process.nextTick(done);
-                });
-
-                it('should not fetch any payments', function() {
-                    expect(request.get).not.toHaveBeenCalled();
-                });
-
-                it('should return a promise resolved to undefined', function() {
-                    expect(result.inspect().value).toBeUndefined();
-                    expect(result.inspect().state).toBe('fulfilled');
-                });
-            });
-
-            describe('if the paymentPlanStart is today', function() {
-                var paymentMethod;
-
-                beforeEach(function(done) {
-                    data.org.paymentPlanId = 'pp-0Ek5Na02vCohpPgw';
-                    data.org.paymentPlanStart = moment(data.date).format();
-
-                    paymentMethod = {
-                        token: 'dq9whudfuier',
-                        default: true
+            describe('if the org has a nextPaymentDate', function() {
+                beforeEach(function() {
+                    paymentMethod = { token: uuid.createUuid(), default: true };
+                    paymentPlan = {
+                        label: 'Starter',
+                        price: 49.99,
+                        maxCampaigns: 1,
+                        viewsPerMonth: 2000,
+                        id: 'pp-0Ekdsm05KVZ43Aqj',
+                        created: '2016-07-05T14:18:29.642Z',
+                        lastUpdated: '2016-07-05T14:28:57.336Z',
+                        status: 'active'
                     };
-
-                    spyOn(request, 'put').and.callFake(function(requestConfig) {
-                        return q([ld.assign({}, data.org, requestConfig.json)]);
-                    });
-                    request.get.and.callFake(function(requestConfig) {
-                        if (requestConfig.url === resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint)) {
-                            return q([[], { statusCode: 200 }]);
-                        } else if (requestConfig.url === resolveURL(resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint), 'methods')) {
-                            return q([[paymentMethod], { statusCode: 200 }]);
-                        }
-                    });
-                    watchmanStream.produce.and.returnValue(q({ type: 'paymentRequired' }));
-
-                    result = checkPaymentRequired(event);
-                    process.nextTick(done);
                 });
 
-                it('should add a record to the watchman stream', function() {
-                    expect(watchmanStream.produce).toHaveBeenCalledWith({
-                        type: 'paymentRequired',
-                        data: {
-                            org: data.org,
-                            paymentPlan: config.paymentPlans[data.org.paymentPlanId],
-                            paymentMethod: paymentMethod,
-                            date: data.date
-                        }
-                    });
-                });
-
-                it('should return a promise resolved to undefined', function() {
-                    expect(result.inspect().value).toBeUndefined();
-                    expect(result.inspect().state).toBe('fulfilled');
-                });
-            });
-
-            describe('if the paymentPlanStart is before today', function() {
-                var paymentMethod;
-
-                beforeEach(function(done) {
-                    data.org.paymentPlanId = 'pp-0Ek5Na02vCohpPgw';
-                    data.org.paymentPlanStart = moment(data.date).subtract(1, 'day').format();
-
-                    paymentMethod = {
-                        token: 'dq9whudfuier',
-                        default: true
-                    };
-
-                    spyOn(request, 'put').and.callFake(function(requestConfig) {
-                        return q([ld.assign({}, data.org, requestConfig.json)]);
-                    });
-                    request.get.and.callFake(function(requestConfig) {
-                        if (requestConfig.url === resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint)) {
-                            return q([[], { statusCode: 200 }]);
-                        } else if (requestConfig.url === resolveURL(resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint), 'methods')) {
-                            return q([[paymentMethod], { statusCode: 200 }]);
-                        }
-                    });
-                    watchmanStream.produce.and.returnValue(q({ type: 'paymentRequired' }));
-
-                    result = checkPaymentRequired(event);
-                    process.nextTick(done);
-                });
-
-                it('should add a record to the watchman stream', function() {
-                    expect(watchmanStream.produce).toHaveBeenCalledWith({
-                        type: 'paymentRequired',
-                        data: {
-                            org: data.org,
-                            paymentPlan: config.paymentPlans[data.org.paymentPlanId],
-                            paymentMethod: paymentMethod,
-                            date: data.date
-                        }
-                    });
-                });
-
-                it('should return a promise resolved to undefined', function() {
-                    expect(result.inspect().value).toBeUndefined();
-                    expect(result.inspect().state).toBe('fulfilled');
-                });
-            });
-
-            describe('if the paymentPlanStart is after today', function() {
-                beforeEach(function(done) {
-                    data.org.paymentPlanId = 'pp-0Ek5Na02vCohpPgw';
-                    data.org.paymentPlanStart = moment(data.date).add(1, 'day').format();
-
-                    spyOn(request, 'put').and.callFake(function(requestConfig) {
-                        return q([ld.assign({}, data.org, requestConfig.json)]);
-                    });
-
-                    result = checkPaymentRequired(event);
-                    process.nextTick(done);
-                });
-
-                it('should not fetch any payments', function() {
-                    expect(request.get).not.toHaveBeenCalled();
-                });
-
-                it('should update the org with a nextPaymentDate', function() {
-                    expect(request.put).toHaveBeenCalledWith({
-                        url: resolveURL(config.cwrx.api.root, config.cwrx.api.orgs.endpoint + '/' + data.org.id),
-                        json: {
-                            nextPaymentDate: moment(data.org.paymentPlanStart).format()
-                        }
-                    });
-                });
-
-                it('should return a promise resolved to undefined', function() {
-                    expect(result.inspect().value).toBeUndefined();
-                    expect(result.inspect().state).toBe('fulfilled');
-                });
-            });
-
-            describe('if the org has a paymentPlanId', function() {
-                describe('that is not recognized', function() {
+                describe('that is after today', function() {
                     beforeEach(function(done) {
-                        data.org.paymentPlanId = 'pp-0GK9j102W6Cc9VNu';
+                        data.org.nextPaymentDate = moment(data.date).add(1, 'day').format();
 
-                        result = checkPaymentRequired(event);
-                        process.nextTick(done);
+                        checkPaymentRequired(event).then(success, failure);
+                        setTimeout(done);
                     });
 
-                    it('should not fetch any payments', function() {
+                    it('should not GET anything', function() {
                         expect(request.get).not.toHaveBeenCalled();
                     });
 
-                    it('should return a promise resolved to undefined', function() {
-                        expect(result.inspect().value).toBeUndefined();
-                        expect(result.inspect().state).toBe('fulfilled');
+                    it('should not produce anything', function() {
+                        expect(watchmanStream.produce).not.toHaveBeenCalled();
+                    });
+
+                    it('should fulfill the promise', function() {
+                        expect(success).toHaveBeenCalledWith(undefined);
                     });
                 });
 
-                describe('that is recognized', function() {
-                    var success, failure;
+                [
+                    {
+                        description: 'that is today',
+                        dateOffset: 0
+                    },
+                    {
+                        description: 'that is before today',
+                        dateOffset: 1
+                    }
+                ].forEach(testConfig => describe(testConfig.description, function() {
+                    let getPaymentMethodsDeferred, getPaymentPlanDeferred;
 
                     beforeEach(function(done) {
-                        data.org.paymentPlanId = 'pp-0Ek5Na02vCohpPgw';
+                        data.org.nextPaymentDate = moment(data.date).subtract(testConfig.dateOffset, 'days').format();
 
-                        success = jasmine.createSpy('success()');
-                        failure = jasmine.createSpy('failure()');
+                        request.get.and.callFake(requestConfig => {
+                            const url = parseURL(requestConfig.url);
+
+                            if (url.pathname.indexOf(config.cwrx.api.paymentPlans.endpoint) > -1) {
+                                return (getPaymentPlanDeferred = q.defer()).promise;
+                            }
+
+                            if (url.pathname.indexOf(config.cwrx.api.payments.endpoint) > -1) {
+                                return (getPaymentMethodsDeferred = q.defer()).promise;
+                            }
+
+                            return q.reject(new Error('NOT FOUND!'));
+                        });
 
                         checkPaymentRequired(event).then(success, failure);
-                        process.nextTick(done);
+                        setTimeout(done);
                     });
 
-                    it('should request payments for the org', function() {
+                    it('should get the org\'s payment methods', function() {
                         expect(request.get).toHaveBeenCalledWith({
-                            url: resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint),
+                            url: resolveURL(resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint), 'methods'),
                             qs: { org: data.org.id }
                         });
                     });
 
-                    describe('and a nextPaymentDate', function() {
-                        var paymentMethod;
-
-                        beforeEach(function() {
-                            success.calls.reset();
-                            failure.calls.reset();
-                            request.get.calls.reset();
-                            watchmanStream.produce.calls.reset();
-
-                            paymentMethod = { token: uuid.createUuid(), default: true };
-                            request.get.and.returnValue(q([
-                                [
-                                    { token: uuid.createUuid(), default: false },
-                                    paymentMethod,
-                                    { token: uuid.createUuid(), default: false }
-                                ]
-                            ]));
-                        });
-
-                        describe('that is after today', function() {
-                            beforeEach(function(done) {
-                                data.org.nextPaymentDate = moment(data.date).add(1, 'day').format();
-
-                                checkPaymentRequired(event).then(success, failure);
-                                process.nextTick(done);
-                            });
-
-                            it('should not GET anything', function() {
-                                expect(request.get).not.toHaveBeenCalled();
-                            });
-
-                            it('should not produce anything', function() {
-                                expect(watchmanStream.produce).not.toHaveBeenCalled();
-                            });
-
-                            it('should fulfill the promise', function() {
-                                expect(success).toHaveBeenCalledWith(undefined);
-                            });
-                        });
-
-                        describe('that is today', function() {
-                            beforeEach(function(done) {
-                                data.org.nextPaymentDate = moment(data.date).format();
-
-                                checkPaymentRequired(event).then(success, failure);
-                                process.nextTick(done);
-                            });
-
-                            it('should get the orgs payment methods', function() {
-                                expect(request.get.calls.count()).toBe(1);
-                                expect(request.get).toHaveBeenCalledWith({
-                                    url: resolveURL(resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint), 'methods'),
-                                    qs: { org: data.org.id }
-                                });
-                            });
-
-                            it('should add a record to the watchman stream', function() {
-                                expect(watchmanStream.produce).toHaveBeenCalledWith({
-                                    type: 'paymentRequired',
-                                    data: {
-                                        org: data.org,
-                                        paymentPlan: config.paymentPlans[data.org.paymentPlanId],
-                                        paymentMethod: paymentMethod,
-                                        date: data.date
-                                    }
-                                });
-                            });
-                        });
-
-                        describe('that is before today', function() {
-                            beforeEach(function(done) {
-                                data.org.nextPaymentDate = moment(data.date).subtract(1, 'day').format();
-
-                                checkPaymentRequired(event).then(success, failure);
-                                process.nextTick(done);
-                            });
-
-                            it('should get the orgs payment methods', function() {
-                                expect(request.get.calls.count()).toBe(1);
-                                expect(request.get).toHaveBeenCalledWith({
-                                    url: resolveURL(resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint), 'methods'),
-                                    qs: { org: data.org.id }
-                                });
-                            });
-
-                            it('should add a record to the watchman stream', function() {
-                                expect(watchmanStream.produce).toHaveBeenCalledWith({
-                                    type: 'paymentRequired',
-                                    data: {
-                                        org: data.org,
-                                        paymentPlan: config.paymentPlans[data.org.paymentPlanId],
-                                        paymentMethod: paymentMethod,
-                                        date: data.date
-                                    }
-                                });
-                            });
+                    it('should get the org\'s payment plan', function() {
+                        expect(request.get).toHaveBeenCalledWith({
+                            url: `${resolveURL(config.cwrx.api.root, config.cwrx.api.paymentPlans.endpoint)}/${data.org.paymentPlanId}`
                         });
                     });
 
-                    describe('if the request for payments fails', function() {
-                        var reason;
+                    describe('if the org has no payment methods', function() {
+                        let paymentMethods;
 
                         beforeEach(function(done) {
-                            reason = new Error('I failed!');
-                            getPaymentsDeferred.reject(reason);
+                            paymentMethods = [];
 
-                            process.nextTick(done);
+                            getPaymentMethodsDeferred.fulfill([paymentMethods]);
+                            getPaymentPlanDeferred.fulfill([{}]);
+                            setTimeout(done);
+                        });
+
+                        it('should not produce anything into the watchman stream', function() {
+                            expect(watchmanStream.produce).not.toHaveBeenCalled();
+                        });
+
+                        it('should reject the Promise', function() {
+                            expect(failure).toHaveBeenCalledWith(new Error('Org ' + data.org.id + ' has no payment methods.'));
+                        });
+                    });
+
+                    describe('if getting the payment methods fails', function() {
+                        let reason;
+
+                        beforeEach(function(done) {
+                            reason = new Error('Something went very wrong...');
+                            getPaymentMethodsDeferred.reject(reason);
+
+                            setTimeout(done);
                         });
 
                         it('should reject the promise', function() {
@@ -435,412 +249,52 @@ describe('(action factory) check_payment_required', function() {
                         });
                     });
 
-                    describe('if the request is successful', function() {
-                        var produceDeferred;
-                        var payments;
-                        var paymentMethod;
+                    describe('if getting the payment plan fails', function() {
+                        let reason;
 
-                        beforeEach(function() {
-                            spyOn(request, 'put').and.callFake(function(config) {
-                                return q([ld.assign({}, data.org, config.json)]);
-                            });
-                            watchmanStream.produce.and.returnValue((produceDeferred = q.defer()).promise);
+                        beforeEach(function(done) {
+                            reason = new Error('Something went very wrong...');
+                            getPaymentPlanDeferred.reject(reason);
+
+                            setTimeout(done);
                         });
 
-                        describe('and the last successful payment was', function() {
-                            beforeEach(function() {
-                                paymentMethod = { token: uuid.createUuid(), default: true };
-                                request.get.and.returnValue(q([
-                                    [
-                                        { token: uuid.createUuid(), default: false },
-                                        paymentMethod,
-                                        { token: uuid.createUuid(), default: false }
-                                    ]
-                                ]));
-                                request.get.calls.reset();
+                        it('should reject the promise', function() {
+                            expect(failure).toHaveBeenCalledWith(reason);
+                        });
+                    });
 
-                                watchmanStream.produce.and.callFake(function(event) { return q(event); });
-                            });
+                    describe('if the org has a default paymentMethod', function() {
+                        beforeEach(function(done) {
+                            getPaymentMethodsDeferred.resolve([
+                                [
+                                    { token: uuid.createUuid(), default: false },
+                                    paymentMethod,
+                                    { token: uuid.createUuid(), default: false }
+                                ],
+                                { statusCode: 200 }
+                            ]);
+                            getPaymentPlanDeferred.resolve([
+                                paymentPlan,
+                                { statusCode: 200 }
+                            ]);
 
-                            describe('created on a month that is longer than the current one', function() {
-                                beforeEach(function() {
-                                    data.date = new Date(2015, 1, 15).toISOString();
-
-                                    payments = [
-                                        {
-                                            id: uuid.createUuid(),
-                                            status: 'settled',
-                                            amount: 49.99,
-                                            createdAt: moment('2015-01-30').format()
-                                        },
-                                        {
-                                            id: uuid.createUuid(),
-                                            status: 'settled',
-                                            amount: 49.99,
-                                            createdAt: moment('2014-12-30').format()
-                                        }
-                                    ];
-                                });
-
-                                describe('before the last day of the month', function() {
-                                    beforeEach(function(done) {
-                                        data.date = new Date(2015, 1, 27).toISOString();
-
-                                        getPaymentsDeferred.fulfill([payments]);
-                                        process.nextTick(done);
-                                    });
-
-                                    it('should not get any payment methods', function() {
-                                        expect(request.get).not.toHaveBeenCalled();
-                                    });
-
-                                    it('should not add any records to the watchman stream', function() {
-                                        expect(watchmanStream.produce).not.toHaveBeenCalled();
-                                    });
-
-                                    it('should update the org with a nextPaymentDate', function() {
-                                        expect(request.put).toHaveBeenCalledWith({
-                                            url: resolveURL(config.cwrx.api.root, config.cwrx.api.orgs.endpoint + '/' + data.org.id),
-                                            json: {
-                                                nextPaymentDate: moment(payments[0].createdAt).add(1, 'month').format()
-                                            }
-                                        });
-                                    });
-
-                                    it('should fulfill the promise', function() {
-                                        expect(success).toHaveBeenCalledWith(undefined);
-                                    });
-                                });
-
-                                describe('on the last day of the month', function() {
-                                    beforeEach(function(done) {
-                                        data.date = new Date(2015, 1, 28).toISOString();
-
-                                        getPaymentsDeferred.fulfill([payments]);
-                                        process.nextTick(done);
-                                    });
-
-                                    it('should get the orgs payment methods', function() {
-                                        expect(request.get).toHaveBeenCalledWith({
-                                            url: resolveURL(resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint), 'methods'),
-                                            qs: { org: data.org.id }
-                                        });
-                                    });
-
-                                    it('should update the org with a nextPaymentDate', function() {
-                                        expect(request.put).toHaveBeenCalledWith({
-                                            url: resolveURL(config.cwrx.api.root, config.cwrx.api.orgs.endpoint + '/' + data.org.id),
-                                            json: {
-                                                nextPaymentDate: moment(data.date).format()
-                                            }
-                                        });
-                                    });
-
-                                    it('should add a record to the watchman stream', function() {
-                                        expect(watchmanStream.produce).toHaveBeenCalledWith({
-                                            type: 'paymentRequired',
-                                            data: {
-                                                org: data.org,
-                                                paymentPlan: config.paymentPlans[data.org.paymentPlanId],
-                                                paymentMethod: paymentMethod,
-                                                date: data.date
-                                            }
-                                        });
-                                    });
-
-                                    it('should fulfill the promise', function() {
-                                        expect(success).toHaveBeenCalledWith(undefined);
-                                    });
-                                });
-                            });
-
-                            describe('less then a month ago', function() {
-                                beforeEach(function(done) {
-                                    payments = [
-                                        {
-                                            id: uuid.createUuid(),
-                                            status: 'settled',
-                                            amount: 49.99,
-                                            createdAt: moment(data.date).subtract(1, 'month')
-                                                .add(1, 'day')
-                                                .format()
-                                        },
-                                        {
-                                            id: uuid.createUuid(),
-                                            status: 'settled',
-                                            amount: 49.99,
-                                            createdAt: moment(data.date).subtract(2, 'month')
-                                                .add(1, 'day')
-                                                .format()
-                                        }
-                                    ];
-                                    getPaymentsDeferred.fulfill([payments]);
-
-                                    process.nextTick(done);
-                                });
-
-                                it('should not get any payment methods', function() {
-                                    expect(request.get).not.toHaveBeenCalled();
-                                });
-
-                                it('should not add any records to the watchman stream', function() {
-                                    expect(watchmanStream.produce).not.toHaveBeenCalled();
-                                });
-
-                                it('should update the org with a nextPaymentDate', function() {
-                                    expect(request.put).toHaveBeenCalledWith({
-                                        url: resolveURL(config.cwrx.api.root, config.cwrx.api.orgs.endpoint + '/' + data.org.id),
-                                        json: {
-                                            nextPaymentDate: moment(payments[0].createdAt).add(1, 'month').format()
-                                        }
-                                    });
-                                });
-
-                                it('should fulfill the promise', function() {
-                                    expect(success).toHaveBeenCalledWith(undefined);
-                                });
-                            });
-
-                            describe('one month ago', function() {
-                                beforeEach(function(done) {
-                                    payments = [
-                                        {
-                                            id: uuid.createUuid(),
-                                            status: 'settled',
-                                            amount: 49.99,
-                                            createdAt: moment(data.date).subtract(1, 'month')
-                                                .format()
-                                        },
-                                        {
-                                            id: uuid.createUuid(),
-                                            status: 'settled',
-                                            amount: 49.99,
-                                            createdAt: moment(data.date).subtract(2, 'month')
-                                                .format()
-                                        }
-                                    ];
-                                    getPaymentsDeferred.fulfill([payments]);
-
-                                    process.nextTick(done);
-                                });
-
-                                it('should get the orgs payment methods', function() {
-                                    expect(request.get).toHaveBeenCalledWith({
-                                        url: resolveURL(resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint), 'methods'),
-                                        qs: { org: data.org.id }
-                                    });
-                                });
-
-                                it('should update the org with a nextPaymentDate', function() {
-                                    expect(request.put).toHaveBeenCalledWith({
-                                        url: resolveURL(config.cwrx.api.root, config.cwrx.api.orgs.endpoint + '/' + data.org.id),
-                                        json: {
-                                            nextPaymentDate: moment(data.date).format()
-                                        }
-                                    });
-                                });
-
-                                it('should add a record to the watchman stream', function() {
-                                    expect(watchmanStream.produce).toHaveBeenCalledWith({
-                                        type: 'paymentRequired',
-                                        data: {
-                                            org: data.org,
-                                            paymentPlan: config.paymentPlans[data.org.paymentPlanId],
-                                            paymentMethod: paymentMethod,
-                                            date: data.date
-                                        }
-                                    });
-                                });
-
-                                it('should fulfill the promise', function() {
-                                    expect(success).toHaveBeenCalledWith(undefined);
-                                });
-                            });
-
-                            describe('over a month ago', function() {
-                                beforeEach(function(done) {
-                                    payments = [
-                                        {
-                                            id: uuid.createUuid(),
-                                            status: 'rejected',
-                                            amount: 49.99,
-                                            createdAt: moment(data.date).subtract(1, 'day')
-                                                .format()
-                                        },
-                                        {
-                                            id: uuid.createUuid(),
-                                            status: 'settled',
-                                            amount: 49.99,
-                                            createdAt: moment(data.date).subtract(1, 'month')
-                                                .subtract(1, 'day')
-                                                .format()
-                                        },
-                                        {
-                                            id: uuid.createUuid(),
-                                            status: 'settled',
-                                            amount: 49.99,
-                                            createdAt: moment(data.date).subtract(2, 'month')
-                                                .subtract(1, 'day')
-                                                .format()
-                                        }
-                                    ];
-                                    getPaymentsDeferred.fulfill([payments]);
-
-                                    process.nextTick(done);
-                                });
-
-                                it('should get the orgs payment methods', function() {
-                                    expect(request.get).toHaveBeenCalledWith({
-                                        url: resolveURL(resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint), 'methods'),
-                                        qs: { org: data.org.id }
-                                    });
-                                });
-
-                                it('should update the org with a nextPaymentDate', function() {
-                                    expect(request.put).toHaveBeenCalledWith({
-                                        url: resolveURL(config.cwrx.api.root, config.cwrx.api.orgs.endpoint + '/' + data.org.id),
-                                        json: {
-                                            nextPaymentDate: moment(data.date).format()
-                                        }
-                                    });
-                                });
-
-                                it('should add a record to the watchman stream', function() {
-                                    expect(watchmanStream.produce).toHaveBeenCalledWith({
-                                        type: 'paymentRequired',
-                                        data: {
-                                            org: data.org,
-                                            paymentPlan: config.paymentPlans[data.org.paymentPlanId],
-                                            paymentMethod: paymentMethod,
-                                            date: data.date
-                                        }
-                                    });
-                                });
-
-                                it('should fulfill the promise', function() {
-                                    expect(success).toHaveBeenCalledWith(undefined);
-                                });
-                            });
+                            setTimeout(done);
                         });
 
-                        describe('and no payments were made', function() {
-                            var getPaymentMethodsDeferred;
-
-                            beforeEach(function(done) {
-                                payments = [];
-                                getPaymentsDeferred.fulfill([payments]);
-
-                                request.get.and.returnValue((getPaymentMethodsDeferred = q.defer()).promise);
-
-                                process.nextTick(done);
-                            });
-
-                            it('should get the orgs payment methods', function() {
-                                expect(request.get).toHaveBeenCalledWith({
-                                    url: resolveURL(resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint), 'methods'),
-                                    qs: { org: data.org.id }
-                                });
-                            });
-
-                            describe('if getting the payment methods succeeds', function() {
-                                var paymentMethods;
-
-                                describe('and the org has payment methods', function() {
-                                    beforeEach(function(done) {
-                                        paymentMethods = [
-                                            { token: uuid.createUuid(), default: false },
-                                            { token: uuid.createUuid(), default: true },
-                                            { token: uuid.createUuid(), default: false }
-                                        ];
-                                        getPaymentMethodsDeferred.fulfill([paymentMethods]);
-                                        process.nextTick(done);
-                                    });
-
-                                    it('should update the org with a nextPaymentDate', function() {
-                                        expect(request.put).toHaveBeenCalledWith({
-                                            url: resolveURL(config.cwrx.api.root, config.cwrx.api.orgs.endpoint + '/' + data.org.id),
-                                            json: {
-                                                nextPaymentDate: moment(data.date).format()
-                                            }
-                                        });
-                                    });
-
-                                    it('should add a record to the watchman stream', function() {
-                                        expect(watchmanStream.produce).toHaveBeenCalledWith({
-                                            type: 'paymentRequired',
-                                            data: {
-                                                org: data.org,
-                                                paymentPlan: config.paymentPlans[data.org.paymentPlanId],
-                                                paymentMethod: paymentMethods[1],
-                                                date: data.date
-                                            }
-                                        });
-                                    });
-
-                                    describe('if producing the event succeeds', function() {
-                                        beforeEach(function(done) {
-                                            produceDeferred.fulfill(watchmanStream.produce.calls.mostRecent().args[0]);
-                                            process.nextTick(done);
-                                        });
-
-                                        it('should fulfill the promise', function() {
-                                            expect(success).toHaveBeenCalledWith(undefined);
-                                        });
-                                    });
-
-                                    describe('if producing the event fails', function() {
-                                        var reason;
-
-                                        beforeEach(function(done) {
-                                            reason = new Error('Something went wrong!');
-                                            produceDeferred.reject(reason);
-
-                                            process.nextTick(done);
-                                        });
-
-                                        it('should reject the promise', function() {
-                                            expect(failure).toHaveBeenCalledWith(reason);
-                                        });
-                                    });
-                                });
-
-                                describe('and the org has no payment methods', function() {
-                                    var paymentMethods;
-
-                                    beforeEach(function(done) {
-                                        paymentMethods = [];
-
-                                        getPaymentMethodsDeferred.fulfill([paymentMethods]);
-                                        process.nextTick(done);
-                                    });
-
-                                    it('should not produce anything into the watchman stream', function() {
-                                        expect(watchmanStream.produce).not.toHaveBeenCalled();
-                                    });
-
-                                    it('should reject the Promise', function() {
-                                        expect(failure).toHaveBeenCalledWith(new Error('Org ' + data.org.id + ' has no payment methods.'));
-                                    });
-                                });
-                            });
-
-                            describe('if getting the payment methods fails', function() {
-                                var reason;
-
-                                beforeEach(function(done) {
-                                    reason = new Error('Something went very wrong...');
-                                    getPaymentMethodsDeferred.reject(reason);
-
-                                    process.nextTick(done);
-                                });
-
-                                it('should reject the promise', function() {
-                                    expect(failure).toHaveBeenCalledWith(reason);
-                                });
+                        it('should add a record to the watchman stream', function() {
+                            expect(watchmanStream.produce).toHaveBeenCalledWith({
+                                type: 'paymentRequired',
+                                data: {
+                                    paymentPlan,
+                                    paymentMethod,
+                                    org: data.org,
+                                    date: data.date
+                                }
                             });
                         });
                     });
-                });
+                }));
             });
         });
     });

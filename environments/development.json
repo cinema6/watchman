@@ -68,6 +68,9 @@
                             },
                             "advertisers": {
                                 "endpoint": "/api/account/advertisers"
+                            },
+                            "paymentPlans": {
+                                "endpoint": "/api/payment-plans"
                             }
                         }
                     },
@@ -187,7 +190,8 @@
                             "campaignSubmitted": "672810",
                             "initializedShowcaseCampaign": "672910",
                             "campaignActive--app": "694541",
-                            "promotionEnded--app": "722104"
+                            "promotionEnded--app": "722104",
+                            "weekOneStats--app": "736301"
                         }
                     },
                     "beeswax": {
@@ -268,10 +272,33 @@
                             ]
                         },
                         "noon_orgPulse": {
-                            "actions": ["check_payment_required"]
+                            "actions": [
+                                {
+                                    "name": "check_payment_required",
+                                    "ifData": {
+                                        "org.paymentPlanId": "^pp-"
+                                    }
+                                },
+                                {
+                                    "name": "check_weekiversary"
+                                }
+                            ]
                         },
                         "hourly_campaignPulse": {
                             "actions": ["check_expiry"]
+                        },
+                        "campaign_weekiversary": {
+                            "actions": [
+                                {
+                                    "name": "message/campaign_email",
+                                    "options": {
+                                        "type": "stats"
+                                    },
+                                    "ifData": {
+                                        "campaign.application": "^showcase$"
+                                    }
+                                }
+                            ]
                         },
                         "paymentPlanWillStart": {
                             "actions": [
@@ -559,7 +586,7 @@
                                     },
                                     "ifData": {
                                         "transaction.sign": "^1$",
-                                        "transaction.description": "\"target\"\\s*:\\s*\"showcase\""
+                                        "transaction.application": "^showcase$"
                                     }
                                 }
                             ]
