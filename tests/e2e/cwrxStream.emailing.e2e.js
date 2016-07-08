@@ -158,15 +158,6 @@ describe('cwrxStream', function() {
                                 currentState: 'active',
                                 'campaign.application': '^(studio|selfie)$'
                             }
-                        },
-                        {
-                            name: 'showcase/apps/clean_up_campaign',
-                            options: {},
-                            ifData: {
-                                currentState: 'canceled',
-                                'campaign.application': '^showcase$',
-                                'campaign.product.type': '^app$'
-                            }
                         }
                     ]
                 },
