@@ -6,7 +6,7 @@ module.exports = {
     unit: { },
     e2e: {
         options: {
-            apiRoot: 'http://33.33.33.10/',
+            apiRoot: 'http://33.33.33.10',
             mongoHost: '33.33.33.10',
             timeStream: 'devTimeStream-' + watchmanUser,
             watchmanStream: 'devWatchmanStream-' + watchmanUser,

@@ -1,5 +1,6 @@
 'use strict';
 
+var Configurator = require('../helpers/Configurator.js');
 var JsonProducer = require('rc-kinesis').JsonProducer;
 var q = require('q');
 var testUtils = require('cwrx/test/e2e/testUtils');
@@ -11,11 +12,11 @@ var moment = require('moment');
 var Status = require('cwrx/lib/enums').Status;
 var BeeswaxClient = require('beeswax-client');
 
-
 var API_ROOT = process.env.apiRoot;
 var APP_CREDS = JSON.parse(process.env.appCreds);
 var AWS_CREDS = JSON.parse(process.env.awsCreds);
 var CWRX_STREAM = process.env.cwrxStream;
+var PREFIX = process.env.appPrefix;
 
 function createId(prefix) {
     return prefix + '-' + uuid.createUuid();
@@ -34,10 +35,6 @@ function waitUntil(predicate) {
 
     return check();
 }
-
-/*function wait(time) {
-    return waitUntil(function() { return q.delay(time).thenResolve(true); });
-}*/
 
 describe('cwrxStream transactionCreated', function() {
     var producer, request, beeswax;
@@ -88,6 +85,60 @@ describe('cwrxStream transactionCreated', function() {
             }
         });
     }
+
+    // This beforeAll is dedicated to setting application config
+    beforeAll(function(done) {
+        const configurator = new Configurator();
+        const sharedConfig = {
+            secrets: '/opt/sixxy/.watchman.secrets.json',
+            appCreds: '/opt/sixxy/.rcAppCreds.json',
+            cwrx: {
+                api: {
+                    root: API_ROOT,
+                    campaigns: {
+                        endpoint: '/api/campaigns'
+                    }
+                }
+            },
+            emails: {
+                sender: 'support@cinema6.com'
+            },
+            postmark: {
+                templates: {
+                }
+            }
+        };
+        const cwrxConfig = {
+            eventHandlers: {
+                transactionCreated: {
+                    actions: [
+                        {
+                            name: 'showcase/apps/auto_increase_budget',
+                            options: {
+                                dailyLimit: 2,
+                                externalAllocationFactor: 0.5
+                            },
+                            ifData: {
+                                'transaction.sign': '^1$',
+                                'transaction.application': '^showcase$'
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+        const timeConfig = {
+            eventHandlers: { }
+        };
+        const watchmanConfig = {
+            eventHandlers: { }
+        };
+        Promise.all([
+            configurator.updateConfig(`${PREFIX}CwrxStreamApplication`, sharedConfig, cwrxConfig),
+            configurator.updateConfig(`${PREFIX}TimeStreamApplication`, sharedConfig, timeConfig),
+            configurator.updateConfig(`${PREFIX}WatchmanStreamApplication`, sharedConfig, watchmanConfig)
+        ]).then(done, done.fail);
+    });
 
     beforeAll(function() {
         var awsConfig = ld.assign({ region: 'us-east-1' }, AWS_CREDS || {});

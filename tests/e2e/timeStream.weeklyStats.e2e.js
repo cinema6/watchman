@@ -1,13 +1,102 @@
 'use strict';
 
+const Configurator = require('../helpers/Configurator.js');
 const moment = require('moment');
 const rcKinesis = require('rc-kinesis');
 const testUtils = require('cwrx/test/e2e/testUtils.js');
 const uuid = require('rc-uuid');
 
+const API_ROOT = process.env.apiRoot;
+const PREFIX = process.env.appPrefix;
 const TIME_STREAM = process.env.timeStream;
 
 describe('timeStream weeklyStats', function() {
+    // This beforeAll is dedicated to setting application config
+    beforeAll(function(done) {
+        const configurator = new Configurator();
+        const sharedConfig = {
+            secrets: '/opt/sixxy/.watchman.secrets.json',
+            appCreds: '/opt/sixxy/.rcAppCreds.json',
+            cwrx: {
+                api: {
+                    root: API_ROOT,
+                    orgs: {
+                        endpoint: '/api/account/orgs'
+                    },
+                    users: {
+                        endpoint: '/api/account/users'
+                    },
+                    campaigns: {
+                        endpoint: '/api/campaigns'
+                    },
+                    analytics: {
+                        endpoint: '/api/analytics'
+                    }
+                }
+            },
+            emails: {
+                sender: 'support@cinema6.com',
+                dashboardLinks: {
+                    showcase: 'http://localhost:9000/#/showcase/products'
+                }
+            },
+            postmark: {
+                templates: {
+                    'weekOneStats--app': '736301'
+                }
+            }
+        };
+        const cwrxConfig = {
+            eventHandlers: { }
+        };
+        const timeConfig = {
+            eventHandlers: {
+                hourly: {
+                    actions: [
+                        {
+                            name: 'fetch_orgs',
+                            options: {
+                                prefix: 'noon'
+                            },
+                            ifData: {
+                                hour: '^12$'
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+        const watchmanConfig = {
+            eventHandlers: {
+                noon_orgPulse: {
+                    actions: [
+                        {
+                            name: 'check_weekiversary'
+                        }
+                    ]
+                },
+                campaign_weekiversary: {
+                    actions: [
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'stats'
+                            },
+                            ifData: {
+                                'campaign.application': '^showcase$'
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+        Promise.all([
+            configurator.updateConfig(`${PREFIX}CwrxStreamApplication`, sharedConfig, cwrxConfig),
+            configurator.updateConfig(`${PREFIX}TimeStreamApplication`, sharedConfig, timeConfig),
+            configurator.updateConfig(`${PREFIX}WatchmanStreamApplication`, sharedConfig, watchmanConfig)
+        ]).then(done, done.fail);
+    });
+
     beforeEach(function(done) {
         jasmine.DEFAULT_TIMEOUT_INTERVAL = 60000;
 
@@ -127,7 +216,7 @@ describe('timeStream weeklyStats', function() {
         this.mailman.removeAllListeners();
         this.mailman.stop();
         testUtils.closeDbs().then(() => {
-            return new Promise(resolve => process.nextTick(resolve));
+            return new Promise(resolve => setTimeout(resolve, 0));
         }).then(done, done.fail);
     });
 

@@ -1,5 +1,6 @@
 'use strict';
 
+const Configurator = require('../helpers/Configurator.js');
 const JsonProducer = require('rc-kinesis').JsonProducer;
 const q = require('q');
 const ld = require('lodash');
@@ -7,8 +8,10 @@ const uuid = require('rc-uuid');
 const moment = require('moment');
 const BeeswaxClient = require('beeswax-client');
 
+const API_ROOT = process.env.apiRoot;
 const AWS_CREDS = JSON.parse(process.env.awsCreds);
 const CWRX_STREAM = process.env.cwrxStream;
+const PREFIX = process.env.appPrefix;
 const targeting = require('../helpers/targeting.json');
 
 function createId(prefix) {
@@ -28,10 +31,6 @@ function waitUntil(predicate) {
 
     return check();
 }
-
-/*function wait(time) {
-    return waitUntil(function() { return q.delay(time).thenResolve(true); });
-}*/
 
 describe('cwrxStream campaignStateChange', function() {
     let producer, beeswax;
@@ -170,6 +169,55 @@ describe('cwrxStream campaignStateChange', function() {
             .then(() => beeswax.creatives.delete(creative.creative_id))
             .then(() => beeswax.advertisers.delete(advertiser.advertiser_id));
     }
+
+    // This beforeAll is dedicated to setting application config
+    beforeAll(function(done) {
+        const configurator = new Configurator();
+        const sharedConfig = {
+            secrets: '/opt/sixxy/.watchman.secrets.json',
+            appCreds: '/opt/sixxy/.rcAppCreds.json',
+            cwrx: {
+                api: {
+                    root: API_ROOT
+                }
+            },
+            emails: {
+                sender: 'support@cinema6.com'
+            },
+            postmark: {
+                templates: {
+                }
+            }
+        };
+        const cwrxConfig = {
+            eventHandlers: {
+                campaignStateChange: {
+                    actions: [
+                        {
+                            name: 'showcase/apps/clean_up_campaign',
+                            options: {},
+                            ifData: {
+                                currentState: 'canceled',
+                                'campaign.application': '^showcase$',
+                                'campaign.product.type': '^app$'
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+        const timeConfig = {
+            eventHandlers: { }
+        };
+        const watchmanConfig = {
+            eventHandlers: { }
+        };
+        Promise.all([
+            configurator.updateConfig(`${PREFIX}CwrxStreamApplication`, sharedConfig, cwrxConfig),
+            configurator.updateConfig(`${PREFIX}TimeStreamApplication`, sharedConfig, timeConfig),
+            configurator.updateConfig(`${PREFIX}WatchmanStreamApplication`, sharedConfig, watchmanConfig)
+        ]).then(done, done.fail);
+    });
 
     beforeAll(function() {
         const awsConfig = ld.assign({ region: 'us-east-1' }, AWS_CREDS || {});
