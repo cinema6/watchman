@@ -10,7 +10,9 @@ module.exports = {
             mongoHost: '33.33.33.10',
             timeStream: 'devTimeStream-' + watchmanUser,
             watchmanStream: 'devWatchmanStream-' + watchmanUser,
-            cwrxStream: 'devCwrxStream-' + watchmanUser
+            cwrxStream: 'devCwrxStream-' + watchmanUser,
+            watchmanHost: '33.33.33.20',
+            appPrefix: 'dev'
         }
     }
 };

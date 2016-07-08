@@ -171,17 +171,7 @@ KclApp.prototype = {
                 dimensions: 'object',
                 sendInterval: 'number'
             },
-            emails: {
-                sender: 'string',
-                dashboardLinks: 'object',
-                manageLink: 'string',
-                reviewLink: 'string',
-                activationTargets: 'object',
-                supportAddress: 'string',
-                passwordResetPages: 'object',
-                forgotTargets: 'object',
-                previewLink: 'string'
-            },
+            emails: 'object',
             paymentPlans: 'object',
             promotions: 'object',
             postmark: {
