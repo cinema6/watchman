@@ -1,5 +1,8 @@
+'use strict';
+
+const proxyquire = require('proxyquire').noCallThru();
+
 describe('BeeswaxMiddleware(config)', function() {
-    'use strict';
 
     describe('instance:', function() {
         var url, q, ld;
@@ -21,27 +24,28 @@ describe('BeeswaxMiddleware(config)', function() {
             ld = require('lodash');
             url = require('url');
 
-            delete require.cache[require.resolve('../../lib/CwrxRequest')];
-            CwrxRequest = (function(CwrxRequest) {
-                return jasmine.createSpy('CwrxRequest()').and.callFake(function(creds) {
-                    var request = new CwrxRequest(creds);
-                    spyOn(request, 'send').and.returnValue(q.defer().promise);
-                    return request;
-                });
-            }(require('../../lib/CwrxRequest')));
-            require.cache[require.resolve('../../lib/CwrxRequest')].exports = CwrxRequest;
-            
-            delete require.cache[require.resolve('beeswax-client')];
-            BeeswaxClient = (function(BeeswaxClient) {
-                return jasmine.createSpy('BeeswaxClient()').and.callFake(function(creds) {
-                    var beeswax = new BeeswaxClient(creds);
-                    return beeswax;
-                });
-            }(require('beeswax-client')));
-            require.cache[require.resolve('beeswax-client')].exports = BeeswaxClient;
+            CwrxRequest = jasmine.createSpy('CwrxRequest()').and.callFake(function() {
+                return {
+                    send : jasmine.createSpy('send()').and.returnValue(q.defer().promise),
+                    post : function() { return null; },
+                    put : function() { return null; },
+                    get : function() { return null; }
+                };
+            });
+           
+            BeeswaxClient = jasmine.createSpy('BeeswaxClient()').and.callFake(function(){
+                return {
+                    advertisers : { create : function() { return null; }},
+                    campaigns : { create : function() { return null; }},
+                    creatives : { create : function() { return null; }},
+                    uploadCreativeAsset : function(){ return null; }
+                };
+            });
 
-            delete require.cache[require.resolve('../../lib/BeeswaxMiddleware')];
-            BeeswaxMiddleware = require('../../lib/BeeswaxMiddleware');
+            BeeswaxMiddleware = proxyquire('../../lib/BeeswaxMiddleware',{
+                'beeswax-client' : BeeswaxClient,
+                './CwrxRequest' : CwrxRequest
+            });
         });
         
         afterAll(function() {
