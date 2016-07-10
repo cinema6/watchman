@@ -1,6 +1,7 @@
 'use strict';
 
 var CwrxRequest = require('../../../../lib/CwrxRequest');
+var BeeswaxMiddleware = require('../../../../lib/BeeswaxMiddleware');
 var JsonProducer = require('rc-kinesis').JsonProducer;
 var logger = require('cwrx/lib/logger');
 var resolveURL = require('url').resolve;
@@ -17,6 +18,10 @@ var createInterstitialFactory = appFactories.createInterstitialFactory;
 
 module.exports = function initCampaignFactory(config) {
     var log = logger.getLog();
+    var beeswax = new BeeswaxMiddleware(
+        { apiRoot: config.beeswax.apiRoot, creds : config.state.secrets.beeswax},
+        { creds : config.appCreds, api : config.cwrx.api }
+    );
     var request = new CwrxRequest(config.appCreds);
     var stream = new JsonProducer(config.kinesis.producer.stream, config.kinesis.producer);
     var campaignsEndpoint = resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint);
@@ -78,28 +83,36 @@ module.exports = function initCampaignFactory(config) {
             ].map(function(json) {
                 return request.post({
                     url: placementsEndpoint,
+                    qs : { ext : false },
                     json: assign({}, json, {
                         tagParams: assign({}, json.tagParams, {
                             campaign: campaign.id
                         })
                     })
                 });
-            })).then(unzip).spread(function produceRecord(placements) {
+            })).then(unzip).spread(function syncToBeeswax(placements) {
                 log.trace(
                     'Created placements for card([%1 => %2]).',
                     newCards[0].id, placements[0].id
                 );
 
+                log.trace('Initializing campaign %1 in beeswax!', campaign.id);
+
+                return beeswax.initShowcaseAppsCampaign({
+                    campaign : campaign,
+                    placements : placements
+                });
+            }).then(function produceRecord(bwResponse){
                 log.trace(
                     'Producing "initializedShowcaseCampaign" for showcase (app) campaign(%1).',
-                    campaign.id
+                    bwResponse.campaign.id
                 );
 
                 return stream.produce({
                     type: 'initializedShowcaseCampaign',
                     data: {
-                        campaign: campaign,
-                        placements: placements,
+                        campaign: bwResponse.campaign,
+                        placements: bwResponse.placements,
                         date: data.date
                     }
                 });

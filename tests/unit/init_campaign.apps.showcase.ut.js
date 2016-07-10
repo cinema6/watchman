@@ -4,7 +4,7 @@ const proxyquire = require('proxyquire').noCallThru();
 
 describe('(action factory) showcase/apps/init_campaign', function() {
     var q, uuid, resolveURL, ld, logger, showcaseFactories;
-    var JsonProducer, CwrxRequest;
+    var JsonProducer, CwrxRequest, BeeswaxMiddleware;
     var factory;
 
     beforeAll(function() {
@@ -23,11 +23,17 @@ describe('(action factory) showcase/apps/init_campaign', function() {
             post: () => null,
             put: () => null
         }));
+
+        BeeswaxMiddleware = jasmine.createSpy('BeeswaxMiddleware()').and.callFake(() => ({
+            initShowcaseAppsCampaign : () => null
+        }));
+
         factory = proxyquire('../../src/actions/showcase/apps/init_campaign', {
             'rc-kinesis': {
                 JsonProducer: JsonProducer
             },
-            '../../../../lib/CwrxRequest': CwrxRequest
+            '../../../../lib/CwrxRequest': CwrxRequest,
+            '../../../../lib/BeeswaxMiddleware': BeeswaxMiddleware
         });
     });
 
@@ -56,12 +62,16 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                 cwrx: {
                     api: {
                         root: 'http://33.33.33.10/',
+                        advertisers : {
+                            endpoint: '/api/advertisers'
+                        },
                         placements: {
                             endpoint: '/api/placements'
                         },
                         campaigns: {
                             endpoint: '/api/campaigns'
-                        }
+                        },
+                        tracking : 'https://audit.cinema6.com/pixel.gif'
                     }
                 },
                 kinesis: {
@@ -69,6 +79,17 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                         region: 'us-east-1',
                         stream: 'devWatchmanStream'
                     }
+                },
+                state: {
+                    secrets: {
+                        beeswax: {
+                            email: 'ops@reelcontent.com',
+                            password: 'wueyrfhu83rgf4u3gr'
+                        }
+                    }
+                },
+                beeswax: {
+                    apiRoot: 'https://stingersbx.api.beeswax.com'
                 }
             };
 
@@ -97,6 +118,17 @@ describe('(action factory) showcase/apps/init_campaign', function() {
         it('should create a JsonProducer', function() {
             expect(JsonProducer).toHaveBeenCalledWith(config.kinesis.producer.stream, config.kinesis.producer);
         });
+        
+        it('should create a BeeswaxMiddleware', function() {
+            expect(BeeswaxMiddleware).toHaveBeenCalledWith( {
+                apiRoot : config.beeswax.apiRoot,
+                creds   : config.state.secrets.beeswax
+            },{
+                creds : config.appCreds,
+                api : config.cwrx.api
+            });
+        });
+
 
         describe('the action', function() {
             var data, options, event;
@@ -333,6 +365,7 @@ describe('(action factory) showcase/apps/init_campaign', function() {
 
                         expect(request.post).toHaveBeenCalledWith({
                             url: resolveURL(config.cwrx.api.root, config.cwrx.api.placements.endpoint),
+                            qs : { ext : false },
                             json: {
                                 label: 'Showcase--Interstitial for App: "' + campaign.name + '"',
                                 tagType: options.placement.interstitial.tagType,
