@@ -173,7 +173,7 @@ describe('cwrxStream campaignCreated', function() {
             jar: true
         }).spread(function(advertisers) {
             return q.all(advertisers.map(function(advertiser) {
-                return beeswax.advertisers.delete(advertiser.beeswaxIds.advertiser);
+                return beeswax.advertisers.delete(advertiser.externalIds.beeswax);
             }));
         }).then(function() {
             return request.delete({
@@ -193,9 +193,9 @@ describe('cwrxStream campaignCreated', function() {
                 json: true
             });
         }).spread(function(campaign) {
-            if (!campaign.externalCampaigns.beeswax) { return; }
+            if (!campaign.externalIds.beeswax) { return; }
 
-            return beeswax.campaigns.delete(campaign.externalCampaigns.beeswax.externalId);
+            return beeswax.campaigns.delete(campaign.externalIds.beeswax);
         }).then(function() {
             return request.get({
                 url: api('/api/placements?tagParams.campaign=' + campaign.id),
@@ -203,7 +203,7 @@ describe('cwrxStream campaignCreated', function() {
             });
         }).spread(function(placements) {
             return q.all(placements.map(function(placement) {
-                var beeswaxId = placement.beeswaxIds && placement.beeswaxIds.creative;
+                var beeswaxId = placement.externalIds && placement.externalIds.beeswax;
 
                 if (!beeswaxId) { return; }
 
@@ -541,7 +541,7 @@ describe('cwrxStream campaignCreated', function() {
                         url: api('/api/campaigns/' + campaign.id),
                         json: true
                     }).spread(function(campaign) {
-                        return campaign.cards.length > 0 && campaign;
+                        return campaign.externalIds && campaign.cards.length > 0 && campaign;
                     });
                 });
             }).then(function(/*campaign*/) {
@@ -559,8 +559,20 @@ describe('cwrxStream campaignCreated', function() {
                 placements = arguments[0];
 
                 return waitUntil(function() {
+                    return request.get({
+                        url: api('/api/account/advertisers/' + campaign.advertiserId),
+                        json: true
+                    }).spread(function(advertiser) {
+                        return advertiser.externalIds && advertiser;
+                    });
+                });
+            }).then(function(/*placements*/) {
+                advertiser = arguments[0];
+
+                return waitUntil(function() {
                     supportEmail = ld.find(supportEmails, function(email) {
-                        return email.text.indexOf(campaign.externalCampaigns.beeswax.externalId) > -1;
+                        return campaign.externalIds && campaign.externalIds.beeswax &&
+                            email.text.indexOf(campaign.externalIds.beeswax) > -1;
                     });
                     userEmail = ld.find(userEmails, function(email) {
                         return email.text.indexOf(user.firstName) > -1;
@@ -579,12 +591,10 @@ describe('cwrxStream campaignCreated', function() {
         });
 
         it('should create a campaign in beeswax', function() {
-            expect(campaign.externalCampaigns.beeswax).toEqual(jasmine.objectContaining({
-                externalId: jasmine.any(Number)
-            }));
+            expect(campaign.externalIds.beeswax).toEqual(jasmine.any(Number));
         });
 
-        it('should create two cards', function() {
+        it('should create one card', function() {
             expect(campaign.cards[0]).toEqual(jasmine.objectContaining({
                 advertiserId: advertiser.id,
                 campaign: {
@@ -620,44 +630,44 @@ describe('cwrxStream campaignCreated', function() {
                 title: jasmine.any(String),
                 type: 'showcase-app'
             }));
-            expect(campaign.cards[1]).toEqual(jasmine.objectContaining({
-                advertiserId: advertiser.id,
-                campaign: {
-                    minViewTime: jasmine.any(Number),
-                    reportingId: 'Count Coins'
-                },
-                collateral: jasmine.any(Object),
-                data: jasmine.objectContaining({
-                    advanceInterval: jasmine.any(Number),
-                    moat: jasmine.any(Object),
-                    slides: jasmine.any(Array)
-                }),
-                id: jasmine.any(String),
-                links: jasmine.objectContaining({
-                    Action: jasmine.any(Object)
-                }),
-                modules: [],
-                note: jasmine.any(String),
-                params: {
-                    action: {
-                        label: jasmine.any(String),
-                        type: 'button'
-                    },
-                    sponsor: 'Howard Engelhart'
-                },
-                shareLinks: jasmine.any(Object),
-                sponsored: true,
-                status: 'active',
-                thumbs: {
-                    small: jasmine.any(String),
-                    large: jasmine.any(String)
-                },
-                title: jasmine.any(String),
-                type: 'showcase-app'
-            }));
+            //expect(campaign.cards[1]).toEqual(jasmine.objectContaining({
+            //    advertiserId: advertiser.id,
+            //    campaign: {
+            //        minViewTime: jasmine.any(Number),
+            //        reportingId: 'Count Coins'
+            //    },
+            //    collateral: jasmine.any(Object),
+            //    data: jasmine.objectContaining({
+            //        advanceInterval: jasmine.any(Number),
+            //        moat: jasmine.any(Object),
+            //        slides: jasmine.any(Array)
+            //    }),
+            //    id: jasmine.any(String),
+            //    links: jasmine.objectContaining({
+            //        Action: jasmine.any(Object)
+            //    }),
+            //    modules: [],
+            //    note: jasmine.any(String),
+            //    params: {
+            //        action: {
+            //            label: jasmine.any(String),
+            //            type: 'button'
+            //        },
+            //        sponsor: 'Howard Engelhart'
+            //    },
+            //    shareLinks: jasmine.any(Object),
+            //    sponsored: true,
+            //    status: 'active',
+            //    thumbs: {
+            //        small: jasmine.any(String),
+            //        large: jasmine.any(String)
+            //    },
+            //    title: jasmine.any(String),
+            //    type: 'showcase-app'
+            //}));
         });
 
-        it('should create two placements', function() {
+        it('should create one placement', function() {
             expect(ld.find(placements, { tagType: 'mraid' })).toEqual(jasmine.objectContaining({
                 label: 'Showcase--Interstitial for App: "Count Coins"',
                 tagType: 'mraid',
@@ -675,29 +685,29 @@ describe('cwrxStream campaignCreated', function() {
                 lastUpdated: jasmine.any(String),
                 status: 'active'
             }));
-            expect(ld.find(placements, { tagType: 'display' })).toEqual(jasmine.objectContaining({
-                label: 'Showcase--300x250 for App: "Count Coins"',
-                tagType: 'display',
-                tagParams: jasmine.objectContaining({
-                    container: 'beeswax',
-                    type: 'mobile-card',
-                    branding: 'showcase-app--300x250',
-                    card: campaign.cards[1].id,
-                    campaign: campaign.id
-                }),
-                showInTag: jasmine.objectContaining({}),
-                thumbnail: campaign.cards[1].thumbs.small,
-                id: jasmine.any(String),
-                created: jasmine.any(String),
-                lastUpdated: jasmine.any(String),
-                status: 'active'
-            }));
+            //expect(ld.find(placements, { tagType: 'display' })).toEqual(jasmine.objectContaining({
+            //    label: 'Showcase--300x250 for App: "Count Coins"',
+            //    tagType: 'display',
+            //    tagParams: jasmine.objectContaining({
+            //        container: 'beeswax',
+            //        type: 'mobile-card',
+            //        branding: 'showcase-app--300x250',
+            //        card: campaign.cards[1].id,
+            //        campaign: campaign.id
+            //    }),
+            //    showInTag: jasmine.objectContaining({}),
+            //    thumbnail: campaign.cards[1].thumbs.small,
+            //    id: jasmine.any(String),
+            //    created: jasmine.any(String),
+            //    lastUpdated: jasmine.any(String),
+            //    status: 'active'
+            //}));
         });
 
         it('should send an email to support', function() {
             expect(supportEmail.from[0].address.toLowerCase()).toBe('support@cinema6.com');
             expect(supportEmail.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
-            expect(supportEmail.text).toContain('http://stingersbx.beeswax.com/advertisers/' + advertiser.beeswaxIds.advertiser + '/campaigns/' + campaign.externalCampaigns.beeswax.externalId + '/line_items');
+            expect(supportEmail.text).toContain('http://stingersbx.beeswax.com/advertisers/' + advertiser.externalIds.beeswax + '/campaigns/' + campaign.externalIds.beeswax + '/line_items');
         });
 
         it('should send an email to the user', function() {

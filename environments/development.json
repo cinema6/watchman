@@ -36,6 +36,7 @@
                     "cwrx": {
                         "api": {
                             "root": "http://33.33.33.10",
+                            "tracking" : "https://audit.cinema6.com/pixel.gif",
                             "auth": {
                                 "endpoint": "/api/auth"
                             },

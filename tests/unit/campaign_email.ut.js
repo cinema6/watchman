@@ -2194,12 +2194,54 @@ describe('campaign_email.js', function() {
             this.event.options.toSupport = true;
             this.event.data.campaign = {
                 name: 'Amazing Campaign',
-                externalCampaigns: {
-                    beeswax: {
-                        externalId: 'beeswax_id'
-                    }
+                externalIds: {
+                    beeswax: 'beeswax_id'
                 }
             };
+            requestUtils.makeSignedRequest.and.returnValue(Promise.resolve({
+                response: {
+                    statusCode: 200
+                },
+                body: {
+                    externalIds: {
+                        beeswax: 'beeswax_advertiser'
+                    }
+                }
+            }));
+        });
+
+        it('should be able to be sent using postmark', function(done) {
+            this.event.options.provider = 'postmark';
+            this.email(this.event).then(function() {
+                expect(postmark.Client.prototype.sendEmailWithTemplate).toHaveBeenCalledWith({
+                    TemplateId: 'initializedShowcaseCampaign-template-id',
+                    TemplateModel: {
+                        beeswaxCampaignURI: 'https://www.link.com/beeswax_advertiser/beeswax_id',
+                        beeswaxCampaignId: 'beeswax_id',
+                        campName: 'Amazing Campaign'
+                    },
+                    InlineCss: true,
+                    From: 'e2eSender@fake.com',
+                    To: 'e2eSupport@fake.com',
+                    Tag: 'initializedShowcaseCampaign',
+                    TrackOpens: true,
+                    Attachments: [{
+                        Name: 'logo.png',
+                        Content: 'abcdef',
+                        ContentType: 'image/png',
+                        ContentID: 'cid:reelContentLogo'
+                    }]
+                }, jasmine.any(Function));
+            }).then(done, done.fail);
+        });
+
+        it('should be able to be sent using postmark - legacy ids', function(done) {
+            this.event.data.campaign.externalCampaigns = {
+                beeswax: {
+                    externalId: 'beeswax_id'
+                }
+            };
+
             requestUtils.makeSignedRequest.and.returnValue(Promise.resolve({
                 response: {
                     statusCode: 200
@@ -2210,9 +2252,7 @@ describe('campaign_email.js', function() {
                     }
                 }
             }));
-        });
 
-        it('should be able to be sent using postmark', function(done) {
             this.event.options.provider = 'postmark';
             this.email(this.event).then(function() {
                 expect(postmark.Client.prototype.sendEmailWithTemplate).toHaveBeenCalledWith({
