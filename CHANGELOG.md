@@ -1,6 +1,7 @@
 # Watchman
 
 * *[v1.2.0-rc1]*
+  * [DEV]: Add e2e configurator
   * [FEATURE]: Weekly stats emails
   * [FEATURE]: Deactivate line items and campaigns in beeswax when a
     showcase (apps) campaign is canceled
