@@ -4,6 +4,7 @@
   * [FEATURE]: Added BeeswaxMiddleware lib module for workign with Beeswax API
   * [FIX]: showplace/apps/init_campaign creates placments using the ext=false param to prevent auto creation of beeswax placements for showplace apps.
   * [FIX]: init_campaign uses BeeswaxMiddleware to create beeswax advertiser,campaign, and creatives
+  * [FIX]: removed 300x250 card / placement from init_campaigns. 
   * [FIX]: Updated code to expect more consistent property scheme for finding beeswax ids on c6 entities.. (<entity>.externalIds.beeswax).
   * ** Extra Deployment Steps**:
     * Need to add tracking property to cwrx.api config (see environments/development.json)
