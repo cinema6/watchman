@@ -1,5 +1,11 @@
 # Watchman
 
+* *[v1.3.0-rc1]*
+  * [FEATURE]: Added BeeswaxMiddleware lib module for workign with Beeswax API
+  * [FIX]: showplace/apps/init_campaign creates placments using the ext=false param to prevent auto creation of beeswax placements for showplace apps.
+  * [FIX]: init_campaign uses BeeswaxMiddleware to create beeswax advertiser,campaign, and creatives
+  * [FIX]: Updated code to expect more consistent property scheme for finding beeswax ids on c6 entities.. (<entity>.externalIds.beeswax).
+
 * *[v1.2.0-rc1]*
   * [FEATURE]: Weekly stats emails
   * [FEATURE]: Deactivate line items and campaigns in beeswax when a
