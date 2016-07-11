@@ -1,11 +1,11 @@
 'use strict';
 
-var JsonProducer         = require('rc-kinesis').JsonProducer,
+var JsonProducer           = require('rc-kinesis').JsonProducer,
     CwrxRequest            = require('../../lib/CwrxRequest'),
     resolveURL             = require('url').resolve,
-    logger                 = require('cwrx/lib/logger.js'),
-    q                     = require('q'),
-    log                    = logger.getLog();
+    logger                 = require('cwrx/lib/logger.js');
+
+
 
 module.exports = function fetchProductDataFactory(config) {
     var watchmanStream = new JsonProducer(config.kinesis.producer.stream, config.kinesis.producer);
@@ -39,34 +39,39 @@ module.exports = function fetchProductDataFactory(config) {
     }
 
     return function fetchProductData(event) {
+        var log = logger.getLog();
         var campaign = event.data.campaign;
         var id = campaign.id;
         return request.get({
             url: dataEndpoint,
             qs: {uri: campaign.product.uri}
-        }).then(function (data) {
-            if (isEqual(campaign.product.data, data)) {
-                data.name = campaign.product.name;
-                data.description = campaign.product.description;
+        }).spread(function (data) {
+            data.name = campaign.product.name;
+            data.description = campaign.product.description;
+
+            if (!isEqual(campaign.product, data)) {
+                log.info('Updating campaign [%1]', id);
                 return request.put({
                     url: campEndpoint + '/' + id,
-                    json: {product: data}
+                    json: {
+                        product: data
+                    }
+                }).then(function() {
+                    return watchmanStream.produce({
+                        type: 'campaignRefreshed',
+                        data: {
+                            campaign: campaign,
+                            date: new Date()
+                        }
+                    });
                 });
             }
             else {
                 log.info('No data changes to update [%1]', id);
-                return q.reject('No data changes to update');
+                return;
             }
-        }).then(function() {
-            return watchmanStream.produce({
-                type: 'campaignRefreshed',
-                data: {
-                    campaign: campaign,
-                    date: new Date()
-                }
-            });
         }).catch(function(error) {
-            log.info(error);
+            log.warn(error);
         });
     };
 };
