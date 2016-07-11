@@ -30,9 +30,10 @@ module.exports =  class Configurator {
         ld.defaults(opts, options, {
             host: process.env.watchmanHost,
             tmpDir: path.resolve('.'),
-            key: path.resolve(process.env.HOME, '.vagrant.d/insecure_private_key'),
-            user: 'vagrant',
-            configPath: '/opt/sixxy/conf'
+            key: process.env.sshKey,
+            user: process.env.sshUser,
+            configPath: '/opt/sixxy/conf',
+            hostTmp: '/tmp'
         });
         this.opts = opts;
     }
@@ -99,6 +100,14 @@ module.exports =  class Configurator {
         });
     }
 
+    // Executes the given command with the provided list of arguments on the remote host
+    remoteExecute(command, args) {
+        const sshArgs = [
+            '-i', this.opts.key, `${this.opts.user}@${this.opts.host}`, command
+        ].concat(args);
+        return this.execute('ssh', sshArgs);
+    }
+
     // Reads the configuration for a given application and returns it as an Object
     getConfig(application) {
         const appConfigPath = path.resolve(this.opts.configPath, `${application}.json`);
@@ -119,16 +128,18 @@ module.exports =  class Configurator {
         const appConfigPath = path.resolve(this.opts.configPath, `${application}.json`);
         const fileName = `${uuid.createUuid()}.json`;
         const savePath = path.resolve(this.opts.tmpDir, fileName);
-        const scpArgs = ['-i', this.opts.key, savePath, `${this.opts.user}@${this.opts.host}:~`];
-        const sshArgs = ['-i', this.opts.key, `${this.opts.user}@${this.opts.host}`,
-            `sudo cp ~/${fileName} ${appConfigPath};rm ~/${fileName}`];
+        const hostTmpFile = path.resolve(this.opts.hostTmp, fileName);
+        const args = ['-i', this.opts.key, savePath, `${this.opts.user}@${this.opts.host}:${hostTmpFile}`];
 
         return this.writeFile(savePath, JSON.stringify(config, null, 2)).then(() => {
-            return this.execute('scp', scpArgs);
+            return this.execute('scp', args);
         }).then(() => {
-            return this.unlinkFile(savePath);
+            return Promise.all([
+                this.unlinkFile(savePath),
+                this.remoteExecute('sudo cp', [hostTmpFile, appConfigPath])
+            ]);
         }).then(() => {
-            return this.execute('ssh', sshArgs);
+            return this.remoteExecute('rm', [hostTmpFile]);
         });
     }
 
