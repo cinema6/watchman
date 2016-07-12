@@ -1,12 +1,14 @@
 'use strict';
 
 const Configurator = require('../helpers/Configurator.js');
+const ld = require('lodash');
 const moment = require('moment');
 const rcKinesis = require('rc-kinesis');
 const testUtils = require('cwrx/test/e2e/testUtils.js');
 const uuid = require('rc-uuid');
 
 const API_ROOT = process.env.apiRoot;
+const AWS_CREDS = JSON.parse(process.env.awsCreds);
 const PREFIX = process.env.appPrefix;
 const TIME_STREAM = process.env.timeStream;
 
@@ -168,9 +170,8 @@ describe('timeStream weeklyStats', function() {
                 testUtils.resetPGTable('rpt.unique_user_views_daily', testViews)
             ]);
         };
-        const producer = new rcKinesis.JsonProducer(TIME_STREAM, {
-            region: 'us-east-1'
-        });
+        const awsConfig = ld.assign({ region: 'us-east-1' }, AWS_CREDS || {});
+        const producer = new rcKinesis.JsonProducer(TIME_STREAM, awsConfig);
         this.produceRecord = () => {
             return producer.produce({
                 type: 'hourly',
