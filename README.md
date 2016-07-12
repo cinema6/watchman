@@ -94,3 +94,38 @@ The eventHandlers object contains as keys a list of event names to handle. Each 
 * name - The action name
 * options - An object containing options supported by the action
 * ifData - An object containing keys corresponding to event data. The action will only by performed **IF** the data matches the specified regular expression
+
+## E2E Testing Watchman
+
+### Using the Configurator
+Every e2e test file must include a `beforeAll` dedicated to configuring each watchman application. Below is what such a `beforeAll` might look like:
+```
+const Configurator = require('../helpers/Configurator.js');
+
+const PREFIX = process.env.appPrefix;
+
+// This beforeAll is dedicated to setting application config
+beforeAll(function(done) {
+    const configurator = new Configurator();
+    const sharedConfig = {
+        // Configuration shared by every application
+    };
+    const cwrxConfig = {
+        // Cwrx application specific config such as event handlers
+        eventHandlers: { }
+    };
+    const timeConfig = {
+        // Time application specific config such as event handlers
+        eventHandlers: { }
+    };
+    const watchmanConfig = {
+        // Watchman application specific config such as event handlers
+        eventHandlers: { }
+    };
+    Promise.all([
+        configurator.updateConfig(`${PREFIX}CwrxStreamApplication`, sharedConfig, cwrxConfig),
+        configurator.updateConfig(`${PREFIX}TimeStreamApplication`, sharedConfig, timeConfig),
+        configurator.updateConfig(`${PREFIX}WatchmanStreamApplication`, sharedConfig, watchmanConfig)
+    ]).then(done, done.fail);
+});
+```

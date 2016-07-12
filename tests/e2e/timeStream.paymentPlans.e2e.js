@@ -1,5 +1,6 @@
 'use strict';
 
+var Configurator = require('../helpers/Configurator.js');
 var JsonProducer = require('rc-kinesis').JsonProducer;
 var q = require('q');
 var testUtils = require('cwrx/test/e2e/testUtils.js');
@@ -14,6 +15,7 @@ var API_ROOT = process.env.apiRoot;
 var APP_CREDS = JSON.parse(process.env.appCreds);
 var AWS_CREDS = JSON.parse(process.env.awsCreds);
 var TIME_STREAM = process.env.timeStream;
+var PREFIX = process.env.appPrefix;
 
 function createId(prefix) {
     return prefix + '-' + uuid.createUuid();
@@ -275,6 +277,112 @@ describe('timeStream payment plan billing', function() {
             jar: cookies
         }).then(ld.property('0'));
     }
+
+    // This beforeAll is dedicated to setting application config
+    beforeAll(function(done) {
+        const configurator = new Configurator();
+        const sharedConfig = {
+            secrets: '/opt/sixxy/.watchman.secrets.json',
+            appCreds: '/opt/sixxy/.rcAppCreds.json',
+            cwrx: {
+                api: {
+                    root: API_ROOT,
+                    orgs: {
+                        endpoint: '/api/account/orgs'
+                    },
+                    payments: {
+                        endpoint: '/api/payments/'
+                    },
+                    analytics: {
+                        endpoint: '/api/analytics'
+                    },
+                    paymentPlans: {
+                        endpoint: '/api/payment-plans'
+                    },
+                    users: {
+                        endpoint: '/api/account/users'
+                    }
+                }
+            },
+            emails: {
+                sender: 'support@cinema6.com'
+            },
+            postmark: {
+                templates: {
+                    chargePaymentPlanFailure: '672809'
+                }
+            }
+        };
+        const cwrxConfig = {
+            eventHandlers: { }
+        };
+        const timeConfig = {
+            eventHandlers: {
+                hourly: {
+                    actions: [
+                        {
+                            name: 'fetch_orgs',
+                            options: {
+                                prefix: 'noon'
+                            },
+                            ifData: {
+                                hour: '^12$'
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+        const watchmanConfig = {
+            eventHandlers: {
+                noon_orgPulse: {
+                    actions: [
+                        {
+                            name: 'check_payment_required',
+                            ifData: {
+                                'org.paymentPlanId': '^pp-'
+                            }
+                        }
+                    ]
+                },
+                paymentRequired: {
+                    actions: [
+                        {
+                            name: 'charge_payment_plan',
+                            options: {
+                                target: 'showcase'
+                            }
+                        }
+                    ]
+                },
+                chargePaymentPlanFailure: {
+                    actions: [
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'chargePaymentPlanFailure'
+                            }
+                        }
+                    ]
+                },
+                paymentMade: {
+                    actions: [
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'paymentMade'
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+        Promise.all([
+            configurator.updateConfig(`${PREFIX}CwrxStreamApplication`, sharedConfig, cwrxConfig),
+            configurator.updateConfig(`${PREFIX}TimeStreamApplication`, sharedConfig, timeConfig),
+            configurator.updateConfig(`${PREFIX}WatchmanStreamApplication`, sharedConfig, watchmanConfig)
+        ]).then(done, done.fail);
+    });
 
     beforeAll(function(done) {
         var awsConfig = ld.assign({ region: 'us-east-1' }, AWS_CREDS || {});

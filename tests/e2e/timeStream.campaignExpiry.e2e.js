@@ -1,20 +1,142 @@
 
 'use strict';
 
+var Configurator = require('../helpers/Configurator.js');
 var JsonProducer = require('rc-kinesis').JsonProducer;
 var Q = require('q');
 var moment = require('moment');
 var testUtils = require('cwrx/test/e2e/testUtils.js');
 var uuid = require('rc-uuid');
 
+var API_ROOT = process.env.apiRoot;
 var APP_CREDS = JSON.parse(process.env.appCreds);
 var AWS_CREDS = JSON.parse(process.env.awsCreds);
+var PREFIX = process.env.appPrefix;
 var TIME_STREAM = process.env.timeStream;
 var WAIT_TIME = 1000;
 var WATCHMAN_STREAM = process.env.watchmanStream;
 
 describe('timeStream', function() {
     var producer, mockman;
+
+    // This beforeAll is dedicated to setting application config
+    beforeAll(function(done) {
+        const configurator = new Configurator();
+        const sharedConfig = {
+            secrets: '/opt/sixxy/.watchman.secrets.json',
+            appCreds: '/opt/sixxy/.rcAppCreds.json',
+            cwrx: {
+                api: {
+                    root: API_ROOT,
+                    campaigns: {
+                        endpoint: '/api/campaigns'
+                    },
+                    analytics: {
+                        endpoint: '/api/analytics'
+                    },
+                    orgs: {
+                        endpoint: '/api/account/orgs'
+                    },
+                    users: {
+                        endpoint: '/api/account/users'
+                    }
+                }
+            },
+            emails: {
+                sender: 'support@cinema6.com',
+                dashboardLinks: {
+                    showcase: 'http://localhost:9000/#/showcase/products'
+                }
+            },
+            postmark: {
+                templates: {
+                    'promotionEnded--app': '722104'
+                }
+            }
+        };
+        const cwrxConfig = {
+            eventHandlers: { }
+        };
+        const timeConfig = {
+            eventHandlers: {
+                tenMinutes: {
+                    actions: [
+                        {
+                            name: 'fetch_campaigns',
+                            options: {
+                                statuses: ['active', 'paused', 'outOfBudget'],
+                                prefix: 'hourly',
+                                analytics: true,
+                                number: 50
+                            }
+                        }
+                    ]
+                },
+                hourly: {
+                    actions: [
+                        {
+                            name: 'fetch_orgs',
+                            options: {
+                                prefix: 'morning'
+                            },
+                            ifData: {
+                                hour: '^4$'
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+        const watchmanConfig = {
+            eventHandlers: {
+                morning_orgPulse: {
+                    actions: [
+                        {
+                            name: 'check_payment_plan_start'
+                        }
+                    ]
+                },
+                hourly_campaignPulse: {
+                    actions: ['check_expiry']
+                },
+                campaignExpired: {
+                    actions: [
+                        {
+                            name: 'set_status',
+                            options: {
+                                status: 'expired'
+                            }
+                        }
+                    ]
+                },
+                campaignReachedBudget: {
+                    actions: [
+                        {
+                            name: 'set_status',
+                            options: {
+                                status: 'outOfBudget'
+                            }
+                        }
+                    ]
+                },
+                paymentPlanWillStart: {
+                    actions: [
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'promotionEnded'
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+        Promise.all([
+            configurator.updateConfig(`${PREFIX}CwrxStreamApplication`, sharedConfig, cwrxConfig),
+            configurator.updateConfig(`${PREFIX}TimeStreamApplication`, sharedConfig, timeConfig),
+            configurator.updateConfig(`${PREFIX}WatchmanStreamApplication`, sharedConfig, watchmanConfig)
+        ]).then(done, done.fail);
+    });
 
     beforeAll(function(done) {
         var awsConfig = {

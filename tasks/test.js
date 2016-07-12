@@ -51,6 +51,9 @@ module.exports = function(grunt) {
             var mongoHost = grunt.option('dbHost') || options.mongoHost;
             var apiRoot = grunt.option('apiRoot') || options.apiRoot;
             var watchmanHost = grunt.option('watchmanHost') || options.watchmanHost;
+            var appPrefix = grunt.option('appPrefix') || options.appPrefix;
+            var sshUser = grunt.option('sshUser') || options.sshUser;
+            var sshKey = grunt.option('sshKey') || options.sshKey;
 
             initCloudFormation(auth, region);
 
@@ -130,6 +133,9 @@ module.exports = function(grunt) {
                 process.env.watchmanStream = watchmanStream;
                 process.env.cwrxStream = cwrxStream;
                 process.env.watchmanHost = watchmanHost;
+                process.env.appPrefix = appPrefix;
+                process.env.sshUser = sshUser;
+                process.env.sshKey = sshKey;
 
                 grunt.task.run(['exec:setup_e2e', 'jasmine_nodejs:e2e']);
                 done();
