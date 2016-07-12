@@ -1,11 +1,13 @@
 'use strict';
 
+var Configurator = require('../helpers/Configurator.js');
 var JsonProducer = require('rc-kinesis').JsonProducer;
 var Q = require('q');
 var testUtils = require('cwrx/test/e2e/testUtils.js');
 
-// var APP_CREDS = JSON.parse(process.env.appCreds);
+var API_ROOT = process.env.apiRoot;
 var AWS_CREDS = JSON.parse(process.env.awsCreds);
+var PREFIX = process.env.appPrefix;
 var TIME_STREAM = process.env.timeStream;
 var WATCHMAN_STREAM = process.env.watchmanStream;
 
@@ -49,6 +51,70 @@ describe('timeStream available funds check', function() {
             });
         });
     }
+
+    // This beforeAll is dedicated to setting application config
+    beforeAll(function(done) {
+        const configurator = new Configurator();
+        const sharedConfig = {
+            secrets: '/opt/sixxy/.watchman.secrets.json',
+            appCreds: '/opt/sixxy/.rcAppCreds.json',
+            cwrx: {
+                api: {
+                    root: API_ROOT,
+                    campaigns: {
+                        endpoint: '/api/campaigns'
+                    },
+                    orgs: {
+                        endpoint: '/api/account/orgs'
+                    },
+                    accounting: {
+                        endpoint: '/api/accounting'
+                    }
+                }
+            },
+            emails: {
+                sender: 'support@cinema6.com'
+            },
+            postmark: {
+                templates: {
+                }
+            }
+        };
+        const cwrxConfig = {
+            eventHandlers: { }
+        };
+        const timeConfig = {
+            eventHandlers: {
+                tenMinutes: {
+                    actions: [
+                        {
+                            name: 'check_available_funds'
+                        }
+                    ]
+                }
+            }
+        };
+        const watchmanConfig = {
+            eventHandlers: {
+                campaignOutOfFunds: {
+                    actions: [
+                        {
+                            name: 'message/log',
+                            options: {
+                                text: '[activity] Campaign {{campaign.name}} ({{campaign.id}}) is out of funds',
+                                level: 'warn'
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+        Promise.all([
+            configurator.updateConfig(`${PREFIX}CwrxStreamApplication`, sharedConfig, cwrxConfig),
+            configurator.updateConfig(`${PREFIX}TimeStreamApplication`, sharedConfig, timeConfig),
+            configurator.updateConfig(`${PREFIX}WatchmanStreamApplication`, sharedConfig, watchmanConfig)
+        ]).then(done, done.fail);
+    });
 
     beforeAll(function(done) {
         var awsConfig = {

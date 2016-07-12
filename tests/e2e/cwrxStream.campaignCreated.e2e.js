@@ -1,5 +1,6 @@
 'use strict';
 
+var Configurator = require('../helpers/Configurator.js');
 var JsonProducer = require('rc-kinesis').JsonProducer;
 var q = require('q');
 var testUtils = require('cwrx/test/e2e/testUtils');
@@ -15,6 +16,7 @@ var API_ROOT = process.env.apiRoot;
 var APP_CREDS = JSON.parse(process.env.appCreds);
 var AWS_CREDS = JSON.parse(process.env.awsCreds);
 var CWRX_STREAM = process.env.cwrxStream;
+var PREFIX = process.env.appPrefix;
 var SECRETS = JSON.parse(process.env.secrets);
 var HUBSPOT_API_KEY = SECRETS.hubspot.key;
 
@@ -241,6 +243,164 @@ describe('cwrxStream campaignCreated', function() {
             ]
         });
     }
+
+    // This beforeAll is dedicated to setting application config
+    beforeAll(function(done) {
+        const configurator = new Configurator();
+        const sharedConfig = {
+            secrets: '/opt/sixxy/.watchman.secrets.json',
+            appCreds: '/opt/sixxy/.rcAppCreds.json',
+            cwrx: {
+                api: {
+                    root: API_ROOT,
+                    campaigns: {
+                        endpoint: '/api/campaigns'
+                    },
+                    placements: {
+                        endpoint: '/api/placements'
+                    },
+                    orgs: {
+                        endpoint: '/api/account/orgs'
+                    },
+                    promotions: {
+                        endpoint: '/api/promotions'
+                    },
+                    paymentPlans: {
+                        endpoint: '/api/payment-plans'
+                    },
+                    analytics: {
+                        endpoint: '/api/analytics'
+                    },
+                    users: {
+                        endpoint: '/api/account/users'
+                    },
+                    advertisers: {
+                        endpoint: '/api/account/advertisers'
+                    },
+                    transactions: {
+                        endpoint: '/api/transactions'
+                    }
+                }
+            },
+            emails: {
+                sender: 'support@cinema6.com',
+                supportAddress: 'c6e2etester@gmail.com',
+                dashboardLinks: {
+                    selfie: 'http://localhost:9000/#/apps/selfie/campaigns',
+                    showcase: 'http://localhost:9000/#/showcase/products'
+                },
+                beeswax: {
+                    campaignLink: 'http://stingersbx.beeswax.com/advertisers/{{advertiserId}}/campaigns/{{campaignId}}/line_items'
+                }
+            },
+            postmark: {
+                templates: {
+                    initializedShowcaseCampaign: '672910',
+                    campaignActive: '672909',
+                    'campaignActive--app': '694541'
+                }
+            }
+        };
+        const cwrxConfig = {
+            eventHandlers: {
+                campaignCreated: {
+                    actions: [
+                        {
+                            name: 'showcase/apps/init_campaign',
+                            ifData: {
+                                'campaign.application': '^showcase$',
+                                'campaign.product.type': '^app$'
+                            },
+                            options: {
+                                card: {
+                                    interstitial: {
+                                        cardType: 'showcase-app'
+                                    },
+                                    threeHundredByTwoFifty: {
+                                        cardType: 'showcase-app'
+                                    }
+                                },
+                                placement: {
+                                    interstitial: {
+                                        tagType: 'mraid',
+                                        tagParams: {
+                                            container: { value: 'beeswax' },
+                                            type: { value: 'mobile-card' },
+                                            branding: { value: 'showcase-app--interstitial' },
+                                            hostApp: { value: '{{APP_BUNDLE}}', inTag: true },
+                                            network: { value: '{{INVENTORY_SOURCE}}', inTag: true },
+                                            uuid: { value: '{{IOS_ID}}', inTag: true },
+                                            clickUrls: { value: ['{{CLICK_URL}}'], inTag: true },
+                                            forceOrientation: { value: 'none' }
+                                        }
+                                    },
+                                    threeHundredByTwoFifty: {
+                                        tagType: 'display',
+                                        tagParams: {
+                                            container: { value: 'beeswax' },
+                                            type: { value: 'mobile-card' },
+                                            branding: { value: 'showcase-app--300x250' }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+        const timeConfig = {
+            eventHandlers: { }
+        };
+        const watchmanConfig = {
+            eventHandlers: {
+                initializedShowcaseCampaign: {
+                    actions: [
+                        {
+                            name: 'activate_payment_plan',
+                            options: {
+                                target: 'showcase'
+                            }
+                        },
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'campaignActive'
+                            }
+                        },
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'initializedShowcaseCampaign',
+                                toSupport: true
+                            }
+                        },
+                        {
+                            name: 'hubspot/update_user',
+                            options: {
+                                properties: {
+                                    applications: 'apps',
+                                    lifecyclestage: 'customer'
+                                }
+                            }
+                        }
+                    ]
+                },
+                promotionFulfilled: {
+                    actions: [
+                        {
+                            name: 'create_promotion_credit'
+                        }
+                    ]
+                }
+            }
+        };
+        Promise.all([
+            configurator.updateConfig(`${PREFIX}CwrxStreamApplication`, sharedConfig, cwrxConfig),
+            configurator.updateConfig(`${PREFIX}TimeStreamApplication`, sharedConfig, timeConfig),
+            configurator.updateConfig(`${PREFIX}WatchmanStreamApplication`, sharedConfig, watchmanConfig)
+        ]).then(done, done.fail);
+    });
 
     beforeAll(function(done) {
         var awsConfig = ld.assign({ region: 'us-east-1' }, AWS_CREDS || {});
@@ -534,7 +694,6 @@ describe('cwrxStream campaignCreated', function() {
             mailman.on('Johnny, Welcome to Reelcontent Apps', function(message) {
                 userEmails.push(message);
             });
-
             campaignCreatedEvent().then(function() {
                 return waitUntil(function() {
                     return request.get({

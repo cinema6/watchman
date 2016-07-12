@@ -1,16 +1,19 @@
 'use strict';
 
+var Configurator = require('../helpers/Configurator.js');
 var Hubspot = require('../../lib/Hubspot.js');
 var JsonProducer = require('rc-kinesis').JsonProducer;
 var Q = require('q');
 var testUtils = require('cwrx/test/e2e/testUtils.js');
 
+var API_ROOT = process.env.apiRoot;
 var APP_CREDS = JSON.parse(process.env.appCreds);
 var AWS_CREDS = JSON.parse(process.env.awsCreds);
 var CWRX_STREAM = process.env.cwrxStream;
 var SECRETS = JSON.parse(process.env.secrets);
-var HUBSPOT_API_KEY = SECRETS.hubspot.key;
+var PREFIX = process.env.appPrefix;
 var WAIT_TIME = 1000;
+var HUBSPOT_API_KEY = SECRETS.hubspot.key;
 
 describe('cwrxStream', function() {
     var producer;
@@ -41,6 +44,350 @@ describe('cwrxStream', function() {
             });
         }));
     }
+
+    // This beforeAll is dedicated to setting application config
+    beforeAll(function(done) {
+        const configurator = new Configurator();
+        const sharedConfig = {
+            secrets: '/opt/sixxy/.watchman.secrets.json',
+            appCreds: '/opt/sixxy/.rcAppCreds.json',
+            cwrx: {
+                api: {
+                    root: API_ROOT,
+                    analytics: {
+                        endpoint: '/api/analytics'
+                    },
+                    users: {
+                        endpoint: '/api/account/users'
+                    },
+                    orgs: {
+                        endpoint: '/api/account/orgs'
+                    },
+                    promotions: {
+                        endpoint: '/api/promotions'
+                    },
+                    transactions: {
+                        endpoint: '/api/transactions'
+                    }
+                }
+            },
+            emails: {
+                sender: 'support@cinema6.com',
+                dashboardLinks: {
+                    selfie: 'http://localhost:9000/#/apps/selfie/campaigns',
+                    showcase: 'http://localhost:9000/#/showcase/products'
+                },
+                manageLink: 'http://localhost:9000/#/apps/selfie/campaigns/manage/:campId/manage',
+                reviewLink: 'http://localhost:9000/#/apps/selfie/campaigns/manage/:campId/admin',
+                activationTargets: {
+                    selfie: 'http://localhost:9000/#/confirm?selfie=selfie',
+                    showcase: 'http://localhost:9000/#/showcase/confirm'
+                },
+                supportAddress: 'c6e2etester@gmail.com',
+                passwordResetPages: {
+                    portal: 'http://localhost:9000/#/password/forgot',
+                    selfie: 'http://localhost:9000/#/pass/forgot?selfie=true',
+                    showcase: 'http://localhost:9000/#/showcase/pass/forgot'
+                },
+                forgotTargets: {
+                    portal: 'http://localhost:9000/#/password/reset',
+                    selfie: 'http://localhost:9000/#/pass/reset?selfie=true',
+                    showcase: 'http://localhost:9000/#/showcase/pass/reset'
+                },
+                previewLink: 'https://reelcontent.com/preview/?previewSource=platform&campaign=:campId'
+            },
+            postmark: {
+                templates: {
+                    campaignExpired: '672685',
+                    campaignOutOfBudget: '672705',
+                    campaignActive: '672909',
+                    campaignUpdateApproved: '672707',
+                    campaignRejected: '672781',
+                    campaignUpdateRejected: '672782',
+                    newUpdateRequest: '672784',
+                    paymentReceipt: '672801',
+                    'paymentReceipt--app': '672786',
+                    activateAccount: '672787',
+                    'activateAccount--app': '672803',
+                    accountWasActivated: '672804',
+                    'accountWasActivated--app': '672805',
+                    passwordChanged: '672788',
+                    'passwordChanged--app': '672806',
+                    emailChanged: '672807',
+                    'emailChanged--app': '672901',
+                    failedLogins: '672903',
+                    'failedLogins--app': '672904',
+                    passwordReset: '672905',
+                    'passwordReset--app': '672906',
+                    campaignSubmitted: '672810'
+                }
+            }
+        };
+        const cwrxConfig = {
+            eventHandlers: {
+                campaignStateChange: {
+                    actions: [
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'campaignExpired'
+                            },
+                            ifData: {
+                                previousState: 'active|paused',
+                                currentState: 'expired',
+                                'campaign.application': '^(studio|selfie)$'
+                            }
+                        },
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'campaignReachedBudget'
+                            },
+                            ifData: {
+                                currentState: 'outOfBudget',
+                                'campaign.application': '^(studio|selfie)$'
+                            }
+                        },
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'campaignActive'
+                            },
+                            ifData: {
+                                previousState: 'pending',
+                                currentState: 'active',
+                                'campaign.application': '^(studio|selfie)$'
+                            }
+                        },
+                        {
+                            name: 'showcase/apps/clean_up_campaign',
+                            options: {},
+                            ifData: {
+                                currentState: 'canceled',
+                                'campaign.application': '^showcase$',
+                                'campaign.product.type': '^app$'
+                            }
+                        }
+                    ]
+                },
+                campaignUpdateApproved: {
+                    actions: [
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'campaignUpdateApproved'
+                            }
+                        }
+                    ]
+                },
+                campaignRejected: {
+                    actions: [
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'campaignRejected'
+                            }
+                        }
+                    ]
+                },
+                campaignUpdateRejected: {
+                    actions: [
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'campaignUpdateRejected'
+                            }
+                        }
+                    ]
+                },
+                newUpdateRequest: {
+                    actions: [
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                toSupport: true,
+                                type: 'newUpdateRequest'
+                            }
+                        },
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'campaignSubmitted'
+                            },
+                            ifData: {
+                                'updateRequest.initialSubmit': true
+                            }
+                        }
+                    ]
+                },
+                paymentMade: {
+                    actions: [
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'paymentMade'
+                            }
+                        },
+                        {
+                            name: 'hubspot/update_user',
+                            options: {
+                                properties: {
+                                    applications: 'apps',
+                                    paying_customer: 'true'
+                                }
+                            },
+                            ifData: {
+                                target: '^showcase$'
+                            }
+                        }
+                    ]
+                },
+                accountCreated: {
+                    actions: [
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'activateAccount'
+                            }
+                        },
+                        {
+                            name: 'hubspot/submit_form',
+                            options: {
+                                portal: '2041560',
+                                form: '73472e84-6426-4fab-b092-936c0f692da6',
+                                data: {
+                                    applications: 'apps'
+                                }
+                            },
+                            ifData: {
+                                target: '^showcase$'
+                            }
+                        },
+                        {
+                            name: 'hubspot/update_user',
+                            options: {
+                                properties: {
+                                    applications: 'apps',
+                                    lifecyclestage: 'salesqualifiedlead'
+                                }
+                            },
+                            ifData: {
+                                target: '^showcase$'
+                            }
+                        }
+                    ]
+                },
+                accountActivated: {
+                    actions: [
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'accountWasActivated'
+                            }
+                        },
+                        {
+                            name: 'check_signup_promotion'
+                        },
+                        {
+                            name: 'hubspot/update_user',
+                            options: {
+                                properties: {
+                                    applications: 'apps',
+                                    lifecyclestage: 'opportunity'
+                                }
+                            },
+                            ifData: {
+                                target: '^showcase$'
+                            }
+                        }
+                    ]
+                },
+                passwordChanged: {
+                    actions: [
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'passwordChanged'
+                            }
+                        }
+                    ]
+                },
+                emailChanged: {
+                    actions: [
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'emailChanged',
+                                to: '{{oldEmail}}'
+                            }
+                        },
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'emailChanged',
+                                to: '{{newEmail}}'
+                            }
+                        },
+                        {
+                            name: 'hubspot/update_user',
+                            ifData: {
+                                target: '^showcase$'
+                            }
+                        }
+                    ]
+                },
+                failedLogins: {
+                    actions: [
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'failedLogins'
+                            }
+                        }
+                    ]
+                },
+                forgotPassword: {
+                    actions: [
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'forgotPassword'
+                            }
+                        }
+                    ]
+                },
+                resendActivation: {
+                    actions: [
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'activateAccount'
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+        const timeConfig = {
+            eventHandlers: { }
+        };
+        const watchmanConfig = {
+            eventHandlers: {
+                promotionFulfilled: {
+                    actions: [
+                        {
+                            name: 'create_promotion_credit'
+                        }
+                    ]
+                }
+            }
+        };
+        Promise.all([
+            configurator.updateConfig(`${PREFIX}CwrxStreamApplication`, sharedConfig, cwrxConfig),
+            configurator.updateConfig(`${PREFIX}TimeStreamApplication`, sharedConfig, timeConfig),
+            configurator.updateConfig(`${PREFIX}WatchmanStreamApplication`, sharedConfig, watchmanConfig)
+        ]).then(done, done.fail);
+    });
 
     beforeAll(function(done) {
         var self = this;
@@ -654,7 +1001,7 @@ describe('cwrxStream', function() {
             self.waitForHubspotContact = function() {
                 return waitForTrue(function() {
                     return self.hubspot.getContactByEmail(mockUser.email).then(function(contact) {
-                        return (contact && contact.properties.lifecyclestage.value === 'opportunity') ? contact : null;
+                        return (contact && contact.properties.lifecyclestage && contact.properties.lifecyclestage.value === 'opportunity') ? contact : null;
                     });
                 });
             };

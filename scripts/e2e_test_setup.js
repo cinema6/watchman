@@ -7,11 +7,17 @@ const HUBSPOT_API_KEY = SECRETS.hubspot.key;
 
 const hubspot = new Hubspot(HUBSPOT_API_KEY);
 
-// Ensure there is no e2e contact in Hubspot
-hubspot.getContactByEmail('c6e2etester@gmail.com').then(contact => {
-    if(contact) {
-        return hubspot.deleteContact(contact.vid);
-    }
-}).catch(error => {
+// Ensure there is no e2e contacts in Hubspot
+const deleteContact = email => {
+    return hubspot.getContactByEmail(email).then(contact => {
+        if(contact) {
+            return hubspot.deleteContact(contact.vid);
+        }
+    });
+};
+Promise.all([
+    deleteContact('c6e2etester@gmail.com'),
+    deleteContact('c6e2etester2@gmail.com')
+]).catch(error => {
     throw error;
 });
