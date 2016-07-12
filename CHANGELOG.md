@@ -1,5 +1,6 @@
 # Watchman
 
+## v1.2.0 (July 12, 2016)
 * *[v1.2.0-rc1]*
   * [DEV]: Add e2e configurator
   * [FEATURE]: Weekly stats emails
@@ -12,6 +13,7 @@
     * Deploy watchman cookbook `v2.2.0`
     * Update watchman environments
     * Update querybot to not rely on transaction descriptions: [#970](https://github.com/cinema6/cwrx/issues/970)
+* *[/v1.2.0-rc1]*
 
 ## v1.1.0 (June 30, 2016)
 * *[v1.1.0-rc1]*
