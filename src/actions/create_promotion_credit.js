@@ -15,21 +15,25 @@ module.exports = function(config) {
         const paymentPlan = event.data.paymentPlan;
         const target = event.data.target;
         const now = moment(event.data.date);
+        const today = moment(now).utcOffset(0).startOf('day');
 
         function getTransactionData(promotion) {
             switch (promotion.type) {
             case 'signupReward':
                 return { amount: promotion.data.rewardAmount };
-            case 'freeTrial':
+            case 'freeTrial': {
+                const trialLength = promotion.data.trialLength;
+
                 return {
                     // Calculate the amount of credit by prorating the monthly price across each day
                     // of the trial (assuming a month is 30 days.)
                     amount: ld.round((promotion.data.trialLength / 30) * paymentPlan.price, 2),
                     paymentPlanId: paymentPlan.id,
                     targetUsers: promotion.data.targetUsers,
-                    cycleStart: now.format(),
-                    cycleEnd: moment(now).add(promotion.data.trialLength, 'days').format()
+                    cycleStart: today.format(),
+                    cycleEnd: moment(today).add(trialLength, 'days').endOf('day').format()
                 };
+            }
             default:
                 return null;
             }

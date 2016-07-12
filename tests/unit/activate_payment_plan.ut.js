@@ -240,8 +240,8 @@ describe('(action factory) activate_payment_plan', function() {
                                 expect(request.put).toHaveBeenCalledWith({
                                     url: resolveURL(config.cwrx.api.root, config.cwrx.api.orgs.endpoint) + '/' + org.id,
                                     json: ld.merge({}, org, {
-                                        paymentPlanStart: moment(data.date).format(),
-                                        nextPaymentDate: moment(data.date).format()
+                                        paymentPlanStart: moment(data.date).utcOffset(0).startOf('day').format(),
+                                        nextPaymentDate: moment(data.date).utcOffset(0).startOf('day').format()
                                     })
                                 });
                             });
@@ -353,8 +353,8 @@ describe('(action factory) activate_payment_plan', function() {
                                 expect(request.put).toHaveBeenCalledWith({
                                     url: resolveURL(config.cwrx.api.root, config.cwrx.api.orgs.endpoint) + '/' + org.id,
                                     json: ld.merge({}, org, {
-                                        paymentPlanStart: moment(data.date).add(19, 'days').format(),
-                                        nextPaymentDate: moment(data.date).add(19, 'days').format()
+                                        paymentPlanStart: moment(data.date).utcOffset(0).startOf('day').add(19, 'days').format(),
+                                        nextPaymentDate: moment(data.date).utcOffset(0).startOf('day').add(19, 'days').format()
                                     })
                                 });
                             });

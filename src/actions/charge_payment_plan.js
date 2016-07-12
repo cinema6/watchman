@@ -20,7 +20,8 @@ module.exports = function factory(config) {
     return event => Promise.resolve().then(() => {
         const data = event.data;
         const options = event.options;
-        const today = moment(data.date);
+        const now = moment(data.date);
+        const today = moment(now).utcOffset(0).startOf('day');
         const org = data.org;
         const paymentMethod = data.paymentMethod;
         const paymentPlan = data.paymentPlan;
@@ -36,7 +37,7 @@ module.exports = function factory(config) {
                     paymentPlanId: paymentPlan.id,
                     targetUsers: paymentPlan.viewsPerMonth,
                     cycleStart: today.format(),
-                    cycleEnd: moment(today).add(1, 'month').subtract(1, 'day').format()
+                    cycleEnd: moment(today).add(1, 'month').subtract(1, 'day').endOf('day').format()
                 }
             }
         }).spread(payment => (

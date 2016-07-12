@@ -31,6 +31,7 @@ module.exports = function factory(config) {
         const options = event.options;
         const campaign = data.campaign;
         const now = moment(data.date);
+        const today = moment(now).utcOffset(0).startOf('day');
         const orgEndpoint = orgsEndpoint + '/' + campaign.org;
 
         return request.get({ url: orgEndpoint }).spread(org => {
@@ -47,7 +48,7 @@ module.exports = function factory(config) {
             ).spread(promotions => {
                 const freeTrials = ld.filter(promotions, { type: 'freeTrial' });
                 const trialLength = ld.sum(freeTrials.map(ld.property('data.trialLength')));
-                const startDate = moment(now).add(trialLength, 'days').format();
+                const startDate = moment(today).add(trialLength, 'days').format();
 
                 return request.put({
                     url: orgEndpoint,
