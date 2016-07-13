@@ -1,6 +1,10 @@
 # Watchman
 
 ## v1.2.0 (July 12, 2016)
+* *[v1.2.0-rc2]*
+  * [FIX]: Allow sending weekly stats for any non-canceled campaign
+* *[/v1.2.0-rc2]*
+
 * *[v1.2.0-rc1]*
   * [DEV]: Add e2e configurator
   * [FEATURE]: Weekly stats emails
