@@ -16,7 +16,8 @@ module.exports = function factory(config) {
     return event => Promise.resolve().then(() => {
         const data = event.data;
         const campaign = data.campaign;
-        const beeswaxCampaignId = get(campaign, 'externalCampaigns.beeswax.externalId');
+        const beeswaxCampaignId = get(campaign, 'externalIds.beeswax') ||
+            get(campaign, 'externalCampaigns.beeswax.externalId');
 
         if (!beeswaxCampaignId) {
             log.warn(

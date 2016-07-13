@@ -149,10 +149,8 @@ describe('cleanUpCampaignFactory', function() {
                 campaign = {
                     id: `cam-${createUuid()}`,
                     org: `o-${createUuid()}`,
-                    externalCampaigns: {
-                        beeswax: {
-                            externalId: 48354
-                        }
+                    externalIds: {
+                        beeswax: 48354
                     }
                 };
 
@@ -171,12 +169,12 @@ describe('cleanUpCampaignFactory', function() {
             });
 
             it('should get all of the beeswax campaign\'s line items', function() {
-                expect(beeswax.lineItems.queryAll).toHaveBeenCalledWith({ campaign_id: campaign.externalCampaigns.beeswax.externalId, active: true });
+                expect(beeswax.lineItems.queryAll).toHaveBeenCalledWith({ campaign_id: campaign.externalIds.beeswax, active: true });
             });
 
             describe('if the campaign has no externalCampaigns', function() {
                 beforeEach(function(done) {
-                    delete campaign.externalCampaigns;
+                    delete campaign.externalIds;
 
                     success.calls.reset();
                     failure.calls.reset();
@@ -196,6 +194,28 @@ describe('cleanUpCampaignFactory', function() {
 
                 it('should fulfill the promise', function() {
                     expect(success).toHaveBeenCalledWith(undefined);
+                });
+            });
+
+            describe('if the campaign has a beeswax campaign in the old format', function() {
+                beforeEach(function(done) {
+                    delete campaign.externalIds;
+                    campaign.externalCampaigns = {
+                        beeswax: {
+                            externalId: 456738
+                        }
+                    };
+
+                    success.calls.reset();
+                    failure.calls.reset();
+                    beeswax.lineItems.queryAll.calls.reset();
+
+                    action(event).then(success, failure);
+                    setTimeout(done);
+                });
+
+                it('should query by that id', function() {
+                    expect(beeswax.lineItems.queryAll).toHaveBeenCalledWith({ campaign_id: campaign.externalCampaigns.beeswax.externalId, active: true });
                 });
             });
 
@@ -319,7 +339,7 @@ describe('cleanUpCampaignFactory', function() {
                     });
 
                     it('should deactivate the campaign', function() {
-                        expect(beeswax.campaigns.edit).toHaveBeenCalledWith(campaign.externalCampaigns.beeswax.externalId, { active: false });
+                        expect(beeswax.campaigns.edit).toHaveBeenCalledWith(campaign.externalIds.beeswax, { active: false });
                     });
 
                     describe('if there is a problem', function() {
@@ -346,7 +366,7 @@ describe('cleanUpCampaignFactory', function() {
                             edits.campaigns[0].resolve({
                                 success: true,
                                 payload: {
-                                    campaign_id: campaign.externalCampaigns.beeswax.externalId,
+                                    campaign_id: campaign.externalIds.beeswax,
                                     active: false
                                 }
                             });
