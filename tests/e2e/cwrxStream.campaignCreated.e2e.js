@@ -253,6 +253,7 @@ describe('cwrxStream campaignCreated', function() {
             cwrx: {
                 api: {
                     root: API_ROOT,
+                    tracking : 'https://audit.cinema6.com/pixel.gif',
                     campaigns: {
                         endpoint: '/api/campaigns'
                     },
