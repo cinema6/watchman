@@ -376,15 +376,21 @@ module.exports = function factory(config) {
                     config.cwrx.api.advertisers.endpoint
                 );
                 const campaign = data.campaign;
-                const externalCampaignId = campaign.externalCampaigns.beeswax.externalId;
+                const externalCampaignId = ld.get(
+                    campaign,'externalIds.beeswax',
+                    ld.get(campaign,'externalCampaigns.beeswax.externalId')
+                );
 
                 return requestUtils.makeSignedRequest(config.appCreds, 'get', {
                     url: `${advertisersEndpoint}/${campaign.advertiserId}`,
                     json: true
                 }).then(data => {
                     const response = data.response;
-                    const advertiser = data.body;
-
+                    const externalAdvertiserId = ld.get(
+                        data.body,'externalIds.beeswax',
+                        ld.get(data.body,'beeswaxIds.advertiser')
+                    );
+                    
                     if (!/^2/.test(response.statusCode)) {
                         throw new Error(
                             `Failed to GET advertiser(${campaign.advertiserId}): ` +
@@ -398,7 +404,7 @@ module.exports = function factory(config) {
                         data: {
                             beeswaxCampaignId   : externalCampaignId,
                             beeswaxCampaignURI  : emailConfig.beeswax.campaignLink
-                                .replace('{{advertiserId}}', advertiser.beeswaxIds.advertiser)
+                                .replace('{{advertiserId}}', externalAdvertiserId)
                                 .replace('{{campaignId}}', externalCampaignId),
                             campName            : campaign.name
                         },
