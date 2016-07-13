@@ -1,7 +1,6 @@
 'use strict';
 
 var Configurator = require('../helpers/Configurator.js');
-var Hubspot = require('../../lib/Hubspot.js');
 var JsonProducer = require('rc-kinesis').JsonProducer;
 var Q = require('q');
 var testUtils = require('cwrx/test/e2e/testUtils.js');
@@ -10,10 +9,8 @@ var API_ROOT = process.env.apiRoot;
 var APP_CREDS = JSON.parse(process.env.appCreds);
 var AWS_CREDS = JSON.parse(process.env.awsCreds);
 var CWRX_STREAM = process.env.cwrxStream;
-var SECRETS = JSON.parse(process.env.secrets);
 var PREFIX = process.env.appPrefix;
 var WAIT_TIME = 1000;
-var HUBSPOT_API_KEY = SECRETS.hubspot.key;
 
 describe('cwrxStream', function() {
     var producer;
@@ -227,18 +224,6 @@ describe('cwrxStream', function() {
                             options: {
                                 type: 'paymentMade'
                             }
-                        },
-                        {
-                            name: 'hubspot/update_user',
-                            options: {
-                                properties: {
-                                    applications: 'apps',
-                                    paying_customer: 'true'
-                                }
-                            },
-                            ifData: {
-                                target: '^showcase$'
-                            }
                         }
                     ]
                 },
@@ -248,31 +233,6 @@ describe('cwrxStream', function() {
                             name: 'message/campaign_email',
                             options: {
                                 type: 'activateAccount'
-                            }
-                        },
-                        {
-                            name: 'hubspot/submit_form',
-                            options: {
-                                portal: '2041560',
-                                form: '73472e84-6426-4fab-b092-936c0f692da6',
-                                data: {
-                                    applications: 'apps'
-                                }
-                            },
-                            ifData: {
-                                target: '^showcase$'
-                            }
-                        },
-                        {
-                            name: 'hubspot/update_user',
-                            options: {
-                                properties: {
-                                    applications: 'apps',
-                                    lifecyclestage: 'salesqualifiedlead'
-                                }
-                            },
-                            ifData: {
-                                target: '^showcase$'
                             }
                         }
                     ]
@@ -287,18 +247,6 @@ describe('cwrxStream', function() {
                         },
                         {
                             name: 'check_signup_promotion'
-                        },
-                        {
-                            name: 'hubspot/update_user',
-                            options: {
-                                properties: {
-                                    applications: 'apps',
-                                    lifecyclestage: 'opportunity'
-                                }
-                            },
-                            ifData: {
-                                target: '^showcase$'
-                            }
                         }
                     ]
                 },
@@ -326,12 +274,6 @@ describe('cwrxStream', function() {
                             options: {
                                 type: 'emailChanged',
                                 to: '{{newEmail}}'
-                            }
-                        },
-                        {
-                            name: 'hubspot/update_user',
-                            ifData: {
-                                target: '^showcase$'
                             }
                         }
                     ]
@@ -390,8 +332,6 @@ describe('cwrxStream', function() {
     });
 
     beforeAll(function(done) {
-        var self = this;
-        self.hubspot = new Hubspot(HUBSPOT_API_KEY);
         mailman = new testUtils.Mailman();
         mailman2 = new testUtils.Mailman({ user: 'c6e2eTester2@gmail.com' });
         mailman.on('error', function(error) { throw new Error(error); });
@@ -463,14 +403,9 @@ describe('cwrxStream', function() {
         return testUtils.mongoUpsert('applications', { key: mockApp.key }, mockApp).done(done);
     });
 
-    afterEach(function(done) {
+    afterEach(function() {
         mailman.removeAllListeners();
         mailman2.removeAllListeners();
-        if(this.createdContact) {
-            this.hubspot.deleteContact(this.createdContact).then(done, done.fail);
-        } else {
-            done();
-        }
     });
 
     afterAll(function() {
@@ -880,46 +815,10 @@ describe('cwrxStream', function() {
                     });
                 }).catch(done.fail);
             });
-
-            it('should indicate in Hubspot that this user is a paying customer', function(done) {
-                producer.produce({
-                    type: 'paymentMade',
-                    data: {
-                        payment: mockPayment,
-                        user: mockUser,
-                        balance: 9001.12,
-                        target: 'showcase'
-                    }
-                }).then(() => {
-                    return Promise.all([
-                        waitForTrue(() =>  this.hubspot.getContactByEmail(mockUser.email)),
-                        waitForEmails(['Your payment has been approved'])
-                    ]);
-                }).then(results => {
-                    const contact = results[0];
-                    expect(contact.properties.paying_customer.value).toBe('true');
-                }).then(done, done.fail);
-            });
         });
     });
 
     describe('when a new user account has been created', function() {
-        beforeEach(function() {
-            var self = this;
-
-            // Wait for a user to be created in hubspot with the correct email and lifecyclestage
-            self.waitForHubspotContact = function() {
-                return waitForTrue(function() {
-                    return self.hubspot.getContactByEmail(mockUser.email).then(function(contact) {
-                        return (contact && contact.properties.lifecyclestage.value === 'salesqualifiedlead' &&
-                            'firstname' in contact.properties &&
-                            'lastname' in contact.properties &&
-                            'applications' in contact.properties) ? contact : null;
-                    });
-                });
-            };
-        });
-
         it('should send an activation email', function(done) {
             producer.produce({
                 type: 'accountCreated',
@@ -942,7 +841,6 @@ describe('cwrxStream', function() {
         });
 
         it('should send an activation email for a showcase user account', function(done) {
-            var self = this;
             producer.produce({
                 type: 'accountCreated',
                 data: {
@@ -951,14 +849,10 @@ describe('cwrxStream', function() {
                     target: 'showcase'
                 }
             }).then(function() {
-                return Q.all([
-                    waitForEmails(['Terry, Welcome to Reelcontent Apps']),
-                    self.waitForHubspotContact()
-                ]);
-            }).spread(function(messages, contact) {
+                return waitForEmails(['Terry, Welcome to Reelcontent Apps']);
+            }).then(function(messages) {
                 var msg = messages[0];
                 var regex = /https?:\/\/.+id.+u-123.+token.+secret-token/;
-                self.createdContact = contact.vid;
 
                 expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                 expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
@@ -968,45 +862,9 @@ describe('cwrxStream', function() {
                 expect(msg.text.toLowerCase()).toContain('welcome to reelcontent apps');
             }).then(done, done.fail);
         });
-
-        it('should submit a hubspot form for a showcase user account', function(done) {
-            var self = this;
-            producer.produce({
-                type: 'accountCreated',
-                data: {
-                    token: 'secret-token',
-                    user: mockUser,
-                    target: 'showcase'
-                }
-            }).then(function() {
-                return Q.all([
-                    waitForEmails(['Terry, Welcome to Reelcontent Apps']),
-                    self.waitForHubspotContact()
-                ]);
-            }).spread(function(msg, contact) {
-                self.createdContact = contact.vid;
-
-                expect(contact.properties.firstname.value).toBe('Terry');
-                expect(contact.properties.lastname.value).toBe('Fakeuser');
-                expect(contact.properties.applications.value).toBe('apps');
-            }).then(done, done.fail);
-        });
     });
 
     describe('when an account was activated', function() {
-        beforeEach(function() {
-            var self = this;
-
-            // Wait for a user to be created in hubspot with the correct email and lifecyclestage
-            self.waitForHubspotContact = function() {
-                return waitForTrue(function() {
-                    return self.hubspot.getContactByEmail(mockUser.email).then(function(contact) {
-                        return (contact && contact.properties.lifecyclestage && contact.properties.lifecyclestage.value === 'opportunity') ? contact : null;
-                    });
-                });
-            };
-        });
-
         it('should send an email notifying the user that their account has been activated', function(done) {
             producer.produce({
                 type: 'accountActivated',
@@ -1028,7 +886,6 @@ describe('cwrxStream', function() {
         });
 
         it('should send an email notifying the user that their showcase account has been activated', function(done) {
-            var self = this;
             producer.produce({
                 type: 'accountActivated',
                 data: {
@@ -1036,14 +893,10 @@ describe('cwrxStream', function() {
                     target: 'showcase'
                 }
             }).then(function() {
-                return Q.all([
-                    waitForEmails(['Terry, Your Reelcontent Account Is Ready To Go']),
-                    self.waitForHubspotContact()
-                ]);
-            }).spread(function(messages, contact) {
+                return waitForEmails(['Terry, Your Reelcontent Account Is Ready To Go']);
+            }).then(function(messages) {
                 var msg = messages[0];
                 var regex = /Terry,\s+your\s+account/;
-                self.createdContact = contact.vid;
 
                 expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
                 expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
@@ -1181,75 +1034,6 @@ describe('cwrxStream', function() {
                 }).then(done, done.fail);
             });
         });
-
-        describe('in hubspot', function() {
-            it('should create a user if one does not exist', function(done) {
-                var self = this;
-                producer.produce({
-                    type: 'accountActivated',
-                    data: {
-                        user: mockUser,
-                        target: 'showcase'
-                    }
-                }).then(function() {
-                    return self.waitForHubspotContact();
-                }).then(function(contact) {
-                    self.createdContact = contact.vid;
-
-                    expect(contact.properties.email.value).toBe(mockUser.email);
-                    expect(contact.properties.firstname.value).toBe(mockUser.firstName);
-                    expect(contact.properties.lastname.value).toBe(mockUser.lastName);
-                    expect(contact.properties.applications.value).toBe('apps');
-                    expect(contact.properties.lifecyclestage.value).toBe('opportunity');
-                }).then(done, done.fail);
-            });
-
-            it('should update a user if one does exist', function(done) {
-                var self = this;
-                self.hubspot.createContact({
-                    properties: [
-                        {
-                            property: 'email',
-                            value: mockUser.email
-                        },
-                        {
-                            property: 'firstname',
-                            value: mockUser.firstName
-                        },
-                        {
-                            property: 'lastname',
-                            value: mockUser.lastName
-                        },
-                        {
-                            property: 'applications',
-                            value: 'apps'
-                        },
-                        {
-                            property: 'lifecyclestage',
-                            value: 'lead'
-                        }
-                    ]
-                }).then(function(contact) {
-                    self.createdContact = contact.vid;
-                    return producer.produce({
-                        type: 'accountActivated',
-                        data: {
-                            user: mockUser,
-                            target: 'showcase'
-                        }
-                    });
-                }).then(function() {
-                    return self.waitForHubspotContact();
-                }).then(function(contact) {
-                    expect(contact.vid).toBe(self.createdContact);
-                    expect(contact.properties.email.value).toBe(mockUser.email);
-                    expect(contact.properties.firstname.value).toBe(mockUser.firstName);
-                    expect(contact.properties.lastname.value).toBe(mockUser.lastName);
-                    expect(contact.properties.applications.value).toBe('apps');
-                    expect(contact.properties.lifecyclestage.value).toBe('opportunity');
-                }).then(done, done.fail);
-            });
-        });
     });
 
     describe('notifying the user that their password has been changed', function() {
@@ -1367,47 +1151,19 @@ describe('cwrxStream', function() {
 
         describe('for showcase campaigns', function() {
             beforeEach(function(done) {
-                var self = this;
-                self.hubspot.createContact({
-                    properties: [
-                        {
-                            property: 'email',
-                            value: mockUser.email
-                        },
-                        {
-                            property: 'firstname',
-                            value: mockUser.firstName
-                        },
-                        {
-                            property: 'lastname',
-                            value: mockUser.lastName
-                        },
-                        {
-                            property: 'applications',
-                            value: 'apps'
-                        },
-                        {
-                            property: 'lifecyclestage',
-                            value: 'customer'
-                        }
-                    ]
-                }).then(function(contact) {
-                    self.createdContact = contact.vid;
-                    mockUser.email = 'c6e2etester2@gmail.com';
-                    return producer.produce({
-                        type: 'emailChanged',
-                        data: {
-                            user: mockUser,
-                            oldEmail: 'c6e2etester@gmail.com',
-                            newEmail: 'c6e2etester2@gmail.com',
-                            target: 'showcase'
-                        }
-                    });
+                mockUser.email = 'c6e2etester2@gmail.com';
+                return producer.produce({
+                    type: 'emailChanged',
+                    data: {
+                        user: mockUser,
+                        oldEmail: 'c6e2etester@gmail.com',
+                        newEmail: 'c6e2etester2@gmail.com',
+                        target: 'showcase'
+                    }
                 }).then(done, done.fail);
             });
 
             it('should be able to notify the old email address', function(done) {
-                var self = this;
                 return Q.Promise(function(resolve) {
                     var emails = [null, null];
                     mailman.once('Your Email Has Been Changed', function(msg) {
@@ -1433,15 +1189,10 @@ describe('cwrxStream', function() {
                         expect(msg.html).toMatch(regex);
                     });
                     expect((new Date() - msg.date)).toBeLessThan(30000);
-                }).then(function() {
-                    return waitForTrue(function() {
-                        return self.hubspot.getContactByEmail(mockUser.email);
-                    });
                 }).then(done, done.fail);
             });
 
             it('should be able to notify the new email address', function(done) {
-                var self = this;
                 return Q.Promise(function(resolve) {
                     var emails = [null, null];
                     mailman.once('Your Email Has Been Changed', function(msg) {
@@ -1467,22 +1218,6 @@ describe('cwrxStream', function() {
                         expect(msg.html).toMatch(regex);
                     });
                     expect((new Date() - msg.date)).toBeLessThan(30000);
-                }).then(function() {
-                    return waitForTrue(function() {
-                        return self.hubspot.getContactByEmail(mockUser.email);
-                    });
-                }).then(done, done.fail);
-            });
-
-            it('should update the user in Hubspot with the new email', function(done) {
-                var self = this;
-                return waitForTrue(function() {
-                    return self.hubspot.getContactByEmail(mockUser.email);
-                }).then(function(contact) {
-                    expect(contact.vid).toBe(self.createdContact);
-                    expect(contact.properties.firstname.value).toBe('Terry');
-                    expect(contact.properties.lastname.value).toBe('Fakeuser');
-                    expect(contact.properties.applications.value).toBe('apps');
                 }).then(done, done.fail);
             });
         });

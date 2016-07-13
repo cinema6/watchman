@@ -10,15 +10,12 @@ var resolveURL = require('url').resolve;
 var uuid = require('rc-uuid');
 var moment = require('moment');
 var BeeswaxClient = require('beeswax-client');
-var Hubspot = require('../../lib/Hubspot.js');
 
 var API_ROOT = process.env.apiRoot;
 var APP_CREDS = JSON.parse(process.env.appCreds);
 var AWS_CREDS = JSON.parse(process.env.awsCreds);
 var CWRX_STREAM = process.env.cwrxStream;
 var PREFIX = process.env.appPrefix;
-var SECRETS = JSON.parse(process.env.secrets);
-var HUBSPOT_API_KEY = SECRETS.hubspot.key;
 
 function createId(prefix) {
     return prefix + '-' + uuid.createUuid();
@@ -43,7 +40,7 @@ function wait(time) {
 }
 
 describe('cwrxStream campaignCreated', function() {
-    var producer, request, beeswax, mailman, hubspot;
+    var producer, request, beeswax, mailman;
     var user, org, paymentPlan, advertiser, promotions, containers, campaign;
 
     function api(endpoint) {
@@ -217,33 +214,6 @@ describe('cwrxStream campaignCreated', function() {
         });
     }
 
-    function createHubspotContactForUser(user) {
-        return hubspot.createContact({
-            properties: [
-                {
-                    property: 'email',
-                    value: user.email
-                },
-                {
-                    property: 'firstname',
-                    value: user.firstName
-                },
-                {
-                    property: 'lastname',
-                    value: user.lastName
-                },
-                {
-                    property: 'applications',
-                    value: 'apps'
-                },
-                {
-                    property: 'lifecyclestage',
-                    value: 'salesqualifiedlead'
-                }
-            ]
-        });
-    }
-
     // This beforeAll is dedicated to setting application config
     beforeAll(function(done) {
         const configurator = new Configurator();
@@ -375,15 +345,6 @@ describe('cwrxStream campaignCreated', function() {
                                 type: 'initializedShowcaseCampaign',
                                 toSupport: true
                             }
-                        },
-                        {
-                            name: 'hubspot/update_user',
-                            options: {
-                                properties: {
-                                    applications: 'apps',
-                                    lifecyclestage: 'customer'
-                                }
-                            }
                         }
                     ]
                 },
@@ -416,7 +377,6 @@ describe('cwrxStream campaignCreated', function() {
                 password: '07743763902206f2b511bead2d2bf12292e2af82'
             }
         });
-        hubspot = new Hubspot(HUBSPOT_API_KEY);
         mailman = new testUtils.Mailman();
 
         q.all([
@@ -425,7 +385,6 @@ describe('cwrxStream campaignCreated', function() {
     });
 
     beforeEach(function(done) {
-        var self = this;
         var cwrxApp = {
             id: 'app-cwrx',
             created: new Date(),
@@ -655,26 +614,15 @@ describe('cwrxStream campaignCreated', function() {
                 }
             };
 
-            return q.all([
-                testUtils.resetCollection('campaigns', [campaign]),
-                createHubspotContactForUser(user).then(function(contact) {
-                    self.createdContact = contact.vid;
-                })
-            ]);
+            return testUtils.resetCollection('campaigns', [campaign]);
         }).then(done, done.fail);
     });
 
     afterEach(function(done) {
-        var self = this;
         mailman.removeAllListeners();
-
-        q.all([
-            deleteCampaign(campaign).then(function() {
-                return hubspot.deleteContact(self.createdContact);
-            }).then(function() {
-                return deleteUser(user);
-            })
-        ]).then(done, done.fail);
+        deleteCampaign(campaign).then(function() {
+            return deleteUser(user);
+        }).then(done, done.fail);
     });
 
     afterAll(function(done) {
@@ -684,7 +632,7 @@ describe('cwrxStream campaignCreated', function() {
     });
 
     describe('when produced', function() {
-        var placements, supportEmails, supportEmail, userEmails, userEmail, hubspotContact;
+        var placements, supportEmails, supportEmail, userEmails, userEmail;
 
         beforeEach(function(done) {
             supportEmails = [];
@@ -739,14 +687,6 @@ describe('cwrxStream campaignCreated', function() {
                     });
                     return supportEmail && userEmail;
                 });
-            }).then(function() {
-                return waitUntil(function() {
-                    return hubspot.getContactByEmail(user.email).then(function(contact) {
-                        return contact.properties.lifecyclestage.value === 'customer' ? contact : null;
-                    });
-                });
-            }).then(function(contact) {
-                hubspotContact = contact;
             }).then(done, done.fail);
         });
 
@@ -874,15 +814,6 @@ describe('cwrxStream campaignCreated', function() {
             expect(userEmail.from[0].address.toLowerCase()).toBe('support@cinema6.com');
             expect(userEmail.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
             expect(userEmail.text).toContain('We’ve got your ad');
-        });
-
-        it('should update the contact in Hubspot', function() {
-            expect(hubspotContact.vid).toBe(this.createdContact);
-            expect(hubspotContact.properties.email.value).toBe(user.email);
-            expect(hubspotContact.properties.firstname.value).toBe(user.firstName);
-            expect(hubspotContact.properties.lastname.value).toBe(user.lastName);
-            expect(hubspotContact.properties.applications.value).toBe('apps');
-            expect(hubspotContact.properties.lifecyclestage.value).toBe('customer');
         });
     });
 
