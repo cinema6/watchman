@@ -20,8 +20,8 @@ module.exports = function factory(config) {
         const campaignsEndpoint = url.resolve(config.cwrx.api.root,
             config.cwrx.api.campaigns.endpoint);
         const usersEndpoint = url.resolve(config.cwrx.api.root, config.cwrx.api.users.endpoint);
-        const notCanceledStatuses = ld.values(enums.Status)
-            .filter(value => value !== enums.Status.Canceled);
+        const releventStatuses = ld.values(enums.Status)
+            .filter(value => value !== enums.Status.Canceled && value !== enums.Status.Deleted);
 
         if(data.org && data.date) {
             return request.get({
@@ -29,7 +29,7 @@ module.exports = function factory(config) {
                 qs: {
                     application: 'showcase',
                     org: data.org.id,
-                    statuses: notCanceledStatuses.join(','),
+                    statuses: releventStatuses.join(','),
                     sort: 'created,1',
                     limit: '1'
                 }
