@@ -12,6 +12,7 @@ module.exports = function fetchProductDataFactory(config) {
     var request = new CwrxRequest(config.appCreds);
     var dataEndpoint = resolveURL(config.cwrx.api.root, config.cwrx.api.productData.endpoint);
     var campEndpoint = resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint);
+    var log = logger.getLog();
 
     function isObject(obj) {
         return((typeof obj === 'object') && (obj !== null));
@@ -39,7 +40,6 @@ module.exports = function fetchProductDataFactory(config) {
     }
 
     return function fetchProductData(event) {
-        var log = logger.getLog();
         var campaign = event.data.campaign;
         var id = campaign.id;
         return request.get({
