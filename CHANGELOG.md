@@ -11,6 +11,10 @@
 
 
 ## v1.2.0 (July 12, 2016)
+* *[v1.2.0-rc3]*
+  * [FIX]: Do not query for deleted campaigns
+* *[/v1.2.0-rc3]*
+
 * *[v1.2.0-rc2]*
   * [FIX]: Allow sending weekly stats for any non-canceled campaign
 * *[/v1.2.0-rc2]*

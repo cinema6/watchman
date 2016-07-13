@@ -50,7 +50,7 @@ describe('check_weekiversary', function() {
         }).then(done, done.fail);
     });
 
-    it('should fetch the first non-canceled created campaign for an org in data', function(done) {
+    it('should fetch the first created campaign which is not canceled or deleted for an org in data', function(done) {
         this.event.data.org = { id: 'o-123' };
         this.event.data.date = new Date();
         CwrxRequest.prototype.get.and.returnValue(Q.resolve([[]]));
@@ -60,7 +60,7 @@ describe('check_weekiversary', function() {
                 qs: {
                     application: 'showcase',
                     org: 'o-123',
-                    statuses: 'draft,new,pending,approved,rejected,active,paused,inactive,expired,outOfBudget,deleted,error',
+                    statuses: 'draft,new,pending,approved,rejected,active,paused,inactive,expired,outOfBudget,error',
                     sort: 'created,1',
                     limit: '1'
                 }
