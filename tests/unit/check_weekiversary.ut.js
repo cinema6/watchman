@@ -50,7 +50,7 @@ describe('check_weekiversary', function() {
         }).then(done, done.fail);
     });
 
-    it('should fetch the first active created campaign for an org in data', function(done) {
+    it('should fetch the first non-canceled created campaign for an org in data', function(done) {
         this.event.data.org = { id: 'o-123' };
         this.event.data.date = new Date();
         CwrxRequest.prototype.get.and.returnValue(Q.resolve([[]]));
@@ -59,7 +59,7 @@ describe('check_weekiversary', function() {
                 url: 'https://root.com/api/campaigns',
                 qs: {
                     org: 'o-123',
-                    statuses: 'active',
+                    statuses: 'draft,new,pending,approved,rejected,active,paused,inactive,expired,outOfBudget,deleted,error',
                     sort: 'created,1',
                     limit: '1'
                 }
