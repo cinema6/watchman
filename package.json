@@ -1,23 +1,34 @@
 {
   "name": "watchman",
-  "version": "0.11.0",
+  "version": "1.2.0",
   "description": "",
   "scripts": {
     "preinstall": "sh ./scripts/preinstall.sh"
   },
+  "files": [
+    "src",
+    "lib"
+  ],
   "author": "ReelContent",
   "contributors": [
     "Scott Bouloutian <sbouloutian@reelcontent.com>"
   ],
   "license": "ISC",
+  "engines": {
+    "node": "4.4.7"
+  },
   "dependencies": {
     "aws-kcl": "^0.5.0",
     "aws-sdk": "^2.2.29",
+    "beeswax-client": "^0.4.0",
+    "canvas": "^1.4.0",
+    "chart.js": "^2.1.6",
     "commander": "^2.9.0",
-    "cwrx": "git+ssh://git@github.com:cinema6/cwrx#master",
+    "cwrx": "cinema6/cwrx#ads-5.4.0",
     "handlebars": "^4.0.5",
     "highland": "^2.7.3",
     "html-to-text": "^2.0.0",
+    "jsdom": "^9.2.1",
     "lodash": "^4.8.2",
     "moment": "^2.12.0",
     "nodemailer": "^2.3.0",
@@ -26,18 +37,22 @@
     "q": "^1.4.1",
     "rc-kinesis": "^1.1.0",
     "readable-stream": "^2.0.6",
+    "safe-buffer": "^5.0.1",
     "showcase-core": "^1.0.0"
   },
   "devDependencies": {
     "beeswax-client": "^0.1.0",
     "braintree": "^1.37.1",
+    "eslint": "^2.13.1",
+    "eslint-plugin-jasmine": "^1.8.1",
+    "eslint-plugin-node": "^1.5.1",
     "grunt": "^0.4.5",
-    "grunt-c6-util": "git+ssh://git@github.com:cinema6/c6-grunt-util#master",
-    "grunt-contrib-jshint": "^0.11.3",
+    "grunt-c6-util": "cinema6/c6-grunt-util#v0.8.3",
     "grunt-contrib-watch": "^0.6.1",
     "grunt-contrib-yuidoc": "^0.10.0",
     "grunt-exec": "^0.4.6",
-    "grunt-jasmine-nodejs": "^1.4.3",
+    "grunt-jasmine-nodejs": "^1.5.3",
+    "gruntify-eslint": "^2.0.0",
     "load-grunt-config": "^0.19.1",
     "pg.js": "^4.1.1",
     "proxyquire": "^1.7.3",

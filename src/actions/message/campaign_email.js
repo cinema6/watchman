@@ -1,26 +1,32 @@
 'use strict';
 
-var Q = require('q');
-var fs = require('fs');
-var handlebars = require('handlebars');
-var htmlToText = require('html-to-text');
-var ld = require('lodash');
-var logger = require('cwrx/lib/logger.js');
-var moment = require('moment');
-var nodemailer = require('nodemailer');
-var path = require('path');
-var postmark = require('postmark');
-var requestUtils = require('cwrx/lib/requestUtils.js');
-var sesTransport = require('nodemailer-ses-transport');
-var util = require('util');
-var resolveURL = require('url').resolve;
+const ChartComposer = require('../../../lib/ChartComposer.js');
+const CwrxRequest = require('../../../lib/CwrxRequest.js');
+const fs = require('fs');
+const appsChart = require('../../charts/apps.chart.js');
+const handlebars = require('handlebars');
+const htmlToText = require('html-to-text');
+const ld = require('lodash');
+const logger = require('cwrx/lib/logger.js');
+const moment = require('moment');
+const nodemailer = require('nodemailer');
+const path = require('path');
+const postmark = require('postmark');
+const requestUtils = require('cwrx/lib/requestUtils.js');
+const sesTransport = require('nodemailer-ses-transport');
+const resolveURL = require('url').resolve;
+const url = require('url');
 
 module.exports = function factory(config) {
-    var emailConfig = config.emails;
-    var postmarkClient = new postmark.Client(config.state.secrets.postmark.key);
+    const emailConfig = config.emails;
+    const postmarkClient = new postmark.Client(config.state.secrets.postmark.key);
+    const cwrxRequest = new CwrxRequest(config.appCreds);
+    const showcaseAnalyticsEndpoint = url.resolve(config.cwrx.api.root,
+        `${config.cwrx.api.analytics.endpoint}/campaigns/showcase/apps`);
+    const chartComposer = new ChartComposer();
 
     function friendlyName(data) {
-        return (data && data.user && data.user.firstName) ? data.user.firstName + ', ' : '';
+        return (data && data.user && data.user.firstName) ? `${data.user.firstName}, ` : '';
     }
 
     function campaignName(data) {
@@ -28,7 +34,7 @@ module.exports = function factory(config) {
     }
 
     function getAttachments(data) {
-        var target = data.target || (data.campaign && data.campaign.application);
+        const target = data.target || (data.campaign && data.campaign.application);
         switch(target) {
         case 'showcase':
             return [
@@ -50,432 +56,452 @@ module.exports = function factory(config) {
     * Each key value may be a function in which case its return value will be assigned to the key.
     * The function may optionally also return a promise.
     */
-    var transactionalEmails = {
-        campaignExpired: {
+    const transactionalEmails = {
+        campaignExpired: data => ({
             subject: 'Your Campaign Has Ended',
             template: 'campaignExpired',
-            data: function(data) {
-                return {
-                    campName       : data.campaign.name,
-                    date           : new Date(data.date).toLocaleDateString(),
-                    dashboardLink  : emailConfig.dashboardLinks[data.target || 'selfie'],
-                    manageLink     : emailConfig.manageLink.replace(':campId', data.campaign.id)
-                };
+            data: {
+                campName       : data.campaign.name,
+                date           : moment(new Date(data.date)).format('dddd, MMMM DD, YYYY'),
+                dashboardLink  : emailConfig.dashboardLinks[data.target || 'selfie'],
+                manageLink     : emailConfig.manageLink.replace(':campId', data.campaign.id)
             },
-            attachments: getAttachments
-        },
-        campaignReachedBudget: {
+            attachments: getAttachments(data)
+        }),
+        campaignReachedBudget: data => ({
             subject: 'Your Campaign is Out of Budget',
             template: 'campaignOutOfBudget',
-            data: function(data) {
-                return {
-                    campName       : data.campaign.name,
-                    date           : new Date(data.date).toLocaleDateString(),
-                    dashboardLink  : emailConfig.dashboardLinks[data.target || 'selfie'],
-                    manageLink     : emailConfig.manageLink.replace(':campId', data.campaign.id)
-                };
+            data: {
+                campName       : data.campaign.name,
+                date           : moment(new Date(data.date)).format('dddd, MMMM DD, YYYY'),
+                dashboardLink  : emailConfig.dashboardLinks[data.target || 'selfie'],
+                manageLink     : emailConfig.manageLink.replace(':campId', data.campaign.id)
             },
-            attachments: getAttachments
-        },
-        campaignApproved: {
+            attachments: getAttachments(data)
+        }),
+        campaignApproved: data => ({
             subject: 'Reelcontent Campaign Approved',
             template: 'campaignApproved',
-            data: function(data) {
-                return {
-                    campName       : data.campaign.name,
-                    dashboardLink  : emailConfig.dashboardLinks[data.target || 'selfie']
-                };
+            data: {
+                campName       : data.campaign.name,
+                dashboardLink  : emailConfig.dashboardLinks[data.target || 'selfie']
             },
-            attachments: getAttachments
-        },
-        campaignUpdateApproved: {
+            attachments: getAttachments(data)
+        }),
+        campaignUpdateApproved: data => ({
             subject: 'Your Campaign Change Request Has Been Approved',
             template: 'campaignUpdateApproved',
-            data: function(data) {
-                return {
-                    campName       : data.campaign.name,
-                    dashboardLink  : emailConfig.dashboardLinks[data.target || 'selfie']
-                };
+            data: {
+                campName       : data.campaign.name,
+                dashboardLink  : emailConfig.dashboardLinks[data.target || 'selfie']
             },
-            attachments: getAttachments
-        },
-        campaignRejected: {
+            attachments: getAttachments(data)
+        }),
+        campaignRejected: data => ({
             subject: 'Reelcontent Campaign Rejected',
             template: 'campaignRejected',
-            data: function(data) {
-                return {
-                    campName         : data.campaign.name,
-                    dashboardLink    : emailConfig.dashboardLinks[data.target || 'selfie'],
-                    rejectionReason  : data.updateRequest.rejectionReason
-                };
+            data: {
+                campName         : data.campaign.name,
+                dashboardLink    : emailConfig.dashboardLinks[data.target || 'selfie'],
+                rejectionReason  : data.updateRequest.rejectionReason
             },
-            attachments: getAttachments
-        },
-        campaignUpdateRejected: {
+            attachments: getAttachments(data)
+        }),
+        campaignUpdateRejected: data => ({
             subject: 'Your Campaign Change Request Has Been Rejected',
             template: 'campaignUpdateRejected',
-            data: function(data) {
-                return {
-                    campName         : data.campaign.name,
-                    dashboardLink    : emailConfig.dashboardLinks[data.target || 'selfie'],
-                    rejectionReason  : data.updateRequest.rejectionReason
-                };
+            data: {
+                campName         : data.campaign.name,
+                dashboardLink    : emailConfig.dashboardLinks[data.target || 'selfie'],
+                rejectionReason  : data.updateRequest.rejectionReason
             },
-            attachments: getAttachments
-        },
-        newUpdateRequest: {
-            subject: function(data) {
-                var submitter = null;
+            attachments: getAttachments(data)
+        }),
+        newUpdateRequest: data => {
+            let submitter = null;
 
-                if (data.user) {
-                    submitter = data.user.company || (data.user.firstName + ' ' +
-                        data.user.lastName);
-                } else if (data.application) {
-                    submitter = data.application.key;
-                }
+            if (data.user) {
+                submitter = data.user.company || `${data.user.firstName} ${data.user.lastName}`;
+            } else if (data.application) {
+                submitter = data.application.key;
+            }
 
-                return 'New update request from ' + submitter + ' for campaign "' +
-                    campaignName(data) + '"';
-            },
-            template: 'newUpdateRequest',
-            data: function(data) {
-                return {
+            return {
+                subject: `New update request from ${submitter} for campaign ` +
+                    `"${campaignName(data)}"`,
+                template: 'newUpdateRequest',
+                data: {
                     requester   : (data.user && data.user.email) ||
                                     (data.application && data.application.key),
                     campName    : data.campaign.name,
                     reviewLink  : emailConfig.reviewLink.replace(':campId', data.campaign.id),
                     user: data.user,
                     application: data.application
-                };
-            },
-            attachments: getAttachments
+                },
+                attachments: getAttachments(data)
+            };
         },
-        paymentMade: {
-            subject: 'Your payment has been approved',
-            template: function(data) {
+        paymentMade: data => {
+            function getTemplate() {
                 switch (data.target) {
                 case 'showcase':
                     return 'paymentReceipt--app';
                 default:
                     return 'paymentReceipt';
                 }
-            },
-            data: function(data) {
-                return {
+            }
+
+            return {
+                subject: 'Your payment has been approved',
+                template: getTemplate(),
+                data: {
                     contact         : emailConfig.supportAddress,
-                    amount          : '$' + data.payment.amount.toFixed(2),
+                    amount          : `\$${data.payment.amount.toFixed(2)}`,
                     isCreditCard    : data.payment.method.type === 'creditCard',
                     method          : data.payment.method,
-                    date            : new Date(data.payment.createdAt).toLocaleDateString(),
-                    balance         : '$' + data.balance.toFixed(2),
+                    date            : moment(new Date(data.payment.createdAt))
+                                        .format('dddd, MMMM DD, YYYY'),
+                    balance         : `\$${data.balance.toFixed(2)}`,
                     firstName       : data.user.firstName,
-                    billingEndDate  : moment(data.payment.createdAt).add(1, 'month')
-                                        .subtract(1, 'day').toDate().toLocaleDateString()
-                };
-            },
-            attachments: getAttachments
+                    billingEndDate  : moment(new Date(data.payment.createdAt)).add(1, 'month')
+                                        .subtract(1, 'day').format('dddd, MMMM DD, YYYY')
+                },
+                attachments: getAttachments(data)
+            };
         },
-        activateAccount: {
-            subject: function(data) {
+        activateAccount: data => {
+            function getSubject() {
                 switch (data.target) {
                 case 'showcase':
-                    return friendlyName(data) + 'Welcome to Reelcontent Apps';
+                    return `${friendlyName(data)}Welcome to Reelcontent Apps`;
                 default:
-                    return friendlyName(data) + 'Welcome to Reelcontent';
+                    return `${friendlyName(data)}Welcome to Reelcontent`;
                 }
-            },
-            template: function(data) {
+            }
+            function getTemplate() {
                 switch (data.target) {
                 case 'showcase':
                     return 'activateAccount--app';
                 default:
                     return 'activateAccount';
                 }
-            },
-            data: function(data) {
-                var target = emailConfig.activationTargets[data.target || 'selfie'];
-                var link = target + ((target.indexOf('?') === -1) ? '?' : '&') +
-                    'id=' + data.user.id + '&token=' + data.token;
+            }
+            function getLink() {
+                const target = emailConfig.activationTargets[data.target || 'selfie'];
+                const link = `${target}${(target.indexOf('?') === -1) ? '?' : '&'}` +
+                    `id=${data.user.id}&token=${data.token}`;
+                return link;
+            }
 
-                return {
-                    activationLink  : link,
-                    firstName       : data.user.firstName,
-                };
-            },
-            attachments: getAttachments
+            return {
+                subject: getSubject(),
+                template: getTemplate(),
+                data: {
+                    activationLink  : getLink(),
+                    firstName       : data.user.firstName
+                },
+                attachments: getAttachments(data)
+            };
         },
-        accountWasActivated: {
-            subject: function(data) {
-                return friendlyName(data) + 'Your Reelcontent Account Is Ready To Go';
-            },
-            template: function(data) {
+        accountWasActivated: data => {
+            function getTemplate() {
                 switch (data.target) {
                 case 'showcase':
                     return 'accountWasActivated--app';
                 default:
                     return 'accountWasActivated';
                 }
-            },
-            data: function(data) {
-                return {
+            }
+
+            return {
+                subject: `${friendlyName(data)}Your Reelcontent Account Is Ready To Go`,
+                template: getTemplate(),
+                data: {
                     dashboardLink  : emailConfig.dashboardLinks[data.target || 'selfie'],
-                    firstName      : data.user.firstName,
-                };
-            },
-            attachments: getAttachments
+                    firstName      : data.user.firstName
+                },
+                attachments: getAttachments(data)
+            };
         },
-        passwordChanged: {
-            subject: 'Reelcontent Password Change Notice',
-            template: function(data) {
+        passwordChanged: data => {
+            function getTemplate() {
                 switch (data.target) {
                 case 'showcase':
                     return 'passwordChanged--app';
                 default:
                     return 'passwordChanged';
                 }
-            },
-            data: function(data) {
-                return {
+            }
+
+            return {
+                subject: 'Reelcontent Password Change Notice',
+                template: getTemplate(),
+                data: {
                     contact        : emailConfig.supportAddress,
                     dashboardLink  : emailConfig.dashboardLinks[data.target || 'selfie'],
-                    date           : new Date(data.date).toLocaleDateString(),
+                    date           : moment(new Date(data.date)).format('dddd, MMMM DD, YYYY'),
                     firstName      : data.user.firstName,
                     time           : new Date(data.date).toTimeString()
-                };
-            },
-            attachments: getAttachments
+                },
+                attachments: getAttachments(data)
+            };
         },
-        emailChanged: {
-            subject: 'Your Email Has Been Changed',
-            template: function(data) {
+        emailChanged: data => {
+            function getTemplate() {
                 switch (data.target) {
                 case 'showcase':
                     return 'emailChanged--app';
                 default:
                     return 'emailChanged';
                 }
-            },
-            data: function(data) {
-                return {
+            }
+
+            return {
+                subject: 'Your Email Has Been Changed',
+                template: getTemplate(),
+                data: {
                     contact    : emailConfig.supportAddress,
                     newEmail   : data.newEmail,
                     oldEmail   : data.oldEmail,
                     firstName  : data.user.firstName
-                };
-            },
-            attachments: getAttachments
+                },
+                attachments: getAttachments(data)
+            };
         },
-        failedLogins: {
-            subject: 'Reelcontent: Multiple-Failed Logins',
-            template: function(data) {
+        failedLogins: data => {
+            const resetPasswordLink = emailConfig.passwordResetPages[data.target];
+
+            function getTemplate() {
                 switch (data.target) {
                 case 'showcase':
                     return 'failedLogins--app';
                 default:
                     return 'failedLogins';
                 }
-            },
-            data: function(data) {
-                var resetPasswordLink = emailConfig.passwordResetPages[data.target];
+            }
 
-                return {
+            return {
+                subject: 'Reelcontent: Multiple-Failed Logins',
+                template: getTemplate(),
+                data: {
                     contact    : emailConfig.supportAddress,
                     firstName  : data.user.firstName,
                     link       : resetPasswordLink
-                };
-            },
-            attachments: getAttachments
+                },
+                attachments: getAttachments(data)
+            };
         },
-        forgotPassword: {
-            subject: 'Forgot Your Password?',
-            template: function(data) {
+        forgotPassword: data => {
+            const forgotTarget = emailConfig.forgotTargets[data.target];
+            const resetLink = `${forgotTarget}${(forgotTarget.indexOf('?') === -1) ? '?' : '&'}` +
+                `id=${data.user.id}&token=${data.token}`;
+
+            function getTemplate() {
                 switch (data.target) {
                 case 'showcase':
                     return 'passwordReset--app';
                 default:
                     return 'passwordReset';
                 }
-            },
-            data: function(data) {
-                var forgotTarget = emailConfig.forgotTargets[data.target];
-                var resetLink = forgotTarget + ((forgotTarget.indexOf('?') === -1) ? '?' : '&') +
-                    'id=' + data.user.id + '&token=' + data.token;
+            }
 
-                return {
+            return {
+                subject: 'Forgot Your Password?',
+                template: getTemplate(),
+                data: {
                     firstName  : data.user.firstName,
                     resetLink  : resetLink
-                };
-            },
-            attachments: getAttachments
+                },
+                attachments: getAttachments(data)
+            };
         },
-        chargePaymentPlanFailure: {
+        chargePaymentPlanFailure: data => ({
             subject: 'We Hit a Snag',
             template: 'chargePaymentPlanFailure',
-            data: function(data) {
-                return {
-                    contact      : emailConfig.supportAddress,
-                    amount       : '$' + data.paymentPlan.price,
-                    cardType     : data.paymentMethod.cardType,
-                    cardLast4    : data.paymentMethod.last4,
-                    paypalEmail  : data.paymentMethod.email
-                };
+            data: {
+                contact      : emailConfig.supportAddress,
+                amount       : `\$${data.paymentPlan.price}`,
+                cardType     : data.paymentMethod.cardType,
+                cardLast4    : data.paymentMethod.last4,
+                paypalEmail  : data.paymentMethod.email
             },
-            attachments: getAttachments
-        },
-        campaignActive: {
-            subject: function(data) {
-                return campaignName(data) + ' Is Now Live!';
-            },
-            template: function(data) {
+            attachments: getAttachments(data)
+        }),
+        campaignActive: data => {
+            function getTemplate() {
                 switch (data.campaign.application) {
                 case 'showcase':
                     return 'campaignActive--app';
                 default:
                     return 'campaignActive';
                 }
-            },
-            data: function(data) {
-                return {
+            }
+            function getExtraAttachments() {
+                switch (data.campaign.application) {
+                case 'showcase':
+                    return [{
+                        filename: 'plant-success.png',
+                        cid: 'plantSuccess'
+                    }];
+                default:
+                    return [];
+                }
+            }
+
+            return {
+                subject: `${campaignName(data)} Is Now Live!`,
+                template: getTemplate(),
+                data: {
                     campName       : data.campaign.name,
                     dashboardLink  : emailConfig.dashboardLinks[data.target || 'selfie'],
                     firstName      : data.user.firstName
-                };
-            },
-            attachments: function(data) {
-                var attachments = getAttachments(data);
-                switch (data.campaign.application) {
-                case 'showcase':
-                    return attachments.concat([{
-                        filename: 'plant-success.png',
-                        cid: 'plantSuccess'
-                    }]);
-                default:
-                    return attachments;
-                }
-            }
+                },
+                attachments: getAttachments(data).concat(getExtraAttachments())
+            };
         },
-        campaignSubmitted: {
-            subject: function(data) {
-                return 'We\'ve Got It! ' + campaignName(data) + ' Has Been Submitted for Approval.';
-            },
+        campaignSubmitted: data => ({
+            subject: `We\'ve Got It! ${campaignName(data)} Has Been Submitted for Approval.`,
             template: 'campaignSubmitted',
-            data: function(data) {
-                var previewLink = emailConfig.previewLink.replace(':campId', data.campaign.id);
+            data: {
+                campName     : data.campaign.name,
+                firstName    : data.user.firstName,
+                previewLink  : emailConfig.previewLink.replace(':campId', data.campaign.id)
+            },
+            attachments: getAttachments(data)
+        }),
+        initializedShowcaseCampaign: data => {
+            return Promise.resolve().then(() => {
+                const advertisersEndpoint = resolveURL(
+                    config.cwrx.api.root,
+                    config.cwrx.api.advertisers.endpoint
+                );
+                const campaign = data.campaign;
+                const externalCampaignId = ld.get(
+                    campaign,'externalIds.beeswax',
+                    ld.get(campaign,'externalCampaigns.beeswax.externalId')
+                );
 
-                return {
-                    campName     : data.campaign.name,
-                    firstName    : data.user.firstName,
-                    previewLink  : previewLink
-                };
-            },
-            attachments: getAttachments
-        },
-        initializedShowcaseCampaign: {
-            subject: function(data) {
-                return 'New Showcase Campaign Started: ' + campaignName(data);
-            },
-            template: 'initializedShowcaseCampaign',
-            data: function(data) {
-                return Q.when().then(function() {
-                    var advertisersEndpoint = resolveURL(
-                        config.cwrx.api.root,
-                        config.cwrx.api.advertisers.endpoint
+                return requestUtils.makeSignedRequest(config.appCreds, 'get', {
+                    url: `${advertisersEndpoint}/${campaign.advertiserId}`,
+                    json: true
+                }).then(data => {
+                    const response = data.response;
+                    const externalAdvertiserId = ld.get(
+                        data.body,'externalIds.beeswax',
+                        ld.get(data.body,'beeswaxIds.advertiser')
                     );
-                    var campaign = data.campaign;
-                    var externalCampaignId = campaign.externalCampaigns.beeswax.externalId;
+                    
+                    if (!/^2/.test(response.statusCode)) {
+                        throw new Error(
+                            `Failed to GET advertiser(${campaign.advertiserId}): ` +
+                            `[${response.statusCode}]: data.body`
+                        );
+                    }
 
-                    return requestUtils.makeSignedRequest(config.appCreds, 'get', {
-                        url: advertisersEndpoint + '/' + campaign.advertiserId,
-                        json: true
-                    }).then(function(data) {
-                        var response = data.response;
-                        var advertiser = data.body;
-
-                        if (!/^2/.test(response.statusCode)) {
-                            throw new Error(
-                                'Failed to GET advertiser(' + campaign.advertiserId + '): ' +
-                                '[' + response.statusCode +']: ' + data.body
-                            );
-                        }
-
-                        return {
+                    return {
+                        subject: `New Showcase Campaign Started: ${campaignName(data)}`,
+                        template: 'initializedShowcaseCampaign',
+                        data: {
                             beeswaxCampaignId   : externalCampaignId,
                             beeswaxCampaignURI  : emailConfig.beeswax.campaignLink
-                                .replace('{{advertiserId}}', advertiser.beeswaxIds.advertiser)
+                                .replace('{{advertiserId}}', externalAdvertiserId)
                                 .replace('{{campaignId}}', externalCampaignId),
                             campName            : campaign.name
-                        };
-                    });
+                        },
+                        attachments: [
+                            { filename: 'logo.png', cid: 'reelContentLogo' }
+                        ]
+                    };
                 });
+            });
+        },
+        promotionEnded: data => ({
+            template: 'promotionEnded--app',
+            data: {
+                firstName     : data.user.firstName,
+                dashboardLink : emailConfig.dashboardLinks.showcase
             },
-            attachments: [
-                { filename: 'logo.png', cid: 'reelContentLogo' }
-            ]
+            attachments: getAttachments({
+                target: 'showcase'
+            })
+        }),
+        stats: data => {
+            const uri = `${showcaseAnalyticsEndpoint}/${data.campaign.id}`;
+            return cwrxRequest.get(uri).then(results => {
+                const chartWidth = 640;
+                const chartHeight = 480;
+                const dateFormat = 'MMM D, YYYY';
+                const items = results[0].daily_7;
+                const log = logger.getLog();
+
+                function toPercent(number) {
+                    return Math.round(number * 100);
+                }
+
+                function sum(numbers) {
+                    return numbers.reduce((lhs, rhs) => lhs + rhs);
+                }
+
+                // Organize and calculate data for the chart
+                const users = items.map(item => item.users);
+                const clicks = items.map(item => item.clicks);
+                const ctrs = items.map(item => toPercent(Math.min(
+                    item.clicks, item.users) / item.users) || null);
+                const labels = items.map(item => moment(item.date));
+                const firstLabel = labels[0];
+                const lastLabel = labels[items.length - 1];
+                const totalUsers = sum(users);
+                const totalClicks = sum(clicks);
+                const totalCtr = Math.round(Math.min(
+                    totalClicks, totalUsers) / totalUsers * 10000) / 100;
+
+                // Compile chart.js options
+                const chart = appsChart({
+                    items: items,
+                    industryCTR: 1,
+                    users: users,
+                    ctrs: ctrs,
+                    labels: labels
+                });
+
+                log.info(`Generating stats chart for campaign ${data.campaign.id}`);
+
+                // Compose the chart
+                return chartComposer.compose(chart, {
+                    width: chartWidth,
+                    height: chartHeight
+                }).then(chartImage => {
+                    const chartData = chartImage.replace('data:image/png;base64,', '');
+                    return {
+                        template: 'weekOneStats--app',
+                        data: {
+                            firstName: data.user.firstName,
+                            startDate: firstLabel.format(dateFormat),
+                            endDate: lastLabel.format(dateFormat),
+                            views: totalUsers,
+                            clicks: totalClicks,
+                            ctr: totalCtr,
+                            dashboardLink: emailConfig.dashboardLinks.showcase
+                        },
+                        attachments: getAttachments({
+                            target: 'showcase'
+                        }).concat([{
+                            filename: `stats_week_${data.week}.png`,
+                            cid: 'stats',
+                            content: chartData
+                        }])
+                    };
+                });
+            });
         }
     };
 
     /* The action function */
-    return function action(event) {
-        var data = event.data;
-        var options = event.options;
-        var emailType = options.type;
-        var provider = options.provider || 'postmark';
-
-        /* Evaluates any functions in the transactional email template. */
-        function compileEmailOptions(options) {
-            var keys = Object.keys(options);
-            return Q.all(keys.map(function(key) {
-                var value = options[key];
-                if(ld.isFunction(value)) {
-                    return value(data);
-                } else {
-                    return value;
-                }
-            })).then(function(results) {
-                var result = { };
-                keys.forEach(function(key, index) {
-                    result[key] = results[index];
-                });
-                return result;
-            });
-        }
-
-        /* Returns attachments which exist and warns of those that do not. */
-        function validAttachments(email) {
-            var attachments = email.attachments;
-            var log = logger.getLog();
-
-            return Q.allSettled(attachments.map(function(attachment) {
-                return Q.Promise(function(resolve, reject) {
-                    var filepath = path.join(__dirname, '../../../templates/assets',
-                        attachment.filename);
-                    fs.stat(filepath, function(error, stats) {
-                        if(error) {
-                            reject(error);
-                        } else {
-                            resolve(stats.isFile());
-                        }
-                    });
-                });
-            })).then(function(results) {
-                return attachments.filter(function(attachment, index) {
-                    var result = results[index];
-                    if(result.state === 'fulfilled') {
-                        var exists = result.value;
-                        if(exists) {
-                            return true;
-                        } else {
-                            log.warn('Attachment file %1 not found', attachment.filename);
-                            return false;
-                        }
-                    } else {
-                        log.warn('Error checking for attachment file %1: %2', attachment.filename,
-                            util.inspect(result.reason));
-                        return false;
-                    }
-                });
-            });
-        }
+    return event => {
+        const data = event.data;
+        const options = event.options;
+        const emailType = options.type;
+        const provider = options.provider || 'postmark';
 
         /**
         * Gets the recipient of the email. If the "toSupport" option is true, the recipient will be
@@ -485,92 +511,93 @@ module.exports = function factory(config) {
         * the owner of the campaign is considered to be the recipient.
         */
         function getRecipient(data, options) {
-            var log = logger.getLog();
-            return Q.resolve().then(function() {
+            const log = logger.getLog();
+            return Promise.resolve().then(() => {
                 if(options.toSupport) {
                     return config.emails.supportAddress;
                 } else if(options.to) {
-                    var compiledRecipient = handlebars.compile(options.to);
+                    const compiledRecipient = handlebars.compile(options.to);
                     return compiledRecipient(data);
                 } else if(data.user && data.user.email) {
                     return data.user.email;
                 } else if(data.campaign && data.campaign.user) {
-                    var apiRoot = config.cwrx.api.root;
-                    var appCreds = config.appCreds;
-                    var userId = data.campaign.user;
-                    var userEndpoint = apiRoot + config.cwrx.api.users.endpoint + '/' + userId;
+                    const apiRoot = config.cwrx.api.root;
+                    const appCreds = config.appCreds;
+                    const userId = data.campaign.user;
+                    const userEndpoint = apiRoot + config.cwrx.api.users.endpoint + '/' + userId;
                     return requestUtils.makeSignedRequest(appCreds, 'get', {
                         fields: 'email,firstName',
                         json: true,
                         url: userEndpoint
-                    }).then(function(response) {
-                        var statusCode = response.response.statusCode;
-                        var body = response.body;
+                    }).then(response => {
+                        const statusCode = response.response.statusCode;
+                        const body = response.body;
                         if(statusCode === 200) {
                             ld.set(data, 'user', body);
                             return body.email;
                         } else {
-                            log.warn('Error requesting user %1, code: %2 body: %3', userId,
-                                statusCode, body);
-                            return Q.reject('Error requesting user');
+                            log.warn(`Error requesting user ${userId}, code: ${statusCode} ` +
+                                `body: ${body}`);
+                            return Promise.reject('Error requesting user');
                         }
                     });
                 } else if (data.org) {
                     return requestUtils.makeSignedRequest(config.appCreds, 'get', {
-                        qs: { fields: 'email', org: data.org.id, sort: 'created,1' },
+                        qs: { fields: 'email,firstName', org: data.org.id, sort: 'created,1' },
                         url: resolveURL(config.cwrx.api.root, config.cwrx.api.users.endpoint)
-                    }).then(function handleResponse(result) {
-                        var response = result.response;
-                        var body = result.body;
+                    }).then(result => {
+                        const response = result.response;
+                        const body = result.body;
 
                         if (response.statusCode !== 200) {
-                            throw new Error('Failed to get users for org ' + data.org.id + ': ' +
-                                body);
+                            throw new Error(`Failed to get users for org ${data.org.id}: ${body}`);
                         }
 
+                        ld.set(data, 'user', body[0]);
                         return body[0].email;
                     });
                 } else {
-                    return Q.reject('Could not find a recipient');
+                    return Promise.reject('Could not find a recipient');
                 }
             });
         }
 
         /* Knows how to send a transactional emails using ses. */
         function sesAdapter(email) {
-            var sesEmail = ld.pick(email, ['to', 'from', 'subject']);
-            var templatePath = path.join(__dirname, '../../../templates', email.template + '.html');
+            const sesEmail = ld.pick(email, ['to', 'from', 'subject']);
+            const templatePath = path.join(__dirname, '../../../templates',
+                `${email.template}.html`);
 
-            return Q.Promise(function(resolve, reject) {
+            return new Promise((resolve, reject) => {
                 fs.readFile(templatePath, {
                     encoding: 'utf8'
-                }, function(error, data) {
+                }, (error, data) => {
                     if(error) {
                         reject(error);
                     } else {
                         resolve(data);
                     }
                 });
-            }).then(function(fileContents) {
-                var compiledTemplate = handlebars.compile(fileContents);
-                var html = compiledTemplate(email.data);
-                var text = htmlToText.fromString(html);
-                var capsLinks = text.match(/\[HTTPS?:\/\/[^\]]+\]/g);
-                (capsLinks || []).forEach(function(link) {
+            }).then(fileContents => {
+                const compiledTemplate = handlebars.compile(fileContents);
+                const html = compiledTemplate(email.data);
+                let text = htmlToText.fromString(html);
+                const capsLinks = text.match(/\[HTTPS?:\/\/[^\]]+\]/g);
+                (capsLinks || []).forEach(link => {
                     text = text.replace(link, link.toLowerCase());
                 });
 
                 sesEmail.html = html;
                 sesEmail.text = text;
                 sesEmail.attachments = email.attachments;
-                sesEmail.attachments.forEach(function(attachment) {
+                sesEmail.attachments.forEach(attachment => {
                     attachment.path = path.join(__dirname, '../../../templates/assets',
                         attachment.filename);
                 });
 
-                return Q.Promise(function(resolve, reject) {
-                    var transport = nodemailer.createTransport(sesTransport());
-                    transport.sendMail(sesEmail, function(error) {
+                return new Promise((resolve, reject) => {
+                    const transport = nodemailer.createTransport(sesTransport());
+                    transport.sendMail(sesEmail, error => {
                         if(error) {
                             reject(error);
                         } else {
@@ -583,24 +610,27 @@ module.exports = function factory(config) {
 
         /* Knows how to send a transaction emails using postmark. */
         function postmarkAdapter(email) {
-            var template = email.template;
+            const template = email.template;
 
-            return Q.all(email.attachments.map(function(attachment) {
-                return Q.Promise(function(resolve, reject) {
-                    var assetPath = path.join(__dirname, '../../../templates/assets',
-                        attachment.filename);
-                    fs.readFile(assetPath, {
-                        encoding: 'base64'
-                    }, function(error, data) {
-                        if(error) {
-                            reject(error);
-                        } else {
-                            resolve(data);
-                        }
+            return Promise.all(email.attachments.map(attachment => {
+                const getContent = () => {
+                    return new Promise((resolve, reject) => {
+                        const assetPath = path.join(__dirname, '../../../templates/assets',
+                            attachment.filename);
+                        fs.readFile(assetPath, {
+                            encoding: 'base64'
+                        }, (error, data) => {
+                            if(error) {
+                                reject(error);
+                            } else {
+                                resolve(data);
+                            }
+                        });
                     });
-                });
-            })).then(function(files) {
-                return Q.Promise(function(resolve, reject) {
+                };
+                return ('content' in attachment) ? attachment.content : getContent();
+            })).then(files => {
+                return new Promise((resolve, reject) => {
                     return postmarkClient.sendEmailWithTemplate({
                         TemplateId: config.postmark.templates[template],
                         TemplateModel: email.data,
@@ -609,7 +639,7 @@ module.exports = function factory(config) {
                         To: email.to,
                         Tag: template,
                         TrackOpens: true,
-                        Attachments: email.attachments.map(function(attachment, index) {
+                        Attachments: email.attachments.map((attachment, index) => {
                             return {
                                 Name: attachment.filename,
                                 Content: files[index],
@@ -617,7 +647,7 @@ module.exports = function factory(config) {
                                 ContentID: 'cid:' + attachment.cid
                             };
                         })
-                    }, function(error, response) {
+                    }, (error, response) => {
                         if(error) {
                             reject(error);
                         } else {
@@ -629,27 +659,24 @@ module.exports = function factory(config) {
         }
 
         if(!emailType || !transactionalEmails[emailType]) {
-            return Q.reject('Must specify a valid email type');
+            return Promise.reject('Must specify a valid email type');
         }
 
+        return getRecipient(data, options).then(recipient => {
+            const optionsFactory = transactionalEmails[emailType];
 
-        return getRecipient(data, options).then(function(recipient) {
-            return compileEmailOptions(transactionalEmails[emailType]).then(function(email) {
+            return Promise.resolve(optionsFactory(data)).then(email => {
                 email.to = recipient;
                 email.from = emailConfig.sender;
 
-                return validAttachments(email).then(function(attachments) {
-                    email.attachments = attachments;
-
-                    switch(provider) {
-                    case 'ses':
-                        return sesAdapter(email);
-                    case 'postmark':
-                        return postmarkAdapter(email);
-                    default:
-                        throw new Error('Unrecognized provider ' + provider);
-                    }
-                });
+                switch(provider) {
+                case 'ses':
+                    return sesAdapter(email);
+                case 'postmark':
+                    return postmarkAdapter(email);
+                default:
+                    throw new Error(`Unrecognized provider ${provider}`);
+                }
             });
         });
     };

@@ -7,6 +7,7 @@ var logger          = require('cwrx/lib/logger.js');
 var requestUtils    = require('cwrx/lib/requestUtils');
 var Status          = require('cwrx/lib/enums').Status;
 var actionFactory   = require('../../src/actions/check_signup_promotion.js');
+var moment          = require('moment');
 
 var FAKE_NOW = new Date('2016-02-10T17:25:38.555Z');
 
@@ -17,27 +18,26 @@ function series(fns) {
 }
 
 describe('check_signup_promotion.js', function() {
-    var mockOptions, mockConfig, mockLog, mockProducer, event, mockOrg, mockPromotion,
+    var mockConfig, mockLog, mockProducer, event, mockOrg, mockPromotion,
         resps, checkSignupProm;
 
     beforeEach(function() {
         jasmine.clock().install();
         jasmine.clock().mockDate(FAKE_NOW);
     });
-    
+
     afterEach(function() {
         jasmine.clock().uninstall();
     });
 
     beforeEach(function() {
-        mockOptions = { };
         mockConfig = {
             appCreds: 'i am watchman',
             cwrx: {
                 api: {
                     root: 'http://test.com',
                     promotions: {
-                        endpoint: '/api/promotions',
+                        endpoint: '/api/promotions'
                     },
                     orgs: {
                         endpoint: '/api/account/orgs'
@@ -54,13 +54,18 @@ describe('check_signup_promotion.js', function() {
                 { type: 'freeTrial', fulfillImmediately: false }
             ]
         };
-        event = { data: { user: {
-            id: 'u-1',
-            org: 'o-1',
-            promotion: 'pro-signup-1',
-            status: 'active'
-        } } };
-        
+        event = {
+            data: {
+                user: {
+                    id: 'u-1',
+                    org: 'o-1',
+                    promotion: 'pro-signup-1',
+                    status: 'active'
+                },
+                date: moment().format()
+            }
+        };
+
         mockLog = {
             trace : jasmine.createSpy('log.trace'),
             error : jasmine.createSpy('log.error'),
@@ -95,13 +100,13 @@ describe('check_signup_promotion.js', function() {
         resps = {
             orgs: {
                 get: { response: { statusCode: 200 }, body: mockOrg },
-                put: { response: { statusCode: 200 }, body: mockOrg },
+                put: { response: { statusCode: 200 }, body: mockOrg }
             },
             promotions: {
                 get: { response: { statusCode: 200 }, body: mockPromotion }
             }
         };
-        
+
         spyOn(requestUtils, 'makeSignedRequest').and.callFake(function(creds, method, opts) {
             if (/orgs/.test(opts.url)) {
                 return q(resps.orgs[method]);
@@ -109,7 +114,7 @@ describe('check_signup_promotion.js', function() {
                 return q(resps.promotions[method]);
             }
         });
-        
+
         checkSignupProm = actionFactory(mockConfig);
     });
 
@@ -161,7 +166,8 @@ describe('check_signup_promotion.js', function() {
                 type: 'promotionFulfilled',
                 data: {
                     promotion: mockPromotion,
-                    org: { id: 'o-1', name: 'test org', promotions: expectedArr }
+                    org: { id: 'o-1', name: 'test org', promotions: expectedArr },
+                    date: event.data.date
                 }
             });
             expect(mockLog.warn).not.toHaveBeenCalled();
@@ -169,7 +175,7 @@ describe('check_signup_promotion.js', function() {
             done();
         }).catch(done.fail);
     });
-    
+
     it('should initialize the promotions array if not defined on the org', function(done) {
         var expectedArr = [{
             id: 'pro-signup-1',
@@ -188,7 +194,8 @@ describe('check_signup_promotion.js', function() {
                 type: 'promotionFulfilled',
                 data: {
                     promotion: mockPromotion,
-                    org: jasmine.objectContaining({ promotions: expectedArr })
+                    org: jasmine.objectContaining({ promotions: expectedArr }),
+                    date: event.data.date
                 }
             });
             expect(mockLog.warn).not.toHaveBeenCalled();
@@ -196,7 +203,7 @@ describe('check_signup_promotion.js', function() {
             done();
         }).catch(done.fail);
     });
-    
+
     it('should warn and skip if the promotion is invalid', function(done) {
         mockPromotion.status = Status.Inactive;
         checkSignupProm(event).then(function() {
@@ -204,7 +211,7 @@ describe('check_signup_promotion.js', function() {
             expect(requestUtils.makeSignedRequest)
                 .not.toHaveBeenCalledWith('i am watchman', 'put', jasmine.any(Object));
             expect(mockLog.warn).toHaveBeenCalled();
-            
+
             requestUtils.makeSignedRequest.calls.reset();
             mockLog.warn.calls.reset();
             mockPromotion.status = Status.Active;
@@ -220,7 +227,7 @@ describe('check_signup_promotion.js', function() {
             done();
         }).catch(done.fail);
     });
-    
+
     it('should warn and skip if the org already has the promotion', function(done) {
         mockOrg.promotions[0].id = event.data.user.promotion;
         checkSignupProm(event).then(function() {
@@ -260,13 +267,13 @@ describe('check_signup_promotion.js', function() {
             expect(mockProducer.produce).not.toHaveBeenCalled();
         }).then(done, done.fail);
     });
-    
+
     it('should warn and skip if fetching the promotion returns a 4xx', function(done) {
         resps.promotions.get = {
             response: { statusCode: 404 },
             body: 'dat aint real'
         };
-        
+
         checkSignupProm(event).then(function() {
             expect(requestUtils.makeSignedRequest.calls.count()).toBe(2);
             expect(requestUtils.makeSignedRequest)
@@ -277,7 +284,7 @@ describe('check_signup_promotion.js', function() {
             done();
         }).catch(done.fail);
     });
-    
+
     ['get', 'put'].forEach(function(verb) {
         var reqStr = verb.toUpperCase() + ' /orgs';
 
@@ -286,7 +293,7 @@ describe('check_signup_promotion.js', function() {
                 response: { statusCode: 400 },
                 body: 'I got a problem with YOU'
             };
-            
+
             checkSignupProm(event).then(function() {
                 if (verb === 'get') {
                     expect(requestUtils.makeSignedRequest)
@@ -304,7 +311,7 @@ describe('check_signup_promotion.js', function() {
             }).catch(done.fail);
         });
     });
-    
+
     [{ obj: 'orgs', verb: 'get' }, { obj: 'orgs', verb: 'put' }, { obj: 'promotions', verb: 'get' }]
     .forEach(function(cfg) {
         var reqStr = cfg.verb.toUpperCase() + ' /' + cfg.obj;

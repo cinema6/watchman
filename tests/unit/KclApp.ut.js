@@ -378,115 +378,17 @@ describe('KclApp.js', function() {
             });
         });
 
-        describe('emails.sender', function() {
+        describe('emails', function() {
             it('should return an error message if missing', function() {
-                delete config.emails.sender;
+                delete config.emails;
                 var configError = app.checkConfig(config, 0);
-                expect(configError).toBe('emails: sender: Missing value');
-            });
-
-            it('should return an error message if not a string', function() {
-                config.emails.sender = 123;
-                var configError = app.checkConfig(config, 0);
-                expect(configError).toBe('emails: sender: Not a string');
-            });
-        });
-
-        describe('emails.dashboardLinks', function() {
-            it('should return an error message if missing', function() {
-                delete config.emails.dashboardLinks;
-                var configError = app.checkConfig(config, 0);
-                expect(configError).toBe('emails: dashboardLinks: Missing value');
+                expect(configError).toBe('emails: Missing value');
             });
 
             it('should return an error message if not an object', function() {
-                config.emails.dashboardLinks = 123;
+                config.emails = 123;
                 var configError = app.checkConfig(config, 0);
-                expect(configError).toBe('emails: dashboardLinks: Not a object');
-            });
-        });
-
-        describe('emails.manageLink', function() {
-            it('should return an error message if missing', function() {
-                delete config.emails.manageLink;
-                var configError = app.checkConfig(config, 0);
-                expect(configError).toBe('emails: manageLink: Missing value');
-            });
-
-            it('should return an error message if not a string', function() {
-                config.emails.manageLink = 123;
-                var configError = app.checkConfig(config, 0);
-                expect(configError).toBe('emails: manageLink: Not a string');
-            });
-        });
-
-        describe('emails.reviewLink', function() {
-            it('should return an error message if missing', function() {
-                delete config.emails.reviewLink;
-                var configError = app.checkConfig(config, 0);
-                expect(configError).toBe('emails: reviewLink: Missing value');
-            });
-
-            it('should return an error message if not a string', function() {
-                config.emails.reviewLink = 123;
-                var configError = app.checkConfig(config, 0);
-                expect(configError).toBe('emails: reviewLink: Not a string');
-            });
-        });
-
-        describe('emails.activationTargets', function() {
-            it('should return an error message if missing', function() {
-                delete config.emails.activationTargets;
-                var configError = app.checkConfig(config, 0);
-                expect(configError).toBe('emails: activationTargets: Missing value');
-            });
-
-            it('should return an error message if not an object', function() {
-                config.emails.activationTargets = 123;
-                var configError = app.checkConfig(config, 0);
-                expect(configError).toBe('emails: activationTargets: Not a object');
-            });
-        });
-
-        describe('emails.supportAddress', function() {
-            it('should return an error message if missing', function() {
-                delete config.emails.supportAddress;
-                var configError = app.checkConfig(config, 0);
-                expect(configError).toBe('emails: supportAddress: Missing value');
-            });
-
-            it('should return an error message if not a string', function() {
-                config.emails.supportAddress = 123;
-                var configError = app.checkConfig(config, 0);
-                expect(configError).toBe('emails: supportAddress: Not a string');
-            });
-        });
-
-        describe('emails.passwordResetPages', function() {
-            it('should return an error message if missing', function() {
-                delete config.emails.passwordResetPages;
-                var configError = app.checkConfig(config, 0);
-                expect(configError).toBe('emails: passwordResetPages: Missing value');
-            });
-
-            it('should return an error message if not an object', function() {
-                config.emails.passwordResetPages = 123;
-                var configError = app.checkConfig(config, 0);
-                expect(configError).toBe('emails: passwordResetPages: Not a object');
-            });
-        });
-
-        describe('emails.forgotTargets', function() {
-            it('should return an error message if missing', function() {
-                delete config.emails.forgotTargets;
-                var configError = app.checkConfig(config, 0);
-                expect(configError).toBe('emails: forgotTargets: Missing value');
-            });
-
-            it('should return an error message if not an object', function() {
-                config.emails.forgotTargets = 123;
-                var configError = app.checkConfig(config, 0);
-                expect(configError).toBe('emails: forgotTargets: Not a object');
+                expect(configError).toBe('emails: Not a object');
             });
         });
 

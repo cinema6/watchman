@@ -1,38 +1,39 @@
 'use strict';
 
-var CwrxRequest = require('../../../../lib/CwrxRequest');
-var resolveURL = require('url').resolve;
-var ld = require('lodash');
-var filter = ld.filter;
-var assign = ld.assign;
-var get = ld.get;
-var floor = ld.floor;
-var q = require('q');
-var Status = require('cwrx/lib/enums').Status;
-var logger = require('cwrx/lib/logger');
-var inspect = require('util').inspect;
+const CwrxRequest = require('../../../../lib/CwrxRequest');
+const resolveURL = require('url').resolve;
+const ld = require('lodash');
+const filter = ld.filter;
+const assign = ld.assign;
+const get = ld.get;
+const round = ld.round;
+const identity = ld.identity;
+const spread = ld.spread;
+const q = require('q');
+const Status = require('cwrx/lib/enums').Status;
+const logger = require('cwrx/lib/logger');
+const inspect = require('util').inspect;
+const BeeswaxClient = require('beeswax-client');
 
-module.exports = function autoIncreaseBudgetFactory(config) {
-    var log = logger.getLog();
-    var request = new CwrxRequest(config.appCreds);
-    var campaignsEndpoint = resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint);
+module.exports = function factory(config) {
+    const log = logger.getLog();
+    const request = new CwrxRequest(config.appCreds);
+    const beeswax = new BeeswaxClient({
+        apiRoot: config.beeswax.apiRoot,
+        creds: config.state.secrets.beeswax
+    });
 
-    return function autoIncreaseBudget(event) { return q().then(function() {
-        var data = event.data;
-        var options = event.options;
-        var transaction = data.transaction;
-        var transactionDescription = (function() {
-            try {
-                return JSON.parse(transaction.description) || {};
-            } catch(error) {
-                throw new Error('"' + transaction.description + '" is not JSON.');
-            }
-        }());
-        var dailyLimit = options.dailyLimit;
-        var paymentPlan = config.paymentPlans[transactionDescription.paymentPlanId];
+    const campaignsEndpoint = resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint);
+
+    return event => Promise.resolve().then(() => {
+        const data = event.data;
+        const options = event.options;
+        const transaction = data.transaction;
+        const dailyLimit = options.dailyLimit;
+        const paymentPlan = config.paymentPlans[transaction.paymentPlanId];
 
         if (!paymentPlan) {
-            throw new Error('Unknown payment plan id: ' + transactionDescription.paymentPlanId);
+            throw new Error('Unknown payment plan id: ' + transaction.paymentPlanId);
         }
 
         return request.get({
@@ -46,52 +47,64 @@ module.exports = function autoIncreaseBudgetFactory(config) {
                     Status.OutOfBudget, Status.Error
                 ].join(',')
             }
-        }).spread(function increaseBudgets(campaigns) {
-            var appCampaigns = filter(campaigns, { product: { type: 'app' } });
-            // Split this transaction between all showcase (app) campaigns
-            var externalImpressionPortion = floor(
-                (transaction.amount / appCampaigns.length) * paymentPlan.impressionsPerDollar
-            );
-            var budgetPortion = (transaction.amount / appCampaigns.length);
+        }).spread(campaigns => {
+            const appCampaigns = filter(campaigns, { product: { type: 'app' } });
+            const totalCampaigns = appCampaigns.length;
 
-            return q.all(appCampaigns.map(function increaseBudget(campaign) {
-                var externalCampaign = get(campaign, 'externalCampaigns.beeswax', {});
+            return q.all(appCampaigns.map(campaign => {
+                const externalMultiplier = get(
+                    campaign,
+                    'conversionMultipliers.external',
+                    config.campaign.conversionMultipliers.external
+                );
+                const internalMultiplier = get(
+                    campaign,
+                    'conversionMultipliers.internal',
+                    config.campaign.conversionMultipliers.internal
+                );
 
-                return request.put({
-                    url: campaignsEndpoint + '/' + campaign.id,
-                    json: assign({}, campaign, {
-                        status: Status.Active,
-                        pricing: assign({}, campaign.pricing, {
-                            budget: get(campaign, 'pricing.budget', 0) + budgetPortion,
-                            dailyLimit: dailyLimit
+                const targetUsers = round(transaction.targetUsers / totalCampaigns);
+                const budget = round(transaction.amount / totalCampaigns, 2);
+                const externalImpressions = targetUsers * externalMultiplier;
+                const cost = round(budget / (targetUsers * internalMultiplier), 3);
+
+                return Promise.all([
+                    request.put({
+                        url: campaignsEndpoint + '/' + campaign.id,
+                        json: assign({}, campaign, {
+                            status: Status.Active,
+                            pricing: assign({}, campaign.pricing, {
+                                cost,
+                                model: 'cpv',
+                                budget: get(campaign, 'pricing.budget', 0) + budget,
+                                dailyLimit: dailyLimit
+                            })
                         })
-                    })
-                }).spread(function increaseExternalBudget(newCampaign) {
-                    return request.put({
-                        url: campaignsEndpoint + '/' + campaign.id + '/external/beeswax',
-                        json: {
-                            budgetImpressions: (externalCampaign.budgetImpressions || 0) +
-                                externalImpressionPortion,
-                                dailyLimitImpressions: paymentPlan.dailyImpressionLimit,
-                                budget: null,
-                                dailyLimit: null
-                        }
-                    }).spread(function logSuccess(newExternalCampaign) {
+                    }).then(spread(identity)),
+                    beeswax.campaigns.find(
+                        get(campaign, 'externalIds.beeswax') ||
+                        get(campaign, 'externalCampaigns.beeswax.externalId')
+                    ).then(response => response.payload)
+                ]).then(spread((newCampaign, beeswaxCampaign) => (
+                    beeswax.campaigns.edit(beeswaxCampaign.campaign_id, {
+                        campaign_budget: beeswaxCampaign.campaign_budget + externalImpressions
+                    }).then(response => response.payload).then(updatedBeeswaxCampaign => {
                         log.info(
                             'Increased budget of campaign(%1): %2 => %3.',
                             campaign.id, get(campaign, 'pricing.budget', 0),
                             get(newCampaign, 'pricing.budget', 0)
                         );
                         log.info(
-                            'Increased budget of externalCampaign(%1): %2 => %3.',
-                            externalCampaign.externalId,
-                            externalCampaign.budget, newExternalCampaign.budget
+                            'Increased budget of beeswaxCampaign(%1): %2 => %3.',
+                            beeswaxCampaign.campaign_id,
+                            beeswaxCampaign.campaign_budget,
+                            updatedBeeswaxCampaign.campaign_budget
                         );
-                    });
-                });
+                    })
+                )));
             }));
         });
-    }).catch(function logError(reason) {
-        return log.error('Failed to increase campaign budget: %1', inspect(reason));
-    }).thenResolve(undefined); };
+    }).catch(reason => (
+        log.error('Failed to increase campaign budget: %1', inspect(reason))
+    )).then(() => undefined);
 };

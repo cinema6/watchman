@@ -1,7 +1,86 @@
 # Watchman
 
+* *[v1.3.0-rc1]*
+  * [FEATURE]: Added BeeswaxMiddleware lib module for workign with Beeswax API
+  * [FIX]: showplace/apps/init_campaign creates placments using the ext=false param to prevent auto creation of beeswax placements for showplace apps.
+  * [FIX]: init_campaign uses BeeswaxMiddleware to create beeswax advertiser,campaign, and creatives
+  * [FIX]: removed 300x250 card / placement from init_campaigns. 
+  * [FIX]: Updated code to expect more consistent property scheme for finding beeswax ids on c6 entities.. (<entity>.externalIds.beeswax).
+  * Change the logic for allocating funds/impressions to showcase
+    campaigns
+  * [FEATURE]: Reallocate funds/impressions when a showcase campaign is
+    added/removed
+  * All dependencies on the cwrx-beeswax integration have been removed
+  * ** Extra Deployment Steps**:
+    * Need to add tracking property to cwrx.api config (see environments/development.json)
+    * Update watchman environments
+    * Ensure watchman app can:
+      * Read all transactions
+      * Do whatever it wants with `campaign.pricing`
+
+## v1.2.0 (July 12, 2016)
+* *[v1.2.0-rc3]*
+  * [FIX]: Do not query for deleted campaigns
+* *[/v1.2.0-rc3]*
+
+* *[v1.2.0-rc2]*
+  * [FIX]: Allow sending weekly stats for any non-canceled campaign
+* *[/v1.2.0-rc2]*
+
+* *[v1.2.0-rc1]*
+  * [DEV]: Add e2e configurator
+  * [FEATURE]: Weekly stats emails
+  * [FEATURE]: Deactivate line items and campaigns in beeswax when a
+    showcase (apps) campaign is canceled
+  * Change the format of the transactions/payments created for showcase
+  * ** Extra Deployment Steps**:
+    * Deploy c6env cookbook `v2.18.0`
+    * Deploy postmark email template
+    * Deploy watchman cookbook `v2.2.0`
+    * Update watchman environments
+    * Update querybot to not rely on transaction descriptions: [#970](https://github.com/cinema6/cwrx/issues/970)
+* *[/v1.2.0-rc1]*
+
+## v1.1.0 (June 30, 2016)
+* *[v1.1.0-rc1]*
+  * [FEATURE]: Indicate paying customers in Hubspot
+  * [DEV]: Replace jshint with eslint
+* *[/v1.1.0-rc1]*
+
+## v1.0.0 (June 27, 2016)
+* *[v1.0.0-rc2]*
+  * [FIX]: Use Node v4.4.7
+* *[/v1.0.0-rc2]*
+
+* *[v1.0.0-rc1]*
+  * Switch to use Node v4.4.6 for Watchman (ES6 Features)
+  * ** Extra Deployment Steps**:
+    * Deploy c6env cookbook v2.17.0
+    * Deploy watchman cookbook v2.0.0
+* *[/v1.0.0-rc1]*
+
+## v0.13.0 (June 21, 2016)
+* *[v0.13.0-rc1]*
+  * [FEATURE]: Add support for sending promotionEnded emails for showcase users
+  * ** Extra Deployment Steps**:
+    * Update environments
+    * Update lambda function to produce tenMinutes event
+    * Add lambda function to produce hourly events with the hour in data
+    * Remove daily lambda function
+    * Promote promotionEnded template in Postmark
+* *[/v0.13.0-rc1]*
+
+## v0.12.0 (June 17, 2016)
+* *[v0.12.0-rc2]*
+  * [FIX]: Improve the reliability of deployments and the nightly build
+* *[/v0.12.0-rc2]*
+
 * *[v0.12.0-rc1]*
   * [FEATURE]: Add `nextPaymentDate` property to orgs with payment plans
+  * [FEATURE]: Revamp `check_available_funds` action to fetch orgs itself, and batch requests to `/api/accounting/balances`
+  * ** Extra Deployment Steps**:
+    * Update environment so that `check_available_funds` runs on `hourly` event from time stream, and not on `hourly_orgPulse` from watchman stream
+* *[/v0.12.0-rc1]*
 
 ## v0.11.0 (June 13, 2016)
 * *[v0.11.0-rc1]*

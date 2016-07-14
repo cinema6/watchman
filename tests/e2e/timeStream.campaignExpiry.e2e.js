@@ -1,12 +1,17 @@
 
 'use strict';
 
+var Configurator = require('../helpers/Configurator.js');
 var JsonProducer = require('rc-kinesis').JsonProducer;
 var Q = require('q');
+var moment = require('moment');
 var testUtils = require('cwrx/test/e2e/testUtils.js');
+var uuid = require('rc-uuid');
 
+var API_ROOT = process.env.apiRoot;
 var APP_CREDS = JSON.parse(process.env.appCreds);
 var AWS_CREDS = JSON.parse(process.env.awsCreds);
+var PREFIX = process.env.appPrefix;
 var TIME_STREAM = process.env.timeStream;
 var WAIT_TIME = 1000;
 var WATCHMAN_STREAM = process.env.watchmanStream;
@@ -14,19 +19,143 @@ var WATCHMAN_STREAM = process.env.watchmanStream;
 describe('timeStream', function() {
     var producer, mockman;
 
+    // This beforeAll is dedicated to setting application config
+    beforeAll(function(done) {
+        const configurator = new Configurator();
+        const sharedConfig = {
+            secrets: '/opt/sixxy/.watchman.secrets.json',
+            appCreds: '/opt/sixxy/.rcAppCreds.json',
+            cwrx: {
+                api: {
+                    root: API_ROOT,
+                    campaigns: {
+                        endpoint: '/api/campaigns'
+                    },
+                    analytics: {
+                        endpoint: '/api/analytics'
+                    },
+                    orgs: {
+                        endpoint: '/api/account/orgs'
+                    },
+                    users: {
+                        endpoint: '/api/account/users'
+                    }
+                }
+            },
+            emails: {
+                sender: 'support@cinema6.com',
+                dashboardLinks: {
+                    showcase: 'http://localhost:9000/#/showcase/products'
+                }
+            },
+            postmark: {
+                templates: {
+                    'promotionEnded--app': '722104'
+                }
+            }
+        };
+        const cwrxConfig = {
+            eventHandlers: { }
+        };
+        const timeConfig = {
+            eventHandlers: {
+                tenMinutes: {
+                    actions: [
+                        {
+                            name: 'fetch_campaigns',
+                            options: {
+                                statuses: ['active', 'paused', 'outOfBudget'],
+                                prefix: 'hourly',
+                                analytics: true,
+                                number: 50
+                            }
+                        }
+                    ]
+                },
+                hourly: {
+                    actions: [
+                        {
+                            name: 'fetch_orgs',
+                            options: {
+                                prefix: 'morning'
+                            },
+                            ifData: {
+                                hour: '^4$'
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+        const watchmanConfig = {
+            eventHandlers: {
+                morning_orgPulse: {
+                    actions: [
+                        {
+                            name: 'check_payment_plan_start'
+                        }
+                    ]
+                },
+                hourly_campaignPulse: {
+                    actions: ['check_expiry']
+                },
+                campaignExpired: {
+                    actions: [
+                        {
+                            name: 'set_status',
+                            options: {
+                                status: 'expired'
+                            }
+                        }
+                    ]
+                },
+                campaignReachedBudget: {
+                    actions: [
+                        {
+                            name: 'set_status',
+                            options: {
+                                status: 'outOfBudget'
+                            }
+                        }
+                    ]
+                },
+                paymentPlanWillStart: {
+                    actions: [
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'promotionEnded'
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+        Promise.all([
+            configurator.updateConfig(`${PREFIX}CwrxStreamApplication`, sharedConfig, cwrxConfig),
+            configurator.updateConfig(`${PREFIX}TimeStreamApplication`, sharedConfig, timeConfig),
+            configurator.updateConfig(`${PREFIX}WatchmanStreamApplication`, sharedConfig, watchmanConfig)
+        ]).then(done, done.fail);
+    });
+
     beforeAll(function(done) {
         var awsConfig = {
-            region: 'us-east-1',
+            region: 'us-east-1'
         };
         if(AWS_CREDS) {
             awsConfig.accessKeyId = AWS_CREDS.accessKeyId;
             awsConfig.secretAccessKey = AWS_CREDS.secretAccessKey;
         }
         producer = new JsonProducer(TIME_STREAM, awsConfig);
+        this.mailman = new testUtils.Mailman();
+        this.mailman.on('error', function(error) { throw new Error(error); });
         mockman = new testUtils.Mockman({
             streamName: WATCHMAN_STREAM
         });
-        mockman.start().then(done, done.fail);
+        Q.all([
+            this.mailman.start(),
+            mockman.start()
+        ]).then(done, done.fail);
     });
 
     afterAll(function() {
@@ -349,11 +478,13 @@ describe('timeStream', function() {
     });
 
     afterAll(function(done) {
+        this.mailman.stop();
         mockman.stop();
         testUtils.closeDbs().then(done, done.fail);
     });
 
     afterEach(function() {
+        this.mailman.removeAllListeners();
         mockman.removeAllListeners();
     });
 
@@ -379,28 +510,15 @@ describe('timeStream', function() {
         });
     }
 
-    function waitForMockman(eventType, n) {
-        var records = [];
-        return Q.Promise(function(resolve) {
-            mockman.on(eventType, function(record) {
-                records.push(record);
-                if(records.length === n) {
-                    resolve(records);
-                }
-            });
-        });
-    }
-
     describe('the time event prompting campaigns to be fetched', function() {
         beforeEach(function(done) {
-            producer.produce({ type: 'hourly', data: { date: new Date() } }).then(done, done.fail);
+            producer.produce({ type: 'tenMinutes', data: { date: new Date() } }).then(done, done.fail);
         });
 
         describe('when an active, paused, or outOfBudget campaign has reached its end date', function() {
             beforeEach(function(done) {
                 var promises = [
-                    waitForStatus(['e2e-cam-01', 'e2e-cam-02', 'e2e-cam-07', 'e2e-cam-09'], 'expired'),
-                    waitForMockman('campaignOutOfFunds', 3)
+                    waitForStatus(['e2e-cam-01', 'e2e-cam-02', 'e2e-cam-07', 'e2e-cam-09'], 'expired')
                 ];
                 Q.all(promises).then(done, done.fail);
             });
@@ -430,8 +548,7 @@ describe('timeStream', function() {
         describe('when an active or paused campaign has reached its budget', function() {
             beforeEach(function(done) {
                 var promises = [
-                    waitForStatus(['e2e-cam-05', 'e2e-cam-06', 'e2e-cam-10'], 'outOfBudget'),
-                    waitForMockman('campaignOutOfFunds', 3)
+                    waitForStatus(['e2e-cam-05', 'e2e-cam-06', 'e2e-cam-10'], 'outOfBudget')
                 ];
                 Q.all(promises).then(done, done.fail);
             });
@@ -456,17 +573,53 @@ describe('timeStream', function() {
                 }).then(done, done.fail);
             });
         });
+    });
 
-        describe('when an org has a non positive balance', function() {
-            it('should produce a campaignOutOfFunds event for each active campaign in the org', function(done) {
-                waitForMockman('campaignOutOfFunds', 3).then(function(records) {
-                    var campaignIds = records.map(function(record) {
-                        return record.data.campaign.id;
-                    });
-                    ['e2e-cam-01', 'e2e-cam-03', 'e2e-cam-08'].forEach(function(id) {
-                        expect(campaignIds).toContain(id);
-                    });
-                }).then(done, done.fail);
+    describe('the hourly event', function() {
+        beforeEach(function(done) {
+            var orgId = 'o-' + uuid.createUuid();
+            var mockOrgs = [
+                {
+                    id: orgId,
+                    paymentPlanStart: moment().toDate()
+                }
+            ];
+            var mockUsers = [
+                {
+                    id: 'u-' + uuid.createUuid(),
+                    firstName: 'Allison',
+                    lastName: 'Applesmith',
+                    email: 'c6e2etester@gmail.com',
+                    org: orgId
+                }
+            ];
+            return Q.all([
+                producer.produce({
+                    type: 'hourly',
+                    data: {
+                        date: moment().toDate(),
+                        hour: 4
+                    }
+                }),
+                testUtils.resetCollection('orgs', mockOrgs),
+                testUtils.resetCollection('users', mockUsers)
+            ]).then(done, done.fail);
+        });
+
+        it('should be able to send an email informing the user if their promotion has ended', function(done) {
+            this.mailman.once('Allison, Your Free Trial Is About To End', function(msg) {
+                var regexes = [
+                    /Hi Allison,/,
+                    /trial is coming to an end/
+                ];
+                expect(msg.from[0].address.toLowerCase()).toBe('support@cinema6.com');
+                expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+                regexes.forEach(function(regex) {
+                    expect(msg.text).toMatch(regex);
+                    expect(msg.html).toMatch(regex);
+                });
+                expect((new Date() - msg.date)).toBeLessThan(30000);
+                done();
             });
         });
     });

@@ -1,26 +1,30 @@
 'use strict';
 
-var JsonProducer = require('rc-kinesis').JsonProducer;
-var CwrxRequest = require('../../lib/CwrxRequest');
-var resolveURL = require('url').resolve;
-var moment = require('moment');
-var logger = require('cwrx/lib/logger');
-var inspect = require('util').inspect;
+const JsonProducer = require('rc-kinesis').JsonProducer;
+const CwrxRequest = require('../../lib/CwrxRequest');
+const resolveURL = require('url').resolve;
+const moment = require('moment');
+const logger = require('cwrx/lib/logger');
+const inspect = require('util').inspect;
 
-module.exports = function chargePaymentPlanFactory(config) {
-    var watchmanStream = new JsonProducer(config.kinesis.producer.stream, config.kinesis.producer);
-    var request = new CwrxRequest(config.appCreds);
-    var paymentsEndpoint = resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint);
-    var orgsEndpoint = resolveURL(config.cwrx.api.root, config.cwrx.api.orgs.endpoint);
-    var log = logger.getLog();
+module.exports = function factory(config) {
+    const watchmanStream = new JsonProducer(
+        config.kinesis.producer.stream,
+        config.kinesis.producer
+    );
+    const request = new CwrxRequest(config.appCreds);
+    const paymentsEndpoint = resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint);
+    const orgsEndpoint = resolveURL(config.cwrx.api.root, config.cwrx.api.orgs.endpoint);
+    const log = logger.getLog();
 
-    return function chargePaymentPlan(event) {
-        var data = event.data;
-        var options = event.options;
-        var today = moment(data.date);
-        var org = data.org;
-        var paymentMethod = data.paymentMethod;
-        var paymentPlan = data.paymentPlan;
+    return event => Promise.resolve().then(() => {
+        const data = event.data;
+        const options = event.options;
+        const now = moment(data.date);
+        const today = moment(now).utcOffset(0).startOf('day');
+        const org = data.org;
+        const paymentMethod = data.paymentMethod;
+        const paymentPlan = data.paymentPlan;
 
         return request.post({
             url: paymentsEndpoint,
@@ -28,35 +32,33 @@ module.exports = function chargePaymentPlanFactory(config) {
             json: {
                 paymentMethod: paymentMethod.token,
                 amount: paymentPlan.price,
-                description: JSON.stringify({
-                    eventType: 'credit',
-                    source: 'braintree',
-                    target: options.target,
-                    paymentPlanId: paymentPlan.id
-                })
+                transaction: {
+                    application: options.target,
+                    paymentPlanId: paymentPlan.id,
+                    targetUsers: paymentPlan.viewsPerMonth,
+                    cycleStart: today.format(),
+                    cycleEnd: moment(today).add(1, 'month').subtract(1, 'day').endOf('day').format()
+                }
             }
-        }).spread(function handleSuccess(payment) {
-            return request.put({
+        }).spread(payment => (
+            // TODO: Stop updating the org's nextPaymentDate
+            request.put({
                 url: orgsEndpoint + '/' + org.id,
                 json: {
                     nextPaymentDate: moment(today).add(1, 'month').format()
                 }
-            }).then(function produceRecord() {
-                return watchmanStream.produce({
-                    type: 'chargedPaymentPlan',
-                    data: {
-                        org: org,
-                        paymentPlan: paymentPlan,
-                        payment: payment
-                    }
-                });
-            }, function logError(reason) {
-                log.error(
-                    'Failed to update org(%1)\'s nextPaymentDate: %2.',
-                    org.id, inspect(reason)
-                );
-            });
-        }).catch(function handleFailure(reason) {
+            }).then(() => watchmanStream.produce({
+                type: 'chargedPaymentPlan',
+                data: {
+                    org: org,
+                    paymentPlan: paymentPlan,
+                    payment: payment
+                }
+            }), reason => log.error(
+                'Failed to update org(%1)\'s nextPaymentDate: %2.',
+                org.id, inspect(reason)
+            ))
+        )).catch(reason => {
             if (/^4/.test(reason.statusCode)) {
                 return watchmanStream.produce({
                     type: 'chargePaymentPlanFailure',
@@ -69,6 +71,6 @@ module.exports = function chargePaymentPlanFactory(config) {
             }
 
             throw reason;
-        }).thenResolve(undefined);
-    };
+        });
+    }).then(() => undefined);
 };

@@ -1,61 +1,57 @@
 'use strict';
 
+const proxyquire = require('proxyquire');
+const q = require('q');
+const createUuid = require('rc-uuid').createUuid;
+const resolveURL = require('url').resolve;
+const ld = require('lodash');
+const logger = require('cwrx/lib/logger');
+const showcaseFactories = require('showcase-core').factories;
+
 describe('(action factory) showcase/apps/init_campaign', function() {
-    var q, uuid, resolveURL, ld, logger, showcaseFactories;
-    var JsonProducer, CwrxRequest;
-    var factory;
+    let JsonProducer, CwrxRequest, BeeswaxMiddleware, showcaseLib;
+    let factory;
 
     beforeAll(function() {
-        q = require('q');
-        uuid = require('rc-uuid');
-        resolveURL = require('url').resolve;
-        ld = require('lodash');
-        logger = require('cwrx/lib/logger');
-        showcaseFactories = require('showcase-core').factories;
+        JsonProducer = jasmine.createSpy('JsonProducer()').and.callFake(() => ({
+            produce: jasmine.createSpy('produce()').and.returnValue(q.defer().promise)
+        }));
+        CwrxRequest = jasmine.createSpy('CwrxRequest()').and.callFake(() => ({
+            send: jasmine.createSpy('send()').and.returnValue(q.defer().promise),
+            post: () => null,
+            put: () => null
+        }));
 
-        delete require.cache[require.resolve('rc-kinesis')];
-        JsonProducer = (function(JsonProducer) {
-            return jasmine.createSpy('JsonProducer()').and.callFake(function(name, options) {
-                var producer = new JsonProducer(name, options);
+        BeeswaxMiddleware = jasmine.createSpy('BeeswaxMiddleware()').and.callFake(() => ({
+            initShowcaseAppsCampaign: () => null
+        }));
 
-                spyOn(producer, 'produce').and.returnValue(q.defer().promise);
+        showcaseLib = (showcaseLib => jasmine.createSpy('showcase()').and.callFake(config => {
+            const showcase = showcaseLib(config);
 
-                return producer;
-            });
-        }(require('rc-kinesis').JsonProducer));
-        require.cache[require.resolve('rc-kinesis')].exports.JsonProducer = JsonProducer;
+            spyOn(showcase, 'rebalance');
 
-        delete require.cache[require.resolve('../../lib/CwrxRequest')];
-        CwrxRequest = (function(CwrxRequest) {
-            return jasmine.createSpy('CwrxRequest()').and.callFake(function(creds) {
-                var request = new CwrxRequest(creds);
+            return showcase;
+        }))(require('../../lib/showcase'));
 
-                spyOn(request, 'send').and.returnValue(q.defer().promise);
-
-                return request;
-            });
-        }(require('../../lib/CwrxRequest')));
-        require.cache[require.resolve('../../lib/CwrxRequest')].exports = CwrxRequest;
-
-        delete require.cache[require.resolve('../../src/actions/showcase/apps/init_campaign')];
-        factory = require('../../src/actions/showcase/apps/init_campaign');
-    });
-
-    beforeEach(function() {
-        [JsonProducer, CwrxRequest].forEach(function(spy) {
-            spy.calls.reset();
+        factory = proxyquire('../../src/actions/showcase/apps/init_campaign', {
+            'rc-kinesis': {
+                JsonProducer
+            },
+            '../../../../lib/CwrxRequest': CwrxRequest,
+            '../../../../lib/BeeswaxMiddleware': BeeswaxMiddleware,
+            '../../../../lib/showcase': showcaseLib
         });
     });
 
     it('should exist', function() {
         expect(factory).toEqual(jasmine.any(Function));
-        expect(factory.name).toBe('initCampaignFactory');
     });
 
     describe('when called', function() {
-        var config;
-        var initCampaign;
-        var request, watchmanStream, log;
+        let config;
+        let initCampaign;
+        let request, watchmanStream, log, beeswax, showcase;
 
         beforeEach(function() {
             config = {
@@ -66,18 +62,45 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                 cwrx: {
                     api: {
                         root: 'http://33.33.33.10/',
+                        advertisers: {
+                            endpoint: '/api/advertisers'
+                        },
                         placements: {
                             endpoint: '/api/placements'
                         },
                         campaigns: {
                             endpoint: '/api/campaigns'
-                        }
+                        },
+                        transactions: {
+                            endpoint: '/api/transactions'
+                        },
+                        analytics: {
+                            endpoint: '/api/analytics'
+                        },
+                        tracking: 'https://audit.cinema6.com/pixel.gif'
                     }
                 },
                 kinesis: {
                     producer: {
                         region: 'us-east-1',
                         stream: 'devWatchmanStream'
+                    }
+                },
+                state: {
+                    secrets: {
+                        beeswax: {
+                            email: 'ops@reelcontent.com',
+                            password: 'wueyrfhu83rgf4u3gr'
+                        }
+                    }
+                },
+                beeswax: {
+                    apiRoot: 'https://stingersbx.api.beeswax.com'
+                },
+                campaign: {
+                    conversionMultipliers: {
+                        internal: 1.10,
+                        external: 1.25
                     }
                 }
             };
@@ -93,11 +116,12 @@ describe('(action factory) showcase/apps/init_campaign', function() {
 
             request = CwrxRequest.calls.mostRecent().returnValue;
             watchmanStream = JsonProducer.calls.mostRecent().returnValue;
+            beeswax = BeeswaxMiddleware.calls.mostRecent().returnValue;
+            showcase = showcaseLib.calls.mostRecent().returnValue;
         });
 
         it('should return the action Function', function() {
             expect(initCampaign).toEqual(jasmine.any(Function));
-            expect(initCampaign.name).toBe('initCampaign');
         });
 
         it('should create a CwrxRequest', function() {
@@ -108,23 +132,37 @@ describe('(action factory) showcase/apps/init_campaign', function() {
             expect(JsonProducer).toHaveBeenCalledWith(config.kinesis.producer.stream, config.kinesis.producer);
         });
 
+        it('should create a BeeswaxMiddleware', function() {
+            expect(BeeswaxMiddleware).toHaveBeenCalledWith( {
+                apiRoot: config.beeswax.apiRoot,
+                creds  : config.state.secrets.beeswax
+            },{
+                creds: config.appCreds,
+                api: config.cwrx.api
+            });
+        });
+
+        it('should create a showcase lib', function() {
+            expect(showcaseLib).toHaveBeenCalledWith(config);
+        });
+
         describe('the action', function() {
-            var data, options, event;
-            var postExternalCampaignDeferred;
-            var success, failure;
+            let data, options, event;
+            let putCampaignDeferred;
+            let success, failure;
 
             beforeEach(function(done) {
                 data = {
                     campaign: {
-                        id: 'cam-' + uuid.createUuid(),
+                        id: 'cam-' + createUuid(),
                         advertiserDisplayName: 'Curbside',
-                        advertiserId: 'a-' + uuid.createUuid(),
+                        advertiserId: 'a-' + createUuid(),
                         application: 'showcase',
                         cards: [],
                         created: '2016-03-17T21:18:48.953Z',
                         lastUpdated: '2016-03-18T14:13:35.918Z',
                         name: 'This is the Name of My Product',
-                        org: 'o-' + uuid.createUuid(),
+                        org: 'o-' + createUuid(),
                         status: 'active',
                         product: {
                             type: 'app',
@@ -213,7 +251,7 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                                     budget: 500,
                                     dailyLimit: 50
                                 },
-                                userId: 'u-' + uuid.createUuid(),
+                                userId: 'u-' + createUuid(),
                                 user: 'hoopes@shopcurbside.com'
                             }
                         ],
@@ -228,7 +266,7 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                                 osVersion: []
                             }
                         },
-                        user: 'u-' + uuid.createUuid()
+                        user: 'u-' + createUuid()
                     },
                     date: new Date().toISOString()
                 };
@@ -238,11 +276,6 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                             duration: 15,
                             slideCount: 3,
                             cardType: 'showcase-app'
-                        },
-                        threeHundredByTwoFifty: {
-                            duration: 10,
-                            slideCount: 2,
-                            cardType: 'showcase-app--small'
                         }
                     },
                     placement: {
@@ -254,15 +287,6 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                                 branding: { value: 'showcase-app--interstitial' },
                                 uuid: { value: '{{DEVICE_ID}}', inTag: true }
                             }
-                        },
-                        threeHundredByTwoFifty: {
-                            tagType: 'display',
-                            tagParams: {
-                                container: { value: 'beeswax' },
-                                type: { value: 'mobile-card' },
-                                branding: { value: 'showcase-app--300x250' },
-                                uuid: { value: '{{DEVICE_ID}}', inTag: true }
-                            }
                         }
                     }
                 };
@@ -271,80 +295,35 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                 success = jasmine.createSpy('success()');
                 failure = jasmine.createSpy('failure()');
 
-                spyOn(request, 'post').and.returnValue((postExternalCampaignDeferred = q.defer()).promise);
+                spyOn(request, 'post');
+                spyOn(request, 'put')
+                    .and.returnValue((putCampaignDeferred = q.defer()).promise);
 
                 initCampaign(event).then(success, failure);
-                process.nextTick(done);
-            });
-
-            it('should create an external campaign', function() {
-                expect(request.post).toHaveBeenCalledWith({
-                    url: resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint + '/' + data.campaign.id + '/external/beeswax'),
-                    json: {}
-                });
-            });
-
-            describe('if creating the external campaign fails', function() {
-                var reason;
-
-                beforeEach(function(done) {
-                    spyOn(request, 'put').and.returnValue(q.defer().promise);
-
-                    reason = new Error('I failed you...');
-                    postExternalCampaignDeferred.reject(reason);
-                    process.nextTick(done);
-                });
-
-                it('should not PUT anything', function() {
-                    expect(request.put).not.toHaveBeenCalled();
-                });
-
-                it('should log an error', function() {
-                    expect(log.error).toHaveBeenCalled();
-                });
-
-                it('should fulfill with undefined', function() {
-                    expect(success).toHaveBeenCalledWith(undefined);
-                });
+                setTimeout(done);
             });
 
             describe('when the external campaign is created', function() {
-                var externalCampaign;
-                var putCampaignDeferred;
-
-                beforeEach(function(done) {
-                    externalCampaign = {
-                        externalId: uuid.createUuid(),
-                        budget: 20,
-                        dailyLimit: 10
-                    };
-                    postExternalCampaignDeferred.fulfill([externalCampaign, { statusCode: 201 }]);
-
-                    spyOn(request, 'put').and.returnValue((putCampaignDeferred = q.defer()).promise);
-
-                    process.nextTick(done);
-                });
-
-                it('should add two cards to the campaign', function() {
+                it('should add one card and some conversion multipliers to the campaign', function() {
                     expect(request.put).toHaveBeenCalledWith({
                         url: resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint + '/' + data.campaign.id),
-                        json: ld.assign({}, data.campaign, {
+                        json: {
+                            conversionMultipliers: {
+                                internal: config.campaign.conversionMultipliers.internal,
+                                external: config.campaign.conversionMultipliers.external
+                            },
                             cards: data.campaign.cards.concat([
                                 ld.assign(showcaseFactories.app.createInterstitialFactory(options.card.interstitial)(data.campaign.product), {
                                     user: data.campaign.user,
                                     org: data.campaign.org
-                                }),
-                                ld.assign(showcaseFactories.app.createThreeHundredByTwoFiftyFactory(options.card.threeHundredByTwoFifty)(data.campaign.product), {
-                                    user: data.campaign.user,
-                                    org: data.campaign.org
                                 })
                             ])
-                        })
+                        }
                     });
                 });
 
                 describe('if creating the cards fails', function() {
-                    var reason;
+                    let reason;
 
                     beforeEach(function(done) {
                         request.post.calls.reset();
@@ -352,7 +331,7 @@ describe('(action factory) showcase/apps/init_campaign', function() {
 
                         reason = new Error('I failed you...');
                         putCampaignDeferred.reject(reason);
-                        process.nextTick(done);
+                        setTimeout(done);
                     });
 
                     it('should not POST anything', function() {
@@ -369,15 +348,15 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                 });
 
                 describe('when the cards have been created', function() {
-                    var postPlacementDeffereds;
-                    var campaign, interstitial, threeHundredByTwoFifty;
+                    let postPlacementDeffereds;
+                    let campaign, interstitial ;
 
                     beforeEach(function(done) {
                         request.post.calls.reset();
 
                         postPlacementDeffereds = [];
                         request.post.and.callFake(function() {
-                            var deferred = q.defer();
+                            let deferred = q.defer();
 
                             postPlacementDeffereds.push(deferred);
 
@@ -385,28 +364,28 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                         });
 
                         campaign = request.put.calls.mostRecent().args[0].json;
-                        campaign = ld.assign({}, campaign, {
+                        campaign = ld.assign({}, data.campaign, {
                             cards: campaign.cards.map(function(card) {
                                 return ld.assign({}, card, {
-                                    id: 'rc-' + uuid.createUuid()
+                                    id: 'rc-' + createUuid()
                                 });
                             })
                         });
                         interstitial = campaign.cards[0];
-                        threeHundredByTwoFifty = campaign.cards[1];
 
                         putCampaignDeferred.fulfill([
                             campaign,
                             { statusCode: 200 }
                         ]);
-                        process.nextTick(done);
+                        setTimeout(done);
                     });
 
-                    it('should create two placements', function() {
-                        expect(request.post.calls.count()).toBe(2, 'Wrong number of placements created!');
+                    it('should create one placement', function() {
+                        expect(request.post.calls.count()).toBe(1, 'Wrong number of placements created!');
 
                         expect(request.post).toHaveBeenCalledWith({
                             url: resolveURL(config.cwrx.api.root, config.cwrx.api.placements.endpoint),
+                            qs: { ext: false },
                             json: {
                                 label: 'Showcase--Interstitial for App: "' + campaign.name + '"',
                                 tagType: options.placement.interstitial.tagType,
@@ -424,44 +403,17 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                                 thumbnail: interstitial.thumbs.small
                             }
                         });
-                        expect(request.post).toHaveBeenCalledWith({
-                            url: resolveURL(config.cwrx.api.root, config.cwrx.api.placements.endpoint),
-                            json: {
-                                label: 'Showcase--300x250 for App: "' + campaign.name + '"',
-                                tagType: options.placement.threeHundredByTwoFifty.tagType,
-                                tagParams: {
-                                    campaign: campaign.id,
-                                    card: threeHundredByTwoFifty.id,
-                                    container: 'beeswax',
-                                    type: 'mobile-card',
-                                    branding: 'showcase-app--300x250',
-                                    uuid: '{{DEVICE_ID}}'
-                                },
-                                showInTag: {
-                                    uuid: true
-                                },
-                                thumbnail: threeHundredByTwoFifty.thumbs.small
-                            }
-                        });
                     });
 
                     describe('if creating a placement fails', function() {
-                        var reason;
+                        let reason;
 
                         beforeEach(function(done) {
                             watchmanStream.produce.and.returnValue(q.defer().promise);
 
                             reason = new Error('I failed you...');
-                            postPlacementDeffereds[1].reject(reason);
-
-                            postPlacementDeffereds[0].fulfill([
-                                ld.assign({}, request.post.calls.all()[0].args[0].json, {
-                                    id: 'pl-' + uuid.createUuid()
-                                }),
-                                { statusCode: 201 }
-                            ]);
-
-                            process.nextTick(done);
+                            postPlacementDeffereds[0].reject(reason);
+                            setTimeout(done);
                         });
 
                         it('should not produce any records', function() {
@@ -477,70 +429,153 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                         });
                     });
 
-                    describe('when the placements have been created', function() {
-                        var placements;
-                        var produceDeferred;
+                    describe('when the placements have been created', function(){
+                        let initShowcaseDeferred, placements;
 
                         beforeEach(function(done) {
-                            expect(postPlacementDeffereds.length).toBe(2);
+                            initShowcaseDeferred = q.defer();
 
-                            watchmanStream.produce.and.returnValue((produceDeferred = q.defer()).promise);
+                            spyOn(beeswax,'initShowcaseAppsCampaign').and.returnValue(
+                                initShowcaseDeferred.promise);
+
+                            expect(postPlacementDeffereds.length).toBe(1);
 
                             placements = [];
                             postPlacementDeffereds.forEach(function(deferred, index) {
-                                var placement = ld.assign({}, request.post.calls.all()[index].args[0].json, {
-                                    id: 'pl-' + uuid.createUuid()
+                                let placement = ld.assign({}, request.post.calls.all()[index].args[0].json, {
+                                    id: 'pl-' + createUuid()
                                 });
 
                                 placements.push(placement);
 
                                 deferred.fulfill([placement, { statusCode: 201 }]);
                             });
-                            process.nextTick(done);
+                            setTimeout(done);
                         });
 
-                        it('should produce a initializedShowcaseCampaign record', function() {
-                            expect(watchmanStream.produce.calls.count()).toBe(1, 'Incorrect number of records produced!');
-                            expect(watchmanStream.produce).toHaveBeenCalledWith({
-                                type: 'initializedShowcaseCampaign',
-                                data: {
-                                    campaign: campaign,
-                                    placements: placements,
-                                    date: data.date
-                                }
+                        it('should call beeswax middleware',function(){
+                            expect(beeswax.initShowcaseAppsCampaign).toHaveBeenCalledWith({
+                                campaign: campaign,
+                                placements: placements
                             });
                         });
 
-                        describe('if producing the record fails', function() {
-                            var reason;
+                        describe('when the beeswax middleware fails',function(){
+                            beforeEach(function(done){
+                                let reason = new Error('I failed you...');
+                                initShowcaseDeferred.reject(reason);
+                                setTimeout(done);
+                            });
+
+                            it('should not produce any records', function() {
+                                expect(watchmanStream.produce).not.toHaveBeenCalled();
+                            });
+
+                        });
+
+                        describe('when beeswax middleware succeeds', function() {
+                            let rebalanceDeferred, updatedCampaign, updatedPlacements;
 
                             beforeEach(function(done) {
-                                reason = new Error('I failed you...');
-                                produceDeferred.reject(reason);
-                                process.nextTick(done);
+                                expect(postPlacementDeffereds.length).toBe(1);
+
+                                showcase.rebalance.and.returnValue((rebalanceDeferred = q.defer()).promise);
+
+                                updatedCampaign = ld.assign({}, campaign, {
+                                    externalIds: {
+                                        beeswax: createUuid()
+                                    }
+                                });
+                                updatedPlacements = placements.map(placement => ld.assign({}, placement, {
+                                    externalIds: {
+                                        beeswax: createUuid()
+                                    }
+                                }));
+
+                                initShowcaseDeferred.resolve({
+                                    campaign: updatedCampaign,
+                                    placements: updatedPlacements
+                                });
+
+                                setTimeout(done);
                             });
 
-                            it('should log an error', function() {
-                                expect(log.error).toHaveBeenCalled();
+                            it('should rebalance the org', function() {
+                                expect(showcase.rebalance).toHaveBeenCalledWith(campaign.org);
                             });
 
-                            it('should fulfill with undefined', function() {
-                                expect(success).toHaveBeenCalledWith(undefined);
-                            });
-                        });
+                            describe('if the rebalance fails', function() {
+                                let reason;
 
-                        describe('when the record has been produced', function() {
-                            beforeEach(function(done) {
-                                produceDeferred.fulfill(watchmanStream.produce.calls.mostRecent().args[0]);
-                                process.nextTick(done);
+                                beforeEach(function(done) {
+                                    reason = new Error('I failed you...');
+                                    rebalanceDeferred.reject(reason);
+                                    setTimeout(done);
+                                });
+
+                                it('should log an error', function() {
+                                    expect(log.error).toHaveBeenCalled();
+                                });
+
+                                it('should fulfill with undefined', function() {
+                                    expect(success).toHaveBeenCalledWith(undefined);
+                                });
                             });
 
-                            it('should not log an error', function() {
-                                expect(log.error).not.toHaveBeenCalled();
-                            });
+                            describe('when the rebalance is complete', function() {
+                                let produceDeferred;
 
-                            it('should fulfill with undefined', function() {
-                                expect(success).toHaveBeenCalledWith(undefined);
+                                beforeEach(function(done) {
+                                    watchmanStream.produce.and.returnValue((produceDeferred = q.defer()).promise);
+
+                                    rebalanceDeferred.resolve([campaign]);
+                                    setTimeout(done);
+                                });
+
+                                it('should produce a initializedShowcaseCampaign record', function() {
+                                    expect(watchmanStream.produce.calls.count()).toBe(1, 'Incorrect number of records produced!');
+                                    expect(watchmanStream.produce).toHaveBeenCalledWith({
+                                        type: 'initializedShowcaseCampaign',
+                                        data: {
+                                            campaign: updatedCampaign,
+                                            placements: updatedPlacements,
+                                            date: data.date
+                                        }
+                                    });
+                                });
+
+                                describe('if producing the record fails', function() {
+                                    let reason;
+
+                                    beforeEach(function(done) {
+                                        reason = new Error('I failed you...');
+                                        produceDeferred.reject(reason);
+                                        setTimeout(done);
+                                    });
+
+                                    it('should log an error', function() {
+                                        expect(log.error).toHaveBeenCalled();
+                                    });
+
+                                    it('should fulfill with undefined', function() {
+                                        expect(success).toHaveBeenCalledWith(undefined);
+                                    });
+                                });
+
+                                describe('when the record has been produced', function() {
+                                    beforeEach(function(done) {
+                                        produceDeferred.fulfill(watchmanStream.produce.calls.mostRecent().args[0]);
+                                        setTimeout(done);
+                                    });
+
+                                    it('should not log an error', function() {
+                                        expect(log.error).not.toHaveBeenCalled();
+                                    });
+
+                                    it('should fulfill with undefined', function() {
+                                        expect(success).toHaveBeenCalledWith(undefined);
+                                    });
+                                });
                             });
                         });
                     });

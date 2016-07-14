@@ -36,6 +36,7 @@
                     "cwrx": {
                         "api": {
                             "root": "http://33.33.33.10",
+                            "tracking" : "https://audit.cinema6.com/pixel.gif",
                             "auth": {
                                 "endpoint": "/api/auth"
                             },
@@ -71,6 +72,9 @@
                             },
                             "productData" : {
                                 "endpoint": "/api/collateral/product-data"
+                            },
+                            "paymentPlans": {
+                                "endpoint": "/api/payment-plans"
                             }
                         }
                     },
@@ -189,7 +193,18 @@
                             "campaignActive": "672909",
                             "campaignSubmitted": "672810",
                             "initializedShowcaseCampaign": "672910",
-                            "campaignActive--app": "694541"
+                            "campaignActive--app": "694541",
+                            "promotionEnded--app": "722104",
+                            "weekOneStats--app": "736301"
+                        }
+                    },
+                    "beeswax": {
+                        "apiRoot": "https://stingersbx.api.beeswax.com"
+                    },
+                    "campaign": {
+                        "conversionMultipliers": {
+                            "internal": 1.1,
+                            "external": 1.25
                         }
                     }
                 }
@@ -206,35 +221,6 @@
                         }
                     },
                     "eventHandlers": {
-                        "hourly": {
-                            "actions": [
-                                {
-                                    "name": "fetch_campaigns",
-                                    "options": {
-                                        "statuses": ["active", "paused", "outOfBudget"],
-                                        "prefix": "hourly",
-                                        "analytics": true,
-                                        "number": 50
-                                    }
-                                },
-                                {
-                                    "name": "fetch_orgs",
-                                    "options": {
-                                        "prefix": "hourly"
-                                    }
-                                }
-                            ]
-                        },
-                        "daily": {
-                            "actions": [
-                                {
-                                    "name": "fetch_orgs",
-                                    "options": {
-                                        "prefix": "daily"
-                                    }
-                                }
-                            ]
-                        }
                     }
                 }
             },
@@ -250,105 +236,6 @@
                         }
                     },
                     "eventHandlers": {
-                        "daily_orgPulse": {
-                            "actions": ["check_payment_required"]
-                        },
-                        "hourly_campaignPulse": {
-                            "actions": ["check_expiry", "fetch_product_data"]
-                        },
-                        "hourly_orgPulse": {
-                            "actions": ["check_available_funds"]
-                        },
-                        "campaignOutOfFunds": {
-                            "actions": [
-                                {
-                                    "name": "message/log",
-                                    "options": {
-                                        "text": "[activity] Campaign {{campaign.name}} ({{campaign.id}}) is out of funds",
-                                        "level": "warn"
-                                    }
-                                }
-                            ]
-                        },
-                        "campaignExpired": {
-                            "actions": [
-                                {
-                                    "name": "set_status",
-                                    "options": {
-                                        "status": "expired"
-                                    }
-                                }
-                            ]
-                        },
-                        "campaignReachedBudget": {
-                            "actions": [
-                                {
-                                    "name": "set_status",
-                                    "options": {
-                                        "status": "outOfBudget"
-                                    }
-                                }
-                            ]
-                        },
-                        "paymentRequired": {
-                            "actions": [
-                                {
-                                    "name": "charge_payment_plan",
-                                    "options": {
-                                        "target": "showcase"
-                                    }
-                                }
-                            ]
-                        },
-                        "chargePaymentPlanFailure": {
-                            "actions": [
-                                {
-                                    "name": "message/campaign_email",
-                                    "options": {
-                                        "type": "chargePaymentPlanFailure"
-                                    }
-                                }
-                            ]
-                        },
-                        "promotionFulfilled": {
-                            "actions": [
-                                {
-                                    "name": "create_promotion_credit"
-                                }
-                            ]
-                        },
-                        "initializedShowcaseCampaign": {
-                            "actions": [
-                                {
-                                    "name": "activate_payment_plan",
-                                    "options": {
-                                        "target": "showcase"
-                                    }
-                                },
-                                {
-                                    "name": "message/campaign_email",
-                                    "options": {
-                                        "type": "campaignActive"
-                                    }
-                                },
-                                {
-                                    "name": "message/campaign_email",
-                                    "options": {
-                                        "type": "initializedShowcaseCampaign",
-                                        "toSupport": true
-                                    }
-                                },
-                                {
-                                    "name": "hubspot/update_user",
-                                    "options": {
-                                        "properties": {
-                                            "applications": "apps",
-                                            "lifecyclestage": "customer"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
                     }
                 }
             },
@@ -364,273 +251,6 @@
                         }
                     },
                     "eventHandlers": {
-                        "campaignStateChange": {
-                            "actions": [
-                                {
-                                    "name": "message/campaign_email",
-                                    "options": {
-                                        "type": "campaignExpired"
-                                    },
-                                    "ifData": {
-                                        "previousState": "active|paused",
-                                        "currentState": "expired",
-                                        "campaign.application": "^(studio|selfie)$"
-                                    }
-                                },
-                                {
-                                    "name": "message/campaign_email",
-                                    "options": {
-                                        "type": "campaignReachedBudget"
-                                    },
-                                    "ifData": {
-                                        "currentState": "outOfBudget",
-                                        "campaign.application": "^(studio|selfie)$"
-                                    }
-                                },
-                                {
-                                    "name": "message/campaign_email",
-                                    "options": {
-                                        "type": "campaignActive"
-                                    },
-                                    "ifData": {
-                                        "previousState": "pending",
-                                        "currentState": "active",
-                                        "campaign.application": "^(studio|selfie)$"
-                                    }
-                                }
-                            ]
-                        },
-                        "campaignCreated": {
-                            "actions": [
-                                {
-                                    "name": "showcase/apps/init_campaign",
-                                    "ifData": {
-                                        "campaign.application": "^showcase$",
-                                        "campaign.product.type": "^app$"
-                                    },
-                                    "options": {
-                                        "card": {
-                                            "interstitial": {
-                                                "cardType": "showcase-app"
-                                            },
-                                            "threeHundredByTwoFifty": {
-                                                "cardType": "showcase-app"
-                                            }
-                                        },
-                                        "placement": {
-                                            "interstitial": {
-                                                "tagType": "mraid",
-                                                "tagParams": {
-                                                    "container": { "value": "beeswax" },
-                                                    "type": { "value": "mobile-card" },
-                                                    "branding": { "value": "showcase-app--interstitial" },
-                                                    "hostApp": { "value": "{{APP_BUNDLE}}", "inTag": true },
-                                                    "network": { "value": "{{INVENTORY_SOURCE}}", "inTag": true },
-                                                    "uuid": { "value": "{{IOS_ID}}", "inTag": true },
-                                                    "clickUrls": { "value": ["{{CLICK_URL}}"], "inTag": true },
-                                                    "forceOrientation": { "value": "none" }
-                                                }
-                                            },
-                                            "threeHundredByTwoFifty": {
-                                                "tagType": "display",
-                                                "tagParams": {
-                                                    "container": { "value": "beeswax" },
-                                                    "type": { "value": "mobile-card" },
-                                                    "branding": { "value": "showcase-app--300x250" }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        },
-                        "campaignUpdateApproved": {
-                            "actions": [
-                                {
-                                    "name": "message/campaign_email",
-                                    "options": {
-                                        "type": "campaignUpdateApproved"
-                                    }
-                                }
-                            ]
-                        },
-                        "campaignRejected": {
-                            "actions": [
-                                {
-                                    "name": "message/campaign_email",
-                                    "options": {
-                                        "type": "campaignRejected"
-                                    }
-                                }
-                            ]
-                        },
-                        "campaignUpdateRejected": {
-                            "actions": [
-                                {
-                                    "name": "message/campaign_email",
-                                    "options": {
-                                        "type": "campaignUpdateRejected"
-                                    }
-                                }
-                            ]
-                        },
-                        "newUpdateRequest": {
-                            "actions": [
-                                {
-                                    "name": "message/campaign_email",
-                                    "options": {
-                                        "toSupport": true,
-                                        "type": "newUpdateRequest"
-                                    }
-                                },
-                                {
-                                    "name": "message/campaign_email",
-                                    "options": {
-                                        "type": "campaignSubmitted"
-                                    },
-                                    "ifData": {
-                                        "updateRequest.initialSubmit": true
-                                    }
-                                }
-                            ]
-                        },
-                        "paymentMade": {
-                            "actions": [
-                                {
-                                    "name": "message/campaign_email",
-                                    "options": {
-                                        "type": "paymentMade"
-                                    }
-                                }
-                            ]
-                        },
-                        "transactionCreated": {
-                            "actions": [
-                                {
-                                    "name": "showcase/apps/auto_increase_budget",
-                                    "options": {
-                                        "dailyLimit": 2,
-                                        "externalAllocationFactor": 0.5
-                                    },
-                                    "ifData": {
-                                        "transaction.sign": "^1$",
-                                        "transaction.description": "\"target\"\\s*:\\s*\"showcase\""
-                                    }
-                                }
-                            ]
-                        },
-                        "accountCreated": {
-                            "actions": [
-                                {
-                                    "name": "message/campaign_email",
-                                    "options": {
-                                        "type": "activateAccount"
-                                    }
-                                },
-                                {
-                                    "name": "hubspot/submit_form",
-                                    "options": {
-                                        "portal": "2041560",
-                                        "form": "73472e84-6426-4fab-b092-936c0f692da6",
-                                        "data": {
-                                            "applications": "apps"
-                                        }
-                                    },
-                                    "ifData": {
-                                        "target": "^showcase$"
-                                    }
-                                }
-                            ]
-                        },
-                        "accountActivated": {
-                            "actions": [
-                                {
-                                    "name": "message/campaign_email",
-                                    "options": {
-                                        "type": "accountWasActivated"
-                                    }
-                                },
-                                {
-                                    "name": "check_signup_promotion"
-                                },
-                                {
-                                    "name": "hubspot/update_user",
-                                    "options": {
-                                        "properties": {
-                                            "applications": "apps",
-                                            "lifecyclestage": "salesqualifiedlead"
-                                        }
-                                    },
-                                    "ifData": {
-                                        "target": "^showcase$"
-                                    }
-                                }
-                            ]
-                        },
-                        "passwordChanged": {
-                            "actions": [
-                                {
-                                    "name": "message/campaign_email",
-                                    "options": {
-                                        "type": "passwordChanged"
-                                    }
-                                }
-                            ]
-                        },
-                        "emailChanged": {
-                            "actions": [
-                                {
-                                    "name": "message/campaign_email",
-                                    "options": {
-                                        "type": "emailChanged",
-                                        "to": "{{oldEmail}}"
-                                    }
-                                },
-                                {
-                                    "name": "message/campaign_email",
-                                    "options": {
-                                        "type": "emailChanged",
-                                        "to": "{{newEmail}}"
-                                    }
-                                },
-                                {
-                                    "name": "hubspot/update_user",
-                                    "ifData": {
-                                        "target": "^showcase$"
-                                    }
-                                }
-                            ]
-                        },
-                        "failedLogins": {
-                            "actions": [
-                                {
-                                    "name": "message/campaign_email",
-                                    "options": {
-                                        "type": "failedLogins"
-                                    }
-                                }
-                            ]
-                        },
-                        "forgotPassword": {
-                            "actions": [
-                                {
-                                    "name": "message/campaign_email",
-                                    "options": {
-                                        "type": "forgotPassword"
-                                    }
-                                }
-                            ]
-                        },
-                        "resendActivation": {
-                            "actions": [
-                                {
-                                    "name": "message/campaign_email",
-                                    "options": {
-                                        "type": "activateAccount"
-                                    }
-                                }
-                            ]
-                        }
                     }
                 }
             }

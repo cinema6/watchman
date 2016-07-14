@@ -18,11 +18,11 @@ module.exports = function(config) {
         var promotionsConfig = config.promotions;
         var watchmanProducer = new rcKinesis.JsonProducer(producerConfig.stream, producerConfig);
         var user = event.data.user;
-        
+
         if (!user || !user.promotion) {
             return q();
         }
-        
+
         // Fetch the user's org + promotion
         var orgUrl = config.cwrx.api.root + config.cwrx.api.orgs.endpoint,
             promUrl = config.cwrx.api.root + config.cwrx.api.promotions.endpoint;
@@ -50,19 +50,19 @@ module.exports = function(config) {
                 log.warn('User %1 has invalid promotion %2, skipping', user.id, promotion.id);
                 return q();
             }
-            
+
             org.promotions = org.promotions || [];
 
             // Warn and exit if org already has this same promotion
             var existing = org.promotions.some(function(promWrapper) {
                 return promWrapper.id === promotion.id;
             });
-            if (!!existing) {
+            if (existing) {
                 log.warn('Org %1 already has signup promotion %2, not re-applying',
                          org.id, promotion.id);
                 return q();
             }
-            
+
             // Add the new promotion to the org's promotions array and PUT the org
             var now = new Date();
             org.promotions.push({
@@ -71,7 +71,7 @@ module.exports = function(config) {
                 lastUpdated: now,
                 status: Status.Active
             });
-            
+
             return requestUtils.makeSignedRequest(appCreds, 'put', {
                 url: orgUrl + '/' + org.id,
                 json: org
@@ -84,7 +84,7 @@ module.exports = function(config) {
                     });
                 }
                 org = putResp.body;
-                
+
                 log.info('Applied signup promotion %1 from user %2 to org %3',
                          promotion.id, user.id, org.id);
 
@@ -94,7 +94,8 @@ module.exports = function(config) {
                         type: 'promotionFulfilled',
                         data: {
                             org: org,
-                            promotion: promotion
+                            promotion: promotion,
+                            date: event.data.date
                         }
                     });
                 }

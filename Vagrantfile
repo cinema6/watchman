@@ -24,7 +24,8 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   # Enable the Berkshelf plugin
   config.berkshelf.enabled = true
 
-  config.omnibus.chef_version = '12.10.24'
+  # The version of chef that we use on our servers
+  config.omnibus.chef_version = '11.10.4'
 
   # Provision with chef solo
   config.vm.provision "chef_solo" do |chef|
@@ -38,6 +39,18 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
         'recipe[watchman]'
     ]
     chef.json = {
+        :c6env => {
+            :npm => {
+                :fileCache => {
+                    :enabled => true
+                }
+            },
+            :gcc => {
+                :devtools => {
+                    :install => true
+                }
+            }
+        },
         :watchman => {
             :awsAuth => JSON.parse(File.read("#{ENV['HOME']}/.aws.json")),
             :rsyslog => {

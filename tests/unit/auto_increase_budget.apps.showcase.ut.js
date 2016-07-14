@@ -1,10 +1,12 @@
 'use strict';
 
-var Status = require('cwrx/lib/enums').Status;
+const Status = require('cwrx/lib/enums').Status;
+const moment = require('moment');
+const proxyquire = require('proxyquire');
 
 describe('(action factory) showcase/apps/auto_increase_budget', function() {
     var q, uuid, resolveURL, ld, logger;
-    var JsonProducer, CwrxRequest;
+    var JsonProducer, CwrxRequest, BeeswaxClient;
     var factory;
 
     beforeAll(function() {
@@ -13,50 +15,48 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
         resolveURL = require('url').resolve;
         ld = require('lodash');
         logger = require('cwrx/lib/logger');
+    });
 
-        delete require.cache[require.resolve('rc-kinesis')];
+    beforeEach(function() {
         JsonProducer = (function(JsonProducer) {
             return jasmine.createSpy('JsonProducer()').and.callFake(function(name, options) {
-                var producer = new JsonProducer(name, options);
+                const producer = new JsonProducer(name, options);
 
                 spyOn(producer, 'produce').and.returnValue(q.defer().promise);
 
                 return producer;
             });
         }(require('rc-kinesis').JsonProducer));
-        require.cache[require.resolve('rc-kinesis')].exports.JsonProducer = JsonProducer;
 
-        delete require.cache[require.resolve('../../lib/CwrxRequest')];
         CwrxRequest = (function(CwrxRequest) {
             return jasmine.createSpy('CwrxRequest()').and.callFake(function(creds) {
-                var request = new CwrxRequest(creds);
+                const request = new CwrxRequest(creds);
 
                 spyOn(request, 'send').and.returnValue(q.defer().promise);
 
                 return request;
             });
         }(require('../../lib/CwrxRequest')));
-        require.cache[require.resolve('../../lib/CwrxRequest')].exports = CwrxRequest;
 
-        delete require.cache[require.resolve('../../src/actions/showcase/apps/auto_increase_budget')];
-        factory = require('../../src/actions/showcase/apps/auto_increase_budget');
-    });
+        BeeswaxClient = (BeeswaxClient => jasmine.createSpy('BeeswaxClient()').and.callFake(config => new BeeswaxClient(config)))(require('beeswax-client'));
 
-    beforeEach(function() {
-        [JsonProducer, CwrxRequest].forEach(function(spy) {
-            spy.calls.reset();
+        factory = proxyquire('../../src/actions/showcase/apps/auto_increase_budget', {
+            'rc-kinesis': {
+                JsonProducer
+            },
+            '../../../../lib/CwrxRequest': CwrxRequest,
+            'beeswax-client': BeeswaxClient
         });
     });
 
     it('should exist', function() {
         expect(factory).toEqual(jasmine.any(Function));
-        expect(factory.name).toBe('autoIncreaseBudgetFactory');
     });
 
     describe('when called', function() {
         var config, paymentPlan;
         var autoIncreaseBudget;
-        var request, log;
+        var request, beeswax, log;
 
         beforeEach(function() {
             paymentPlan = {
@@ -87,9 +87,27 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                         stream: 'devWatchmanStream'
                     }
                 },
-                paymentPlans: {}
+                paymentPlans: {
+                    [paymentPlan.id]: paymentPlan
+                },
+                state: {
+                    secrets: {
+                        beeswax: {
+                            email: 'ops@reelcontent.com',
+                            password: 'wueyrfhu83rgf4u3gr'
+                        }
+                    }
+                },
+                beeswax: {
+                    apiRoot: 'https://stingersbx.api.beeswax.com'
+                },
+                campaign: {
+                    conversionMultipliers: {
+                        internal: 1.1,
+                        external: 1.25
+                    }
+                }
             };
-            config.paymentPlans[paymentPlan.id] = paymentPlan;
 
             spyOn(logger, 'getLog').and.returnValue(log = jasmine.createSpyObj('log', [
                 'info',
@@ -101,20 +119,29 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
             autoIncreaseBudget = factory(config);
 
             request = CwrxRequest.calls.mostRecent().returnValue;
+            beeswax = BeeswaxClient.calls.mostRecent().returnValue;
         });
 
         it('should return the action Function', function() {
             expect(autoIncreaseBudget).toEqual(jasmine.any(Function));
-            expect(autoIncreaseBudget.name).toBe('autoIncreaseBudget');
         });
 
         it('should create a CwrxRequest', function() {
             expect(CwrxRequest).toHaveBeenCalledWith(config.appCreds);
         });
 
+        it('should create a BeeswaxClient', function() {
+            expect(BeeswaxClient).toHaveBeenCalledWith({
+                apiRoot: config.beeswax.apiRoot,
+                creds: config.state.secrets.beeswax
+            });
+        });
+
         describe('the action', function() {
             var data, options, event;
             var getCampaignsDeferred;
+            let findBeeswaxCampaignDeferreds;
+            let editBeeswaxCampaignDeferreds;
             var success, failure;
 
             beforeEach(function(done) {
@@ -130,7 +157,12 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                         campaign: null,
                         braintreeId: null,
                         promotion: 'pro-' + uuid.createUuid(),
-                        description: JSON.stringify({ eventType: 'credit', source: 'braintree', target: 'showcase', paymentPlanId: paymentPlan.id })
+                        application: 'showcase',
+                        paymentPlanId: paymentPlan.id,
+                        targetUsers: 2000,
+                        cycleStart: moment().format(),
+                        cycleEnd: moment().add(1, 'month').subtract(1, 'day').format(),
+                        description: JSON.stringify({ eventType: 'credit', source: 'braintree' })
                     }
                 };
                 options = {
@@ -144,8 +176,18 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
 
                 spyOn(request, 'get').and.returnValue((getCampaignsDeferred = q.defer()).promise);
 
+                findBeeswaxCampaignDeferreds = [];
+                spyOn(beeswax.campaigns, 'find').and.callFake(() => {
+                    return findBeeswaxCampaignDeferreds[findBeeswaxCampaignDeferreds.push(q.defer()) - 1].promise;
+                });
+
+                editBeeswaxCampaignDeferreds = [];
+                spyOn(beeswax.campaigns, 'edit').and.callFake(() => {
+                    return editBeeswaxCampaignDeferreds[editBeeswaxCampaignDeferreds.push(q.defer()) - 1].promise;
+                });
+
                 autoIncreaseBudget(event).then(success, failure);
-                process.nextTick(done);
+                setTimeout(done);
             });
 
             it('should get all of the org\'s campaigns', function() {
@@ -196,34 +238,36 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                             pricing: {
                                 model: 'cpv',
                                 cost: 0.01,
-                                budget: 1,
+                                budget: 26,
                                 dailyLimit: 2
                             },
                             externalCampaigns: {
                                 beeswax: {
                                     externalId: uuid.createUuid(),
-                                    budgetImpressions: 200,
+                                    budgetImpressions: 1000,
                                     dailyLimitImpressions: 300
                                 }
                             },
+                            conversionMultipliers: {
+                                internal: 1.25,
+                                external: 1.50
+                            },
                             product: {
                                 type: 'app'
-                            }
+                            },
+                            targetUsers: 800
                         },
                         {
                             id: 'cam-' + uuid.createUuid(),
                             status: 'outOfBudget',
                             application: 'showcase',
-                            externalCampaigns: {
-                                beeswax: {
-                                    externalId: uuid.createUuid(),
-                                    budgetImpressions: 0,
-                                    dailyLimitImpressions: 200
-                                }
+                            externalIds: {
+                                beeswax: uuid.createUuid()
                             },
                             product: {
                                 type: 'app'
-                            }
+                            },
+                            targetUsers: 1200
                         },
                         {
                             id: 'cam-' + uuid.createUuid(),
@@ -261,17 +305,19 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                     });
 
                     getCampaignsDeferred.fulfill([campaigns, { statusCode: 200 }]);
-                    process.nextTick(done);
+                    setTimeout(done);
                 });
 
-                it('should update the bob campaign budgets', function() {
+                it('should update the bob campaign pricing', function() {
                     expect(request.put.calls.count()).toBe(2);
                     expect(request.put).toHaveBeenCalledWith({
                         url: resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint + '/' + campaigns[1].id),
                         json: ld.assign({}, campaigns[1], {
                             status: 'active',
                             pricing: ld.assign({}, campaigns[1].pricing, {
-                                budget: campaigns[1].pricing.budget + (data.transaction.amount / 2),
+                                model: 'cpv',
+                                cost: 0.020,
+                                budget: 51,
                                 dailyLimit: options.dailyLimit
                             })
                         })
@@ -281,56 +327,67 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                         json: ld.assign({}, campaigns[2], {
                             status: 'active',
                             pricing: {
-                                budget: (data.transaction.amount / 2),
+                                model: 'cpv',
+                                cost: 0.023,
+                                budget: 25,
                                 dailyLimit: options.dailyLimit
                             }
                         })
                     });
                 });
 
-                describe('when the campaigns have been updated', function() {
+                it('should find the beeswax campaigns', function() {
+                    expect(beeswax.campaigns.find.calls.count()).toBe(2);
+
+                    expect(beeswax.campaigns.find).toHaveBeenCalledWith(campaigns[1].externalCampaigns.beeswax.externalId);
+                    expect(beeswax.campaigns.find).toHaveBeenCalledWith(campaigns[2].externalIds.beeswax);
+                });
+
+                describe('when the campaigns have been updated and the beeswax campaigns have been fetched', function() {
+                    let beeswaxCampaigns;
+
                     beforeEach(function(done) {
                         putCampaignDeferreds[campaigns[1].id].fulfill([request.put.calls.all()[0].args[0].json, { statusCode: 200 }]);
                         putCampaignDeferreds[campaigns[2].id].fulfill([request.put.calls.all()[1].args[0].json, { statusCode: 200 }]);
-                        request.put.calls.reset();
 
-                        process.nextTick(done);
+                        beeswaxCampaigns = [
+                            {
+                                campaign_id: campaigns[1].externalCampaigns.beeswax.externalId,
+                                campaign_budget: 1000
+                            },
+                            {
+                                campaign_id: campaigns[2].externalIds.beeswax,
+                                campaign_budget: 0
+                            }
+                        ];
+
+                        findBeeswaxCampaignDeferreds.forEach((deferred, index) => deferred.resolve({
+                            success: true,
+                            payload: beeswaxCampaigns[index]
+                        }));
+
+                        setTimeout(done);
                     });
 
-                    it('should update the bob external campaign budgets', function() {
-                        expect(request.put.calls.count()).toBe(2);
-                        expect(request.put).toHaveBeenCalledWith({
-                            url: resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint + '/' + campaigns[1].id + '/external/beeswax'),
-                            json: {
-                                budgetImpressions: campaigns[1].externalCampaigns.beeswax.budgetImpressions + ld.floor((data.transaction.amount / 2) * paymentPlan.impressionsPerDollar),
-                                dailyLimitImpressions: paymentPlan.dailyImpressionLimit,
-                                budget: null,
-                                dailyLimit: null
-                            }
+                    it('should update the beeswax campaigns', function() {
+                        expect(beeswax.campaigns.edit.calls.count()).toBe(2);
+
+                        expect(beeswax.campaigns.edit).toHaveBeenCalledWith(beeswaxCampaigns[0].campaign_id, {
+                            campaign_budget: 2500
                         });
-                        expect(request.put).toHaveBeenCalledWith({
-                            url: resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint + '/' + campaigns[2].id + '/external/beeswax'),
-                            json: {
-                                budgetImpressions: campaigns[2].externalCampaigns.beeswax.budgetImpressions + ld.floor((data.transaction.amount / 2) * paymentPlan.impressionsPerDollar),
-                                dailyLimitImpressions: paymentPlan.dailyImpressionLimit,
-                                budget: null,
-                                dailyLimit: null
-                            }
+                        expect(beeswax.campaigns.edit).toHaveBeenCalledWith(beeswaxCampaigns[1].campaign_id, {
+                            campaign_budget: 1250
                         });
                     });
 
-                    describe('when the external campaigns have been updated', function() {
+                    describe('when the beeswax campaigns have been updated', function() {
                         beforeEach(function(done) {
-                            putExternalCampaignDeferreds[campaigns[1].id].fulfill([
-                                ld.assign({}, campaigns[1].externalCampaigns.beeswax, request.put.calls.all()[0].args[0].json),
-                                { statusCode: 200 }
-                            ]);
-                            putExternalCampaignDeferreds[campaigns[2].id].fulfill([
-                                ld.assign({}, campaigns[2].externalCampaigns.beeswax, request.put.calls.all()[1].args[0].json),
-                                { statusCode: 200 }
-                            ]);
+                            editBeeswaxCampaignDeferreds.forEach((deferred, index) => deferred.resolve({
+                                success: true,
+                                payload: ld.assign({}, beeswaxCampaigns[index], beeswax.campaigns.edit.calls.all()[index].args[1])
+                            }));
 
-                            process.nextTick(done);
+                            setTimeout(done);
                         });
 
                         it('should not log an error', function() {
@@ -344,13 +401,9 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
 
                     describe('if an external campaign fails to udpate', function() {
                         beforeEach(function(done) {
-                            putExternalCampaignDeferreds[campaigns[1].id].reject(new Error('Everything dies eventually.'));
-                            putExternalCampaignDeferreds[campaigns[2].id].fulfill([
-                                ld.assign({}, campaigns[2].externalCampaigns.beeswax, request.put.calls.all()[1].args[0].json),
-                                { statusCode: 200 }
-                            ]);
+                            editBeeswaxCampaignDeferreds[0].reject(new Error('Everything dies eventually.'));
 
-                            process.nextTick(done);
+                            setTimeout(done);
                         });
 
                         it('should log an error', function() {
@@ -368,7 +421,7 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                         putCampaignDeferreds[campaigns[1].id].reject(new Error('There was a problem doing stuff!'));
                         putCampaignDeferreds[campaigns[2].id].reject(new Error('There was a problem doing more stuff!'));
 
-                        process.nextTick(done);
+                        setTimeout(done);
                     });
 
                     it('should log an error', function() {
@@ -381,69 +434,17 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                 });
             });
 
-            describe('if the transaction does not have a valid description', function() {
+            describe('if the transaction has no paymentPlanId', function() {
                 beforeEach(function(done) {
                     success.calls.reset();
                     failure.calls.reset();
 
-                    data.transaction.description = 'foo bar';
+                    delete data.transaction.paymentPlanId;
 
                     request.get.calls.reset();
 
                     autoIncreaseBudget(event).then(success, failure);
-                    process.nextTick(done);
-                });
-
-                it('should log an error', function() {
-                    expect(log.error).toHaveBeenCalled();
-                });
-
-                it('should fulfill with undefined', function() {
-                    expect(success).toHaveBeenCalledWith(undefined);
-                });
-
-                it('should not GET anything', function() {
-                    expect(request.get).not.toHaveBeenCalled();
-                });
-            });
-
-            describe('if the transaction has no description', function() {
-                beforeEach(function(done) {
-                    success.calls.reset();
-                    failure.calls.reset();
-
-                    data.transaction.description = null;
-
-                    request.get.calls.reset();
-
-                    autoIncreaseBudget(event).then(success, failure);
-                    process.nextTick(done);
-                });
-
-                it('should log an error', function() {
-                    expect(log.error).toHaveBeenCalled();
-                });
-
-                it('should fulfill with undefined', function() {
-                    expect(success).toHaveBeenCalledWith(undefined);
-                });
-
-                it('should not GET anything', function() {
-                    expect(request.get).not.toHaveBeenCalled();
-                });
-            });
-
-            describe('if the transaction description has no paymentPlanId', function() {
-                beforeEach(function(done) {
-                    success.calls.reset();
-                    failure.calls.reset();
-
-                    data.transaction.description = JSON.stringify({ eventType: 'credit', source: 'braintree', target: 'showcase' });
-
-                    request.get.calls.reset();
-
-                    autoIncreaseBudget(event).then(success, failure);
-                    process.nextTick(done);
+                    setTimeout(done);
                 });
 
                 it('should log an error', function() {
@@ -464,12 +465,12 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                     success.calls.reset();
                     failure.calls.reset();
 
-                    data.transaction.description = JSON.stringify({ eventType: 'credit', source: 'braintree', target: 'showcase', paymentPlanId: 'pp-' + uuid.createUuid() });
+                    data.transaction.paymentPlanId = `pp-${uuid.createUuid()}`;
 
                     request.get.calls.reset();
 
                     autoIncreaseBudget(event).then(success, failure);
-                    process.nextTick(done);
+                    setTimeout(done);
                 });
 
                 it('should log an error', function() {
