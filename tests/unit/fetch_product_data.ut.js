@@ -5,9 +5,10 @@ var q = require('q');
 var ld = require('lodash');
 var logger = require('cwrx/lib/logger.js');
 var fetchProductDataFactory = require('../../src/actions/fetch_product_data.js');
+var resolveURL = require('url').resolve;
 
-describe('fetch_product_data.js', function() {
-    var req, mockLog, mockCampaigns;
+fdescribe('fetch_product_data.js', function() {
+    var req, mockLog, mockCampaigns, dataEndpoint, campEndpoint;
 
     beforeEach(function() {
         this.mockOptions = { };
@@ -26,6 +27,10 @@ describe('fetch_product_data.js', function() {
                 }
             }
         };
+
+        dataEndpoint = resolveURL(this.mockConfig.cwrx.api.root, this.mockConfig.cwrx.api.productData.endpoint);
+        campEndpoint = resolveURL(this.mockConfig.cwrx.api.root, this.mockConfig.cwrx.api.campaigns.endpoint);
+
         mockLog = {
             trace : jasmine.createSpy('log_trace'),
             error : jasmine.createSpy('log_error'),
@@ -150,7 +155,7 @@ describe('fetch_product_data.js', function() {
                     type: 'blah',
                     platform: 'wtvr',
                     name: 'Count Coins',
-                    description: 'some new description',
+                    description: 'some other description',
                     developer: 'Howard Engelhart',
                     uri: 'https://itunes.apple.com/us/app/count-coins/id595124272?mt=8&uo=4',
                     categories: [
@@ -471,9 +476,9 @@ describe('fetch_product_data.js', function() {
         this.fetchProductData = fetchProductDataFactory(this.mockConfig);
     });
 
-    describe('after fetching product data', function() {
+    describe('fetching product data', function() {
         beforeEach(function(done) {
-            spyOn(require('../../lib/CwrxRequest').prototype,'get').and.returnValue(
+            spyOn(req.prototype, 'get').and.returnValue(
                 new q.promise(function(resolve) {
                     resolve(
                         [
@@ -531,7 +536,6 @@ describe('fetch_product_data.js', function() {
 
                 self.fetchProductData({ data: {campaign: mockCampaigns[0]}, options: self.mockOptions })
                 .then(function() {
-                    expect(JsonProducer.prototype.produce).not.toHaveBeenCalled();
                     done();
                 }).catch(function(error) {
                     done.fail(error);
@@ -540,6 +544,10 @@ describe('fetch_product_data.js', function() {
             it('should not update the campaign', function() {
                 expect(req.prototype.put).not.toHaveBeenCalled();
                 expect(mockLog.info).toHaveBeenCalled();
+            });
+
+            it('should not produce a record', function() {
+                expect(JsonProducer.prototype.produce).not.toHaveBeenCalled();
             });
         });
 
@@ -598,13 +606,61 @@ describe('fetch_product_data.js', function() {
                     done.fail(error);
                 });
             });
+
             it('should update the campaign', function() {
-                expect(req.prototype.put).toHaveBeenCalledWith({
-                    url: jasmine.any(String),
-                    json: {
-                        product: jasmine.any(Object)
-                    }
-                });
+                    expect(req.prototype.put).toHaveBeenCalledWith({
+                        url: campEndpoint + '/' + mockCampaigns[1].id,
+                        json: {
+                            product: {
+                                type: 'app',
+                                platform: 'iOS',
+                                name: 'Count Coins',
+                                description: 'some other description',
+                                developer: 'Howard Engelhart',
+                                uri: 'https://itunes.apple.com/us/app/count-coins/id595124272?mt=8&uo=4',
+                                categories: [
+                                    'Education',
+                                    'Games',
+                                    'Educational'
+                                ],
+                                price: 'Free',
+                                extID: 595124272,
+                                images: [
+                                    {
+                                        uri: 'http://a1.mzstatic.com/us/r30/Purple/v4/c2/ec/6b/c2ec6b9a-d47b-20e4-d1f7-2f42fffcb58f/screen1136x1136.jpeg',
+                                        type: 'screenshot',
+                                        device: 'phone'
+                                    },
+                                    {
+                                        uri: 'http://a5.mzstatic.com/us/r30/Purple/v4/fc/4b/e3/fc4be397-6865-7011-361b-59f78c789e62/screen1136x1136.jpeg',
+                                        type: 'screenshot',
+                                        device: 'phone'
+                                    },
+                                    {
+                                        uri: 'http://a5.mzstatic.com/us/r30/Purple/v4/f9/02/63/f902630c-3969-ab9f-07b4-2c91bd629fd0/screen1136x1136.jpeg',
+                                        type: 'screenshot',
+                                        device: 'phone'
+                                    },
+                                    {
+                                        uri: 'http://a3.mzstatic.com/us/r30/Purple/v4/f8/21/0e/f8210e8f-a75a-33c0-9e86-e8c65c9faa54/screen1136x1136.jpeg',
+                                        type: 'screenshot',
+                                        device: 'phone'
+                                    },
+                                    {
+                                        uri: 'http://is5.mzstatic.com/image/thumb/Purple/v4/ef/a0/f3/efa0f340-225e-e512-1616-8f223c6202ea/source/512x512bb.jpg',
+                                        type: 'thumbnail'
+                                    }
+                                ]
+                            }
+                        }
+                    });
+            });
+
+            it('should not update the campaign name or description', function() {
+
+            });
+
+            it ('should produce a new record', function() {
                 expect(JsonProducer.prototype.produce).toHaveBeenCalledWith({
                     type: 'campaignRefreshed',
                     data: {
@@ -614,6 +670,7 @@ describe('fetch_product_data.js', function() {
                 });
                 expect(mockLog.info).toHaveBeenCalled();
             });
+
         });
     });
 });

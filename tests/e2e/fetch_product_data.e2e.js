@@ -5,7 +5,6 @@ var q                       = require('q');
 var testUtils               = require('cwrx/test/e2e/testUtils.js');
 var CwrxRequest             = require('../../lib/CwrxRequest');
 var resolveURL              = require('url').resolve;
-var logger                  = require('cwrx/lib/logger.js');
 var moment                  = require('moment');
 
 var APP_CREDS               = JSON.parse(process.env.appCreds);
@@ -26,9 +25,9 @@ function waitUntil(predicate) {
 }
 
 fdescribe('timeStream', function() {
-    var producer, mockman, mockCampaigns, mockAdvert, awsConfig;
+    var producer, mockCampaigns, mockAdvert, awsConfig;
 
-    beforeAll(function(done) {
+    beforeAll(function() {
         awsConfig = {
             region: 'us-east-1',
             cwrx: {
@@ -48,14 +47,6 @@ fdescribe('timeStream', function() {
             awsConfig.secretAccessKey = AWS_CREDS.secretAccessKey;
         }
         producer = new JsonProducer(WATCHMAN_STREAM, awsConfig);
-        mockman = new testUtils.Mockman({
-            streamName: WATCHMAN_STREAM
-        });
-        mockman.start().then(done, done.fail);
-    });
-
-    afterAll(function() {
-        mockman.stop();
     });
 
     beforeEach(function(done) {
@@ -210,19 +201,14 @@ fdescribe('timeStream', function() {
     });
 
     afterAll(function(done) {
-        mockman.stop();
         testUtils.closeDbs().then(done, done.fail);
     });
 
-    afterEach(function() {
-        mockman.removeAllListeners();
-    });
 
 
     describe('the time event prompting campaign data to be fetched', function() {
-        var dataEndpoint, campEndpoint, log, request;
+        var dataEndpoint, campEndpoint, request;
         beforeEach(function(done) {
-            log = logger.getLog();
             request = new CwrxRequest(APP_CREDS);
             dataEndpoint = resolveURL(awsConfig.cwrx.api.root, awsConfig.cwrx.api.productData.endpoint);
             producer.produce({ type: 'hourly_campaignPulse', data: { campaign: mockCampaigns[0], date: new Date() } }).then(done, done.fail);

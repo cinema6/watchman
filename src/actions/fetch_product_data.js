@@ -70,8 +70,6 @@ module.exports = function fetchProductDataFactory(config) {
                 log.info('No data changes to update [%1]', id);
                 return;
             }
-        }).catch(function(error) {
-            log.warn(error);
         });
     };
 };
