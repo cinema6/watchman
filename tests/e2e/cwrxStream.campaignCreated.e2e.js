@@ -195,7 +195,7 @@ describe('cwrxStream campaignCreated', function() {
                 json: true
             });
         }).spread(function(campaign) {
-            if (!campaign.externalIds.beeswax) { return; }
+            if (!ld.get(campaign, 'externalIds.beeswax')) { return; }
 
             return beeswax.campaigns.delete(campaign.externalIds.beeswax);
         }).then(function() {
@@ -214,7 +214,9 @@ describe('cwrxStream campaignCreated', function() {
                         return beeswax.creatives.delete(beeswaxId);
                     });
             }));
-        });
+        }).then(() => request.delete({
+            url: api(`/api/campaigns/${campaign.id}`)
+        }));
     }
 
     function createHubspotContactForUser(user) {
@@ -299,6 +301,12 @@ describe('cwrxStream campaignCreated', function() {
                     initializedShowcaseCampaign: '672910',
                     campaignActive: '672909',
                     'campaignActive--app': '694541'
+                }
+            },
+            campaign: {
+                conversionMultipliers: {
+                    internal: 1.1,
+                    external: 1.25
                 }
             }
         };
@@ -464,7 +472,7 @@ describe('cwrxStream campaignCreated', function() {
                 placements: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
                 advertisers: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
                 promotions: { read: 'all' },
-                transactions: { create: 'all' },
+                transactions: { read: 'all', create: 'all' },
                 paymentPlans: { read: 'all' }
             },
             entitlements: {
@@ -478,6 +486,11 @@ describe('cwrxStream campaignCreated', function() {
                     },
                     cards: {
                         __length: Infinity
+                    },
+                    pricing: {
+                        budget: {
+                            __min: 0
+                        }
                     }
                 },
                 orgs: {
@@ -573,7 +586,13 @@ describe('cwrxStream campaignCreated', function() {
             testUtils.resetCollection('orgs', []),
             testUtils.resetCollection('users', []),
             testUtils.resetCollection('promotions', promotions),
-            testUtils.resetCollection('containers', containers)
+            testUtils.resetCollection('containers', containers),
+            testUtils.resetCollection('campaigns', []),
+            hubspot.getContactByEmail('c6e2etester@gmail.com').then(contact => {
+                if(contact) {
+                    return hubspot.deleteContact(contact.vid);
+                }
+            })
         ]).then(function() {
             return createUser();
         }).spread(function(/*user, org, advertiser, paymentPlan*/) {
@@ -886,6 +905,243 @@ describe('cwrxStream campaignCreated', function() {
         });
     });
 
+    describe('if the org has other campaigns', function() {
+        let today;
+        let campaigns, beeswaxCampaigns, beeswaxCampaign;
+
+        function createCampaigns() {
+            const ids = [createId('cam'), createId('cam')];
+
+            return Promise.resolve().then(() => {
+                return Promise.all([
+                    beeswax.campaigns.create({
+                        advertiser_id: advertiser.beeswaxIds.advertiser,
+                        campaign_name: `E2E Test Campaign (${uuid.createUuid()})`,
+                        campaign_budget: 4500,
+                        budget_type: 1,
+                        start_date: moment().format('YYYY-MM-DD'),
+                        pacing: 0,
+                        active: true
+                    }),
+                    beeswax.campaigns.create({
+                        advertiser_id: advertiser.beeswaxIds.advertiser,
+                        campaign_name: `E2E Test Campaign (${uuid.createUuid()})`,
+                        campaign_budget: 2500,
+                        budget_type: 1,
+                        start_date: moment().format('YYYY-MM-DD'),
+                        pacing: 0,
+                        active: true
+                    })
+                ]);
+            }).then(responses => {
+                const beeswaxCampaigns = responses.map(response => response.payload);
+
+                return testUtils.resetCollection('campaigns', [
+                    {
+                        id: ids[0],
+                        status: 'active',
+                        targetUsers: 1000,
+                        application: 'showcase',
+                        product: {
+                            type: 'app'
+                        },
+                        conversionMultipliers: {
+                            internal: 1.25,
+                            external: 1.5
+                        },
+                        org: org.id,
+                        user: user.id,
+                        advertiserId: advertiser.id,
+                        externalIds: {
+                            beeswax: beeswaxCampaigns[0].campaign_id
+                        },
+                        pricing: {
+                            model: 'cpv',
+                            cost: 0.02,
+                            budget: 75
+                        }
+                    },
+                    {
+                        id: ids[1],
+                        status: 'active',
+                        targetUsers: 1000,
+                        application: 'showcase',
+                        product: {
+                            type: 'app'
+                        },
+                        org: org.id,
+                        user: user.id,
+                        advertiserId: advertiser.id,
+                        externalIds: {
+                            beeswax: beeswaxCampaigns[1].campaign_id
+                        },
+                        pricing: {
+                            model: 'cpv',
+                            cost: 0.011,
+                            budget: 50
+                        }
+                    },
+                    campaign
+                ]).then(() => request.get({
+                    url: api('/api/campaigns'),
+                    qs: { ids: ids.join(',') }
+                })).spread(campaigns => [campaigns, beeswaxCampaigns]);
+            });
+        }
+
+        function createTransactions() {
+            const ids = [createId('t')];
+
+            return testUtils.resetPGTable('fct.billing_transactions', [
+                `(
+                    1,
+                    current_timestamp,
+                    '${ids[0]}',
+                    '${today.format()}',
+                    '${org.id}',
+                    50,
+                    1,
+                    1,
+                    null,
+                    null,
+                    null,
+                    '${JSON.stringify({
+                        source: 'braintree',
+                        target: 'showcase'
+                    })}',
+                    2000,
+                    '${moment(today).add(1, 'month').subtract(1, 'day').format()}',
+                    '${today.format()}',
+                    'pp-${uuid.createUuid()}',
+                    'showcase'
+                )`
+            ]).then(() => (
+                request.get({
+                    url: api('/api/transactions'),
+                    qs: { org: org.id }
+                })).spread(transactions => (
+                    transactions.filter(transaction => ids.indexOf(transaction.id) > -1)
+                ))
+            );
+        }
+
+        function createAnalytics(campaign, days) {
+            const dailyUserViewsTable = days.map((views, index) => `(
+                '${moment(today).add(index, 'days').format()}',
+                '${campaign.id}',
+                ${views}
+            )`);
+            const showcaseUserViewsTable = ld(days).map((views, index) => Array.apply([], new Array(views)).map(() => `(
+                '${moment(today).add(index, 'days').format()}',
+                '${campaign.id}',
+                '${campaign.org}',
+                '${uuid.createUuid()}'
+            )`)).flatten().value();
+
+            return Promise.all([
+                testUtils.pgQuery(`INSERT INTO rpt.unique_user_views_daily VALUES${dailyUserViewsTable.join(',\n')};`),
+                testUtils.pgQuery(`INSERT INTO fct.showcase_user_views_daily VALUES${showcaseUserViewsTable.join(',\n')};`)
+            ]);
+        }
+
+        beforeEach(function(done) {
+            today = moment().utcOffset(0).startOf('day');
+
+            createTransactions().then(function(/*transactions*/) {
+
+            }).then(() => createCampaigns()).spread(function(/*campaigns, beeswaxCampaigns*/) {
+                campaigns = arguments[0];
+                beeswaxCampaigns = arguments[1];
+            }).then(() => Promise.all([
+                createAnalytics(campaigns[0], [100, 100, 100, 200]),
+                createAnalytics(campaigns[1], [200, 200, 50, 50])
+            ])).then(() => (
+                campaignCreatedEvent()
+            )).then(() => waitUntil(() => Promise.all([
+                request.get({
+                    url: api(`/api/campaigns/${campaign.id}`)
+                }).then(ld.spread(newCampaign => {
+                    return (
+                        ld.get(newCampaign, 'targetUsers', 0) > ld.get(campaign, 'targetUsers', 0) &&
+                        ld.get(newCampaign, 'pricing.budget', 0) > ld.get(campaign, 'pricing.budget', 0)
+                    ) && newCampaign;
+                })),
+                Promise.all(campaigns.map((campaign, index) => (
+                    request.get({
+                        url: api(`/api/campaigns/${campaign.id}`)
+                    }).then(ld.spread(campaign => {
+                        const oldCampaign = campaigns[index];
+
+                        return (
+                            campaign.targetUsers < oldCampaign.targetUsers &&
+                            campaign.pricing.budget < oldCampaign.pricing.budget
+                        ) && campaign;
+                    }))
+                ))).then(campaigns => campaigns.every(campaign => !!campaign) && campaigns),
+                request.get({
+                    url: api(`/api/campaigns/${campaign.id}`)
+                }).then(ld.spread(campaign => (
+                    ld.get(campaign, 'externalIds.beeswax') && beeswax.campaigns.find(campaign.externalIds.beeswax).then(response => (
+                        response.payload.campaign_budget > 1 && response.payload
+                    ))
+                ))),
+                Promise.all(beeswaxCampaigns.map(beeswaxCampaign => (
+                    beeswax.campaigns.find(beeswaxCampaign.campaign_id).then(response => {
+                        const updatedBeeswaxCampaign = response.payload;
+
+                        return (
+                            updatedBeeswaxCampaign.campaign_budget < beeswaxCampaign.campaign_budget
+                        ) && updatedBeeswaxCampaign;
+                    })
+                ))).then(beeswaxCampaigns => beeswaxCampaigns.every(beeswaxCampaign => !!beeswaxCampaign) && beeswaxCampaigns),
+                hubspot.getContactByEmail(user.email).then(contact => (
+                    contact.properties.lifecyclestage.value === 'customer' && contact
+                ))
+            ]).then(items => (
+                items.every(item => !!item) && items
+            )))).then(ld.spread(function(/*campaign, campaigns, beeswaxCampaign, beeswaxCampaigns, hubspotContact*/) {
+                campaign = arguments[0];
+                campaigns = arguments[1];
+                beeswaxCampaign = arguments[2];
+                beeswaxCampaigns = arguments[3];
+            })).then(done, done.fail);
+        });
+
+        afterEach(function(done) {
+            Promise.all([
+                Promise.all(campaigns.map(campaign => deleteCampaign(campaign))),
+                testUtils.pgQuery('DELETE FROM fct.billing_transactions'),
+                testUtils.pgQuery('DELETE FROM rpt.unique_user_views_daily'),
+                testUtils.pgQuery('DELETE FROM fct.showcase_user_views_daily')
+            ]).then(done, done.fail);
+        });
+
+        it('should set the targetUsers on each campaign', function() {
+            expect(campaigns[0].targetUsers).toBe(833);
+            expect(campaigns[1].targetUsers).toBe(833);
+            expect(campaign.targetUsers).toBe(333);
+        });
+
+        it('should set the budget of the existing campaigns', function() {
+            expect(campaigns[0].pricing.budget).toBe(70.83);
+            expect(campaigns[1].pricing.budget).toBe(45.83);
+        });
+
+        it('should give the new campaign a pricing hash', function() {
+            expect(campaign.pricing).toEqual({
+                budget: 8.33,
+                model: 'cpv',
+                cost: 0.05
+            });
+        });
+
+        it('should increase the budget of the beeswax campaigns', function() {
+            expect(beeswaxCampaigns[0].campaign_budget).toBe(4250);
+            expect(beeswaxCampaigns[1].campaign_budget).toBe(2291);
+            expect(beeswaxCampaign.campaign_budget).toBe(417);
+        });
+    });
+
     describe('if the org has a paymentPlanStart', function() {
         var existing;
 
@@ -985,8 +1241,8 @@ describe('cwrxStream campaignCreated', function() {
                 });
 
                 it('should give the org a paymentPlanStart of now', function() {
-                    expect(moment(org.paymentPlanStart).isSame(now, 'day')).toBe(true, 'paymentPlanStart is not today.');
-                    expect(moment(org.nextPaymentDate).isSame(now, 'day')).toBe(true, 'nextPaymentDate is not today.');
+                    expect(moment(org.paymentPlanStart).utcOffset(0).format()).toBe(moment(now).utcOffset(0).startOf('day').format());
+                    expect(moment(org.nextPaymentDate).utcOffset(0).format()).toBe(moment(now).utcOffset(0).startOf('day').format());
                 });
 
                 it('should not give the org any credits', function(done) {
@@ -1031,8 +1287,8 @@ describe('cwrxStream campaignCreated', function() {
                 });
 
                 it('should give the org a paymentPlanStart computed from the transactions', function() {
-                    expect(moment(org.paymentPlanStart).isSame(moment(now).add(17, 'days'), 'day')).toBe(true, 'paymentPlanStart is the wrong day.');
-                    expect(moment(org.nextPaymentDate).isSame(moment(now).add(17, 'days'), 'day')).toBe(true, 'nextPaymentDate is the wrong day.');
+                    expect(moment(org.paymentPlanStart).utcOffset(0).format()).toBe(moment(now).utcOffset(0).startOf('day').add(17, 'days').format());
+                    expect(moment(org.nextPaymentDate).utcOffset(0).format()).toBe(moment(now).utcOffset(0).startOf('day').add(17, 'days').format());
                 });
 
                 it('should create transactions for each promotion', function() {
@@ -1054,8 +1310,8 @@ describe('cwrxStream campaignCreated', function() {
                         cycle_start: jasmine.any(Date),
                         cycle_end: jasmine.any(Date)
                     }));
-                    expect(moment(transactions[0].cycle_start).isSame(now, 'day')).toBe(true, 'cycle_start is not correct.');
-                    expect(moment(transactions[0].cycle_end).isSame(moment(now).add(7, 'days'), 'day')).toBe(true, 'cycle_end is not correct.');
+                    expect(moment(transactions[0].cycle_start).utcOffset(0).format()).toBe(moment(now).utcOffset(0).startOf('day').format(), 'cycle_start is not correct.');
+                    expect(moment(transactions[0].cycle_end).utcOffset(0).format()).toBe(moment(now).utcOffset(0).add(7, 'days').endOf('day').format(), 'cycle_end is not correct.');
 
                     expect(transactions[1]).toEqual(jasmine.objectContaining({
                         rec_key: jasmine.any(String),
@@ -1075,8 +1331,8 @@ describe('cwrxStream campaignCreated', function() {
                         cycle_start: jasmine.any(Date),
                         cycle_end: jasmine.any(Date)
                     }));
-                    expect(moment(transactions[1].cycle_start).isSame(now, 'day')).toBe(true, 'cycle_start is not correct.');
-                    expect(moment(transactions[1].cycle_end).isSame(moment(now).add(10, 'days'), 'day')).toBe(true, 'cycle_end is not correct.');
+                    expect(moment(transactions[1].cycle_start).utcOffset(0).format()).toBe(moment(now).utcOffset(0).startOf('day').format(), 'cycle_start is not correct.');
+                    expect(moment(transactions[1].cycle_end).utcOffset(0).format()).toBe(moment(now).utcOffset(0).add(10, 'days').endOf('day').format(), 'cycle_end is not correct.');
                 });
             });
         });

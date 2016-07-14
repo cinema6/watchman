@@ -197,6 +197,12 @@
                     },
                     "beeswax": {
                         "apiRoot": "https://stingersbx.api.beeswax.com"
+                    },
+                    "campaign": {
+                        "conversionMultipliers": {
+                            "internal": 1.1,
+                            "external": 1.25
+                        }
                     }
                 }
             },

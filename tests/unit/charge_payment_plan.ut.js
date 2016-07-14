@@ -156,8 +156,8 @@ describe('(action factory) charge_payment_plan', function() {
                         amount: data.paymentPlan.price,
                         transaction: {
                             targetUsers: data.paymentPlan.viewsPerMonth,
-                            cycleStart: data.date,
-                            cycleEnd: moment(data.date).add(1, 'month').subtract(1, 'day').format(),
+                            cycleStart: moment(data.date).utcOffset(0).startOf('day').format(),
+                            cycleEnd: moment(data.date).utcOffset(0).add(1, 'month').subtract(1, 'day').endOf('day').format(),
                             paymentPlanId: data.paymentPlan.id,
                             application: options.target
                         }
@@ -179,7 +179,7 @@ describe('(action factory) charge_payment_plan', function() {
                     expect(request.put).toHaveBeenCalledWith({
                         url: resolveURL(config.cwrx.api.root, config.cwrx.api.orgs.endpoint + '/' + data.org.id),
                         json: {
-                            nextPaymentDate: moment(data.date).add(1, 'month').format()
+                            nextPaymentDate: moment(data.date).utcOffset(0).startOf('day').add(1, 'month').format()
                         }
                     });
                 });

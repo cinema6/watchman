@@ -127,8 +127,8 @@ describe('create_promotion_credit.js', function() {
                     application: event.data.target,
                     paymentPlanId: event.data.paymentPlan.id,
                     targetUsers: event.data.promotion.data.targetUsers,
-                    cycleStart: event.data.date,
-                    cycleEnd: moment(event.data.date).add(event.data.promotion.data.trialLength, 'days').format()
+                    cycleStart: moment(event.data.date).utcOffset(0).startOf('day').format(),
+                    cycleEnd: moment(event.data.date).utcOffset(0).add(event.data.promotion.data.trialLength, 'days').endOf('day').format()
                 }
             });
             expect(mockLog.warn).not.toHaveBeenCalled();

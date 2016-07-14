@@ -1,38 +1,43 @@
 'use strict';
 
-var CwrxRequest = require('../../../../lib/CwrxRequest');
-var BeeswaxMiddleware = require('../../../../lib/BeeswaxMiddleware');
-var JsonProducer = require('rc-kinesis').JsonProducer;
-var logger = require('cwrx/lib/logger');
-var resolveURL = require('url').resolve;
-var inspect = require('util').inspect;
-var appFactories = require('showcase-core').factories.app;
-var assign = require('lodash').assign;
-var takeRight = require('lodash').takeRight;
-var unzip = require('lodash').unzip;
-var mapValues = require('lodash').mapValues;
-var pickBy = require('lodash').pickBy;
-var q = require('q');
+const CwrxRequest = require('../../../../lib/CwrxRequest');
+const BeeswaxMiddleware = require('../../../../lib/BeeswaxMiddleware');
+const JsonProducer = require('rc-kinesis').JsonProducer;
+const logger = require('cwrx/lib/logger');
+const resolveURL = require('url').resolve;
+const inspect = require('util').inspect;
+const appFactories = require('showcase-core').factories.app;
+const assign = require('lodash').assign;
+const takeRight = require('lodash').takeRight;
+const unzip = require('lodash').unzip;
+const mapValues = require('lodash').mapValues;
+const pickBy = require('lodash').pickBy;
+const q = require('q');
 
-var createInterstitialFactory = appFactories.createInterstitialFactory;
+const createInterstitialFactory = appFactories.createInterstitialFactory;
 
-module.exports = function initCampaignFactory(config) {
-    var log = logger.getLog();
-    var beeswax = new BeeswaxMiddleware(
-        { apiRoot: config.beeswax.apiRoot, creds : config.state.secrets.beeswax},
-        { creds : config.appCreds, api : config.cwrx.api }
+module.exports = function factory(config) {
+    const log = logger.getLog();
+    const beeswax = new BeeswaxMiddleware(
+        { apiRoot: config.beeswax.apiRoot, creds: config.state.secrets.beeswax},
+        { creds: config.appCreds, api: config.cwrx.api }
     );
-    var request = new CwrxRequest(config.appCreds);
-    var stream = new JsonProducer(config.kinesis.producer.stream, config.kinesis.producer);
-    var campaignsEndpoint = resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint);
-    var placementsEndpoint = resolveURL(config.cwrx.api.root, config.cwrx.api.placements.endpoint);
+    const request = new CwrxRequest(config.appCreds);
+    const stream = new JsonProducer(config.kinesis.producer.stream, config.kinesis.producer);
+    const showcase = require('../../../../lib/showcase')(config);
 
-    return function initCampaign(event) {
-        var data = event.data;
-        var options = event.options;
-        var campaign = data.campaign;
+    const campaignsEndpoint = resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint);
+    const placementsEndpoint = resolveURL(
+        config.cwrx.api.root,
+        config.cwrx.api.placements.endpoint
+    );
 
-        var createInterstitial = createInterstitialFactory(
+    return event => Promise.resolve().then(() => {
+        const data = event.data;
+        const options = event.options;
+        const campaign = data.campaign;
+
+        const createInterstitial = createInterstitialFactory(
             options.card.interstitial
         );
 
@@ -46,14 +51,18 @@ module.exports = function initCampaignFactory(config) {
         log.trace('Creating cards for showcase (app) campaign(%1)', campaign.id);
         return request.put({
             url: campaignsEndpoint + '/' + campaign.id,
-            json: assign({}, campaign, {
+            json: {
+                conversionMultipliers: {
+                    internal: config.campaign.conversionMultipliers.internal,
+                    external: config.campaign.conversionMultipliers.external
+                },
                 cards: campaign.cards.concat([
                     setupCard(createInterstitial(campaign.product))
                 ])
-            })
-        }).spread(function createPlacements(campaign) {
-            var newCards = takeRight(campaign.cards, 1);
-            var interstitial = newCards[0];
+            }
+        }).spread(campaign => {
+            const newCards = takeRight(campaign.cards, 1);
+            const interstitial = newCards[0];
 
             function tagParams(options) {
                 return mapValues(options.tagParams, 'value');
@@ -80,17 +89,15 @@ module.exports = function initCampaignFactory(config) {
                     showInTag: showInTag(options.placement.interstitial),
                     thumbnail: interstitial.thumbs.small
                 }
-            ].map(function(json) {
-                return request.post({
-                    url: placementsEndpoint,
-                    qs : { ext : false },
-                    json: assign({}, json, {
-                        tagParams: assign({}, json.tagParams, {
-                            campaign: campaign.id
-                        })
+            ].map(json => request.post({
+                url: placementsEndpoint,
+                qs: { ext: false },
+                json: assign({}, json, {
+                    tagParams: assign({}, json.tagParams, {
+                        campaign: campaign.id
                     })
-                });
-            })).then(unzip).spread(function syncToBeeswax(placements) {
+                })
+            }))).then(unzip).spread(placements => {
                 log.trace(
                     'Created placements for card([%1 => %2]).',
                     newCards[0].id, placements[0].id
@@ -99,31 +106,31 @@ module.exports = function initCampaignFactory(config) {
                 log.trace('Initializing campaign %1 in beeswax!', campaign.id);
 
                 return beeswax.initShowcaseAppsCampaign({
-                    campaign : campaign,
-                    placements : placements
+                    campaign: campaign,
+                    placements: placements
                 });
-            }).then(function produceRecord(bwResponse){
-                log.trace(
-                    'Producing "initializedShowcaseCampaign" for showcase (app) campaign(%1).',
-                    bwResponse.campaign.id
-                );
+            }).then(bwResponse => (
+                showcase.rebalance(bwResponse.campaign.org).then(() => {
+                    log.trace(
+                        'Producing "initializedShowcaseCampaign" for showcase (app) campaign(%1).',
+                        campaign.id
+                    );
 
-                return stream.produce({
-                    type: 'initializedShowcaseCampaign',
-                    data: {
-                        campaign: bwResponse.campaign,
-                        placements: bwResponse.placements,
-                        date: data.date
-                    }
-                });
-            });
-        }).tap(function logSuccess() {
-            return log.info('Successfully initialized showcase (app) campaign(%1).', campaign.id);
-        }).catch(function logError(reason) {
-            return log.error(
-                'Failed to initialize showcase (app) campaign(%1): %2',
-                campaign.id, inspect(reason)
-            );
-        }).thenResolve(undefined);
-    };
+                    return stream.produce({
+                        type: 'initializedShowcaseCampaign',
+                        data: {
+                            campaign: bwResponse.campaign,
+                            placements: bwResponse.placements,
+                            date: data.date
+                        }
+                    });
+                })
+            ));
+        }).tap(() => (
+            log.info('Successfully initialized showcase (app) campaign(%1).', campaign.id)
+        )).catch(reason => log.error(
+            'Failed to initialize showcase (app) campaign(%1): %2',
+            campaign.id, inspect(reason)
+        ));
+    }).then(() => undefined);
 };

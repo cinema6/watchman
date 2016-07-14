@@ -11,14 +11,16 @@ module.exports = function factory(config) {
         creds: config.state.secrets.beeswax
     });
     const log = logger.getLog();
+    const showcase = require('../../../../lib/showcase')(config);
 
     return event => Promise.resolve().then(() => {
         const data = event.data;
         const campaign = data.campaign;
-        const beeswaxCampaignId = get(campaign, 'externalCampaigns.beeswax.externalId');
+        const beeswaxCampaignId = get(campaign, 'externalIds.beeswax') ||
+            get(campaign, 'externalCampaigns.beeswax.externalId');
 
         if (!beeswaxCampaignId) {
-            log.info(
+            log.warn(
                 'Not cleaning up beeswax entities for ' +
                 `campaign(${campaign.id}) because it has no beeswax campaign id.`
             );
@@ -44,11 +46,16 @@ module.exports = function factory(config) {
                 'Cleaned up beeswax items for ' +
                 `campaign(${campaign.id})/beeswax(${beeswaxCampaignId})`
             ))
+            .then(() => (
+                showcase.rebalance(campaign.org).catch(reason => log.error(
+                    `Failed to rebalance org(${campaign.org}): ${inspect(reason)}`
+                ))
+            ))
             .catch(reason => {
                 throw new Error(
                     'Couldn\'t clean up beeswax entities for ' +
                     `campaign(${campaign.id}): ${inspect(reason)}`
                 );
             });
-    });
+    }).then(() => undefined);
 };

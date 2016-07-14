@@ -545,8 +545,8 @@ describe('timeStream payment plan billing', function() {
                     transaction = result.rows[0];
 
                     return waitUntil(function() {
-                        return getOrg().then(function(org) {
-                            return moment(org.nextPaymentDate).isSame(moment(today).add(1, 'month'), 'day') && org;
+                        return getOrg().then(function(updatedOrg) {
+                            return updatedOrg.nextPaymentDate !== org.nextPaymentDate && updatedOrg;
                         });
                     });
                 }).then(function(/*org*/) {
@@ -563,15 +563,12 @@ describe('timeStream payment plan billing', function() {
                     paymentplan_id: paymentPlan.id,
                     view_target: paymentPlan.viewsPerMonth
                 }));
-                expect(moment(transaction.cycle_start).format()).toEqual(today.format(), 'cycle_start is wrong');
-                expect(moment(transaction.cycle_end).format()).toEqual(moment(today).add(1, 'month').subtract(1, 'day').format(), 'cycle_end is wrong');
+                expect(moment(transaction.cycle_start).utcOffset(0).format()).toEqual(moment(today).utcOffset(0).startOf('day').format(), 'cycle_start is wrong');
+                expect(moment(transaction.cycle_end).utcOffset(0).format()).toEqual(moment(today).utcOffset(0).add(1, 'month').subtract(1, 'day').endOf('day').format(), 'cycle_end is wrong');
             });
 
             it('should update the org\'s nextPaymentDate', function() {
-                var expected = moment(today).add(1, 'month');
-                var actual = moment(org.nextPaymentDate);
-
-                expect(actual.isSame(expected, 'day')).toBe(true, 'Expected ' + actual.format() + ' to be ' + expected.format());
+                expect(moment(org.nextPaymentDate).utcOffset(0).format()).toBe(moment(today).utcOffset(0).startOf('day').add(1, 'month').format());
             });
         });
 
@@ -598,8 +595,8 @@ describe('timeStream payment plan billing', function() {
                     transaction = result.rows[0];
 
                     return waitUntil(function() {
-                        return getOrg().then(function(org) {
-                            return moment(org.nextPaymentDate).isSame(moment(today).add(1, 'month'), 'day') && org;
+                        return getOrg().then(function(updatedOrg) {
+                            return updatedOrg.nextPaymentDate !== org.nextPaymentDate && updatedOrg;
                         });
                     });
                 }).then(function(/*org*/) {
@@ -613,15 +610,12 @@ describe('timeStream payment plan billing', function() {
                     paymentplan_id: paymentPlan.id,
                     view_target: paymentPlan.viewsPerMonth
                 }));
-                expect(moment(transaction.cycle_start).format()).toEqual(today.format(), 'cycle_start is wrong');
-                expect(moment(transaction.cycle_end).format()).toEqual(moment(today).add(1, 'month').subtract(1, 'day').format(), 'cycle_end is wrong');
+                expect(moment(transaction.cycle_start).utcOffset(0).format()).toEqual(moment(today).utcOffset(0).startOf('day').format(), 'cycle_start is wrong');
+                expect(moment(transaction.cycle_end).utcOffset(0).format()).toEqual(moment(today).utcOffset(0).add(1, 'month').subtract(1, 'day').endOf('day').format(), 'cycle_end is wrong');
             });
 
             it('should update the org\'s nextPaymentDate', function() {
-                var expected = moment(today).add(1, 'month');
-                var actual = moment(org.nextPaymentDate);
-
-                expect(actual.isSame(expected, 'day')).toBe(true, 'Expected ' + actual.format() + ' to be ' + expected.format());
+                expect(moment(org.nextPaymentDate).utcOffset(0).format()).toBe(moment(today).utcOffset(0).startOf('day').add(1, 'month').format());
             });
         });
 

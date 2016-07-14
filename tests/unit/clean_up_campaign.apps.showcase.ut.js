@@ -19,7 +19,7 @@ function defer() {
 }
 
 describe('cleanUpCampaignFactory', function() {
-    let BeeswaxClient, queries, edits;
+    let BeeswaxClient, queries, edits, showcaseLib;
     let factory;
 
     beforeEach(function() {
@@ -60,8 +60,12 @@ describe('cleanUpCampaignFactory', function() {
             return client;
         });
 
+        showcaseLib = (showcaseLib => jasmine.createSpy('showcase()').and.callFake(showcaseLib))(require('../../lib/showcase'));
+
         factory = proxyquire('../../src/actions/showcase/apps/clean_up_campaign', {
-            'beeswax-client': BeeswaxClient
+            'beeswax-client': BeeswaxClient,
+            '../../../../lib/showcase': showcaseLib,
+            'cwrx/lib/logger': logger
         });
     });
 
@@ -72,7 +76,7 @@ describe('cleanUpCampaignFactory', function() {
     describe('when called', function() {
         let config;
         let action;
-        let beeswax;
+        let beeswax, showcase, log;
 
         beforeEach(function() {
             config = {
@@ -86,10 +90,27 @@ describe('cleanUpCampaignFactory', function() {
                 },
                 beeswax: {
                     apiRoot: 'https://stingersbx.api.beeswax.com'
+                },
+                cwrx: {
+                    api: {
+                        root: 'http://33.33.33.10/',
+                        payments: {
+                            endpoint: '/api/payments/'
+                        },
+                        campaigns: {
+                            endpoint: '/api/campaigns'
+                        },
+                        transactions: {
+                            endpoint: '/api/transactions'
+                        },
+                        analytics: {
+                            endpoint: '/api/analytics'
+                        }
+                    }
                 }
             };
 
-            spyOn(logger, 'getLog').and.returnValue(jasmine.createSpyObj('log', [
+            spyOn(logger, 'getLog').and.returnValue(log = jasmine.createSpyObj('log', [
                 'trace',
                 'info',
                 'warn',
@@ -98,6 +119,7 @@ describe('cleanUpCampaignFactory', function() {
 
             action = factory(config);
             beeswax = BeeswaxClient.calls.mostRecent().returnValue;
+            showcase = showcaseLib.calls.mostRecent().returnValue;
         });
 
         it('should return an action', function() {
@@ -111,6 +133,10 @@ describe('cleanUpCampaignFactory', function() {
             });
         });
 
+        it('should create a showcase lib', function() {
+            expect(showcaseLib).toHaveBeenCalledWith(config);
+        });
+
         describe('(the action)', function() {
             let campaign;
             let event;
@@ -122,10 +148,9 @@ describe('cleanUpCampaignFactory', function() {
 
                 campaign = {
                     id: `cam-${createUuid()}`,
-                    externalCampaigns: {
-                        beeswax: {
-                            externalId: 48354
-                        }
+                    org: `o-${createUuid()}`,
+                    externalIds: {
+                        beeswax: 48354
                     }
                 };
 
@@ -144,12 +169,12 @@ describe('cleanUpCampaignFactory', function() {
             });
 
             it('should get all of the beeswax campaign\'s line items', function() {
-                expect(beeswax.lineItems.queryAll).toHaveBeenCalledWith({ campaign_id: campaign.externalCampaigns.beeswax.externalId, active: true });
+                expect(beeswax.lineItems.queryAll).toHaveBeenCalledWith({ campaign_id: campaign.externalIds.beeswax, active: true });
             });
 
             describe('if the campaign has no externalCampaigns', function() {
                 beforeEach(function(done) {
-                    delete campaign.externalCampaigns;
+                    delete campaign.externalIds;
 
                     success.calls.reset();
                     failure.calls.reset();
@@ -159,12 +184,38 @@ describe('cleanUpCampaignFactory', function() {
                     setTimeout(done);
                 });
 
+                it('should log a warning', function() {
+                    expect(log.warn).toHaveBeenCalledWith(jasmine.any(String));
+                });
+
                 it('should not perform any queries', function() {
                     expect(beeswax.lineItems.queryAll).not.toHaveBeenCalled();
                 });
 
                 it('should fulfill the promise', function() {
                     expect(success).toHaveBeenCalledWith(undefined);
+                });
+            });
+
+            describe('if the campaign has a beeswax campaign in the old format', function() {
+                beforeEach(function(done) {
+                    delete campaign.externalIds;
+                    campaign.externalCampaigns = {
+                        beeswax: {
+                            externalId: 456738
+                        }
+                    };
+
+                    success.calls.reset();
+                    failure.calls.reset();
+                    beeswax.lineItems.queryAll.calls.reset();
+
+                    action(event).then(success, failure);
+                    setTimeout(done);
+                });
+
+                it('should query by that id', function() {
+                    expect(beeswax.lineItems.queryAll).toHaveBeenCalledWith({ campaign_id: campaign.externalCampaigns.beeswax.externalId, active: true });
                 });
             });
 
@@ -288,7 +339,7 @@ describe('cleanUpCampaignFactory', function() {
                     });
 
                     it('should deactivate the campaign', function() {
-                        expect(beeswax.campaigns.edit).toHaveBeenCalledWith(campaign.externalCampaigns.beeswax.externalId, { active: false });
+                        expect(beeswax.campaigns.edit).toHaveBeenCalledWith(campaign.externalIds.beeswax, { active: false });
                     });
 
                     describe('if there is a problem', function() {
@@ -307,19 +358,53 @@ describe('cleanUpCampaignFactory', function() {
                     });
 
                     describe('when the campaign has been deactivated', function() {
+                        let rebalanceDeferred;
+
                         beforeEach(function(done) {
+                            spyOn(showcase, 'rebalance').and.returnValue((rebalanceDeferred = defer()).promise);
+
                             edits.campaigns[0].resolve({
                                 success: true,
                                 payload: {
-                                    campaign_id: campaign.externalCampaigns.beeswax.externalId,
+                                    campaign_id: campaign.externalIds.beeswax,
                                     active: false
                                 }
                             });
                             setTimeout(done);
                         });
 
-                        it('should fulfill the promise', function() {
-                            expect(success).toHaveBeenCalledWith(undefined);
+                        it('should perform a rebalance', function() {
+                            expect(showcase.rebalance).toHaveBeenCalledWith(campaign.org);
+                        });
+
+                        describe('if the rebalance succeeds', function() {
+                            beforeEach(function(done) {
+                                rebalanceDeferred.resolve([]);
+                                setTimeout(done);
+                            });
+
+                            it('should fulfill the promise', function() {
+                                expect(success).toHaveBeenCalledWith(undefined);
+                            });
+                        });
+
+                        describe('if the rebalance fails', function() {
+                            let reason;
+
+                            beforeEach(function(done) {
+                                reason = new Error('Some terrible reason.');
+                                rebalanceDeferred.reject(reason);
+
+                                setTimeout(done);
+                            });
+
+                            it('should log an error', function() {
+                                expect(log.error).toHaveBeenCalledWith(jasmine.any(String));
+                            });
+
+                            it('should fulfill the promise', function() {
+                                expect(success).toHaveBeenCalledWith(undefined);
+                            });
                         });
                     });
                 });
