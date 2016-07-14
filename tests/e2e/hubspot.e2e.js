@@ -230,7 +230,8 @@ describe('hubspot integration', function() {
                 }
             }).then(() => this.waitForHubspotContact(this.user.email, {
                 email: this.user.email,
-                lifecyclestage: 'salesqualifiedlead'
+                lifecyclestage: 'salesqualifiedlead',
+                num_conversion_events: '1'
             })).then(contact => {
                 expect(contact.properties.email.value).toBe(this.user.email);
                 expect(contact.properties.firstname.value).toBe(this.user.firstName);
