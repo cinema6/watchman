@@ -7,7 +7,7 @@ var logger = require('cwrx/lib/logger.js');
 var fetchProductDataFactory = require('../../src/actions/fetch_product_data.js');
 var resolveURL = require('url').resolve;
 
-fdescribe('fetch_product_data.js', function() {
+describe('fetch_product_data.js', function() {
     var req, mockLog, mockCampaigns, dataEndpoint, campEndpoint;
 
     beforeEach(function() {
