@@ -38,7 +38,7 @@ module.exports = function factory(config) {
         switch(target) {
         case 'showcase':
             return [
-                { filename: 'reelcontent-email-logo-white.png', cid: 'reelContentLogoWhite' },
+                { filename: 'rc-apps-logo-white-text.png', cid: 'reelContentLogoWhite' },
                 { filename: 'facebook-round-icon.png', cid: 'facebookRoundIcon' },
                 { filename: 'twitter-round-icon.png', cid: 'twitterRoundIcon' },
                 { filename: 'linkedin-round-icon.png', cid: 'linkedinRoundIcon' },
@@ -390,7 +390,7 @@ module.exports = function factory(config) {
                         data.body,'externalIds.beeswax',
                         ld.get(data.body,'beeswaxIds.advertiser')
                     );
-                    
+
                     if (!/^2/.test(response.statusCode)) {
                         throw new Error(
                             `Failed to GET advertiser(${campaign.advertiserId}): ` +

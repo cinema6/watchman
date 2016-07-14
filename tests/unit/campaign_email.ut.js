@@ -128,14 +128,14 @@ describe('campaign_email.js', function() {
             }
         };
         self.showcaseAttachments = [
-            { filename: 'reelcontent-email-logo-white.png', cid: 'reelContentLogoWhite', path: path.join(__dirname, '../../templates/assets/reelcontent-email-logo-white.png') },
+            { filename: 'rc-apps-logo-white-text.png', cid: 'reelContentLogoWhite', path: path.join(__dirname, '../../templates/assets/rc-apps-logo-white-text.png') },
             { filename: 'facebook-round-icon.png', cid: 'facebookRoundIcon', path: path.join(__dirname, '../../templates/assets/facebook-round-icon.png')},
             { filename: 'twitter-round-icon.png', cid: 'twitterRoundIcon', path: path.join(__dirname, '../../templates/assets/twitter-round-icon.png') },
             { filename: 'linkedin-round-icon.png', cid: 'linkedinRoundIcon', path: path.join(__dirname, '../../templates/assets/linkedin-round-icon.png') },
             { filename: 'website-round-icon.png', cid: 'websiteRoundIcon', path: path.join(__dirname, '../../templates/assets/website-round-icon.png') }
         ];
         self.showcasePostmarkAttachments = [
-            { Name: 'reelcontent-email-logo-white.png', Content: 'abcdef', ContentType: 'image/png', ContentID: 'cid:reelContentLogoWhite' },
+            { Name: 'rc-apps-logo-white-text.png', Content: 'abcdef', ContentType: 'image/png', ContentID: 'cid:reelContentLogoWhite' },
             { Name: 'facebook-round-icon.png', Content: 'abcdef', ContentType: 'image/png', ContentID: 'cid:facebookRoundIcon' },
             { Name: 'twitter-round-icon.png', Content: 'abcdef', ContentType: 'image/png', ContentID: 'cid:twitterRoundIcon' },
             { Name: 'linkedin-round-icon.png', Content: 'abcdef', ContentType: 'image/png', ContentID: 'cid:linkedinRoundIcon' },
