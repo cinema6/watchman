@@ -45,7 +45,8 @@ describe('hubspot integration', function() {
                             options: {
                                 properties: {
                                     applications: 'apps',
-                                    paying_customer: 'true'
+                                    paying_customer: 'true',
+                                    e2e: 'true'
                                 }
                             },
                             ifData: {
@@ -74,7 +75,8 @@ describe('hubspot integration', function() {
                             options: {
                                 properties: {
                                     applications: 'apps',
-                                    lifecyclestage: 'salesqualifiedlead'
+                                    lifecyclestage: 'salesqualifiedlead',
+                                    e2e: 'true'
                                 }
                             },
                             ifData: {
@@ -90,7 +92,8 @@ describe('hubspot integration', function() {
                             options: {
                                 properties: {
                                     applications: 'apps',
-                                    lifecyclestage: 'opportunity'
+                                    lifecyclestage: 'opportunity',
+                                    e2e: 'true'
                                 }
                             },
                             ifData: {
@@ -103,6 +106,11 @@ describe('hubspot integration', function() {
                     actions: [
                         {
                             name: 'hubspot/update_user',
+                            options: {
+                                properties: {
+                                    e2e: 'true'
+                                }
+                            },
                             ifData: {
                                 target: '^showcase$'
                             }
@@ -123,7 +131,8 @@ describe('hubspot integration', function() {
                             options: {
                                 properties: {
                                     applications: 'apps',
-                                    lifecyclestage: 'customer'
+                                    lifecyclestage: 'customer',
+                                    e2e: 'true'
                                 }
                             }
                         }
