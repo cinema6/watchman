@@ -177,6 +177,36 @@ describe('update_user', function() {
         }).then(done, done.fail);
     });
 
+    it('should be able to update a contact in HubSpot with templated properties', function(done) {
+        Hubspot.prototype.getContactByEmail.and.returnValue(Q.resolve({ vid: 123 }));
+        Hubspot.prototype.updateContact.and.returnValue(Q.resolve());
+        this.event.options.properties ={
+            templateProp: '{{user.id}}'
+        };
+        this.action(this.event).then(() => {
+            expect(Hubspot.prototype.updateContact).toHaveBeenCalledWith(123, {
+                properties: [
+                    {
+                        property: 'email',
+                        value: 'snail@mail.com'
+                    },
+                    {
+                        property: 'firstname',
+                        value: 'Sebastian'
+                    },
+                    {
+                        property: 'lastname',
+                        value: 'Snail'
+                    },
+                    {
+                        property: 'templateProp',
+                        value: this.event.data.user.id
+                    }
+                ]
+            });
+        }).then(done, done.fail);
+    });
+
     it('should log an error if updating a contact fails', function(done) {
         var self = this;
         Hubspot.prototype.getContactByEmail.and.returnValue(Q.resolve({ vid: 123 }));
