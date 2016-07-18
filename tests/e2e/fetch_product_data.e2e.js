@@ -35,7 +35,6 @@ describe('timeStream', function() {
     // This beforeAll is dedicated to setting application config
     beforeAll(function(done) {
 
-        console.log('In beforeAll');
         const configurator = new Configurator();
         const sharedConfig = {
             secrets: '/opt/sixxy/.watchman.secrets.json',
