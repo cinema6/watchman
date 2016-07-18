@@ -1,6 +1,8 @@
 # Watchman
 
+## v1.3.0 (July 18, 2016)
 * *[v1.3.0-rc1]*
+  * [FEATURE]: Add the ability to detect view count milestones for campaigns
   * [DESIGN]: Update logo for showcase emails
   * [FEATURE]: Added BeeswaxMiddleware lib module for workign with Beeswax API
   * [FIX]: showplace/apps/init_campaign creates placments using the ext=false param to prevent auto creation of beeswax placements for showplace apps.
@@ -13,11 +15,14 @@
     added/removed
   * All dependencies on the cwrx-beeswax integration have been removed
   * ** Extra Deployment Steps**:
+    * Add check_views_milestone action to morning_orgPulse handler
+    * Add hubspot/update_user action to views_milestone handler
     * Need to add tracking property to cwrx.api config (see environments/development.json)
     * Update watchman environments
     * Ensure watchman app can:
       * Read all transactions
       * Do whatever it wants with `campaign.pricing`
+* *[/v1.3.0-rc1]*
 
 ## v1.2.0 (July 12, 2016)
 * *[v1.2.0-rc3]*
