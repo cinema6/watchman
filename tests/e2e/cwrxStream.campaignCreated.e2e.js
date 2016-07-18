@@ -546,12 +546,7 @@ describe('cwrxStream campaignCreated', function() {
             testUtils.resetCollection('users', []),
             testUtils.resetCollection('promotions', promotions),
             testUtils.resetCollection('containers', containers),
-            testUtils.resetCollection('campaigns', []),
-            hubspot.getContactByEmail('c6e2etester@gmail.com').then(contact => {
-                if(contact) {
-                    return hubspot.deleteContact(contact.vid);
-                }
-            })
+            testUtils.resetCollection('campaigns', [])
         ]).then(function() {
             return createUser();
         }).spread(function(/*user, org, advertiser, paymentPlan*/) {
@@ -1024,13 +1019,10 @@ describe('cwrxStream campaignCreated', function() {
                             updatedBeeswaxCampaign.campaign_budget < beeswaxCampaign.campaign_budget
                         ) && updatedBeeswaxCampaign;
                     })
-                ))).then(beeswaxCampaigns => beeswaxCampaigns.every(beeswaxCampaign => !!beeswaxCampaign) && beeswaxCampaigns),
-                hubspot.getContactByEmail(user.email).then(contact => (
-                    contact.properties.lifecyclestage.value === 'customer' && contact
-                ))
+                ))).then(beeswaxCampaigns => beeswaxCampaigns.every(beeswaxCampaign => !!beeswaxCampaign) && beeswaxCampaigns)
             ]).then(items => (
                 items.every(item => !!item) && items
-            )))).then(ld.spread(function(/*campaign, campaigns, beeswaxCampaign, beeswaxCampaigns, hubspotContact*/) {
+            )))).then(ld.spread(function(/*campaign, campaigns, beeswaxCampaign, beeswaxCampaigns*/) {
                 campaign = arguments[0];
                 campaigns = arguments[1];
                 beeswaxCampaign = arguments[2];
