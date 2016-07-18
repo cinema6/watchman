@@ -8,7 +8,7 @@ var fetchProductDataFactory = require('../../src/actions/fetch_product_data.js')
 var resolveURL = require('url').resolve;
 
 describe('fetch_product_data.js', function() {
-    var req, mockLog, mockCampaigns, dataEndpoint, campEndpoint;
+    var req, mockLog, mockCampaigns, campEndpoint;
 
     beforeEach(function() {
         this.mockOptions = { };
@@ -28,7 +28,6 @@ describe('fetch_product_data.js', function() {
             }
         };
 
-        dataEndpoint = resolveURL(this.mockConfig.cwrx.api.root, this.mockConfig.cwrx.api.productData.endpoint);
         campEndpoint = resolveURL(this.mockConfig.cwrx.api.root, this.mockConfig.cwrx.api.campaigns.endpoint);
 
         mockLog = {
@@ -431,47 +430,47 @@ describe('fetch_product_data.js', function() {
         spyOn(JsonProducer.prototype, 'produce');
 
         this.mockData =
-            {
-                type: 'app',
-                platform: 'iOS',
-                name: 'Count Coins',
-                description: 'Reinforce basic counting skills by counting coins. This app is a valuable tool for elementary school aged children building fundamental counting skills.  It can also be a useful training assistant for those seeking work as cashiers, where making change accurately is important.',
-                developer: 'Howard Engelhart',
-                uri: 'https://itunes.apple.com/us/app/count-coins/id595124272?mt=8&uo=4',
-                categories: [
-                    'Education',
-                    'Games',
-                    'Educational'
-                ],
-                price: 'Free',
-                extID: 595124272,
-                images: [
-                    {
-                        uri: 'http://a1.mzstatic.com/us/r30/Purple/v4/c2/ec/6b/c2ec6b9a-d47b-20e4-d1f7-2f42fffcb58f/screen1136x1136.jpeg',
-                        type: 'screenshot',
-                        device: 'phone'
-                    },
-                    {
-                        uri: 'http://a5.mzstatic.com/us/r30/Purple/v4/fc/4b/e3/fc4be397-6865-7011-361b-59f78c789e62/screen1136x1136.jpeg',
-                        type: 'screenshot',
-                        device: 'phone'
-                    },
-                    {
-                        uri: 'http://a5.mzstatic.com/us/r30/Purple/v4/f9/02/63/f902630c-3969-ab9f-07b4-2c91bd629fd0/screen1136x1136.jpeg',
-                        type: 'screenshot',
-                        device: 'phone'
-                    },
-                    {
-                        uri: 'http://a3.mzstatic.com/us/r30/Purple/v4/f8/21/0e/f8210e8f-a75a-33c0-9e86-e8c65c9faa54/screen1136x1136.jpeg',
-                        type: 'screenshot',
-                        device: 'phone'
-                    },
-                    {
-                        uri: 'http://is5.mzstatic.com/image/thumb/Purple/v4/ef/a0/f3/efa0f340-225e-e512-1616-8f223c6202ea/source/512x512bb.jpg',
-                        type: 'thumbnail'
-                    }
-                ]
-            };
+        {
+            type: 'app',
+            platform: 'iOS',
+            name: 'Count Coins',
+            description: 'Reinforce basic counting skills by counting coins. This app is a valuable tool for elementary school aged children building fundamental counting skills.  It can also be a useful training assistant for those seeking work as cashiers, where making change accurately is important.',
+            developer: 'Howard Engelhart',
+            uri: 'https://itunes.apple.com/us/app/count-coins/id595124272?mt=8&uo=4',
+            categories: [
+                'Education',
+                'Games',
+                'Educational'
+            ],
+            price: 'Free',
+            extID: 595124272,
+            images: [
+                {
+                    uri: 'http://a1.mzstatic.com/us/r30/Purple/v4/c2/ec/6b/c2ec6b9a-d47b-20e4-d1f7-2f42fffcb58f/screen1136x1136.jpeg',
+                    type: 'screenshot',
+                    device: 'phone'
+                },
+                {
+                    uri: 'http://a5.mzstatic.com/us/r30/Purple/v4/fc/4b/e3/fc4be397-6865-7011-361b-59f78c789e62/screen1136x1136.jpeg',
+                    type: 'screenshot',
+                    device: 'phone'
+                },
+                {
+                    uri: 'http://a5.mzstatic.com/us/r30/Purple/v4/f9/02/63/f902630c-3969-ab9f-07b4-2c91bd629fd0/screen1136x1136.jpeg',
+                    type: 'screenshot',
+                    device: 'phone'
+                },
+                {
+                    uri: 'http://a3.mzstatic.com/us/r30/Purple/v4/f8/21/0e/f8210e8f-a75a-33c0-9e86-e8c65c9faa54/screen1136x1136.jpeg',
+                    type: 'screenshot',
+                    device: 'phone'
+                },
+                {
+                    uri: 'http://is5.mzstatic.com/image/thumb/Purple/v4/ef/a0/f3/efa0f340-225e-e512-1616-8f223c6202ea/source/512x512bb.jpg',
+                    type: 'thumbnail'
+                }
+            ]
+        };
 
         this.fetchProductData = fetchProductDataFactory(this.mockConfig);
     });
@@ -608,52 +607,52 @@ describe('fetch_product_data.js', function() {
             });
 
             it('should update the campaign', function() {
-                    expect(req.prototype.put).toHaveBeenCalledWith({
-                        url: campEndpoint + '/' + mockCampaigns[1].id,
-                        json: {
-                            product: {
-                                type: 'app',
-                                platform: 'iOS',
-                                name: 'Count Coins',
-                                description: 'some other description',
-                                developer: 'Howard Engelhart',
-                                uri: 'https://itunes.apple.com/us/app/count-coins/id595124272?mt=8&uo=4',
-                                categories: [
-                                    'Education',
-                                    'Games',
-                                    'Educational'
-                                ],
-                                price: 'Free',
-                                extID: 595124272,
-                                images: [
-                                    {
-                                        uri: 'http://a1.mzstatic.com/us/r30/Purple/v4/c2/ec/6b/c2ec6b9a-d47b-20e4-d1f7-2f42fffcb58f/screen1136x1136.jpeg',
-                                        type: 'screenshot',
-                                        device: 'phone'
-                                    },
-                                    {
-                                        uri: 'http://a5.mzstatic.com/us/r30/Purple/v4/fc/4b/e3/fc4be397-6865-7011-361b-59f78c789e62/screen1136x1136.jpeg',
-                                        type: 'screenshot',
-                                        device: 'phone'
-                                    },
-                                    {
-                                        uri: 'http://a5.mzstatic.com/us/r30/Purple/v4/f9/02/63/f902630c-3969-ab9f-07b4-2c91bd629fd0/screen1136x1136.jpeg',
-                                        type: 'screenshot',
-                                        device: 'phone'
-                                    },
-                                    {
-                                        uri: 'http://a3.mzstatic.com/us/r30/Purple/v4/f8/21/0e/f8210e8f-a75a-33c0-9e86-e8c65c9faa54/screen1136x1136.jpeg',
-                                        type: 'screenshot',
-                                        device: 'phone'
-                                    },
-                                    {
-                                        uri: 'http://is5.mzstatic.com/image/thumb/Purple/v4/ef/a0/f3/efa0f340-225e-e512-1616-8f223c6202ea/source/512x512bb.jpg',
-                                        type: 'thumbnail'
-                                    }
-                                ]
-                            }
+                expect(req.prototype.put).toHaveBeenCalledWith({
+                    url: campEndpoint + '/' + mockCampaigns[1].id,
+                    json: {
+                        product: {
+                            type: 'app',
+                            platform: 'iOS',
+                            name: 'Count Coins',
+                            description: 'some other description',
+                            developer: 'Howard Engelhart',
+                            uri: 'https://itunes.apple.com/us/app/count-coins/id595124272?mt=8&uo=4',
+                            categories: [
+                                'Education',
+                                'Games',
+                                'Educational'
+                            ],
+                            price: 'Free',
+                            extID: 595124272,
+                            images: [
+                                {
+                                    uri: 'http://a1.mzstatic.com/us/r30/Purple/v4/c2/ec/6b/c2ec6b9a-d47b-20e4-d1f7-2f42fffcb58f/screen1136x1136.jpeg',
+                                    type: 'screenshot',
+                                    device: 'phone'
+                                },
+                                {
+                                    uri: 'http://a5.mzstatic.com/us/r30/Purple/v4/fc/4b/e3/fc4be397-6865-7011-361b-59f78c789e62/screen1136x1136.jpeg',
+                                    type: 'screenshot',
+                                    device: 'phone'
+                                },
+                                {
+                                    uri: 'http://a5.mzstatic.com/us/r30/Purple/v4/f9/02/63/f902630c-3969-ab9f-07b4-2c91bd629fd0/screen1136x1136.jpeg',
+                                    type: 'screenshot',
+                                    device: 'phone'
+                                },
+                                {
+                                    uri: 'http://a3.mzstatic.com/us/r30/Purple/v4/f8/21/0e/f8210e8f-a75a-33c0-9e86-e8c65c9faa54/screen1136x1136.jpeg',
+                                    type: 'screenshot',
+                                    device: 'phone'
+                                },
+                                {
+                                    uri: 'http://is5.mzstatic.com/image/thumb/Purple/v4/ef/a0/f3/efa0f340-225e-e512-1616-8f223c6202ea/source/512x512bb.jpg',
+                                    type: 'thumbnail'
+                                }
+                            ]
                         }
-                    });
+                    }
+                });
             });
 
             it('should not update the campaign name or description', function() {

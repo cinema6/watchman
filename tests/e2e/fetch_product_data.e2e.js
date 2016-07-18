@@ -1,15 +1,20 @@
 'use strict';
 
+var Configurator            = require('../helpers/Configurator.js');
 var JsonProducer            = require('rc-kinesis').JsonProducer;
 var q                       = require('q');
 var testUtils               = require('cwrx/test/e2e/testUtils.js');
 var CwrxRequest             = require('../../lib/CwrxRequest');
 var resolveURL              = require('url').resolve;
 var moment                  = require('moment');
+var ld                      = require('lodash');
 
 var APP_CREDS               = JSON.parse(process.env.appCreds);
 var AWS_CREDS               = JSON.parse(process.env.awsCreds);
 var WATCHMAN_STREAM         = process.env.watchmanStream;
+var API_ROOT                = process.env.apiRoot;
+var PREFIX                  = process.env.appPrefix;
+
 
 function waitUntil(predicate) {
     function check() {
@@ -24,43 +29,69 @@ function waitUntil(predicate) {
     return check();
 }
 
-fdescribe('timeStream', function() {
-    var producer, mockCampaigns, mockAdvert, awsConfig;
+describe('timeStream', function() {
+    var producer, mockCampaigns, mockAdvert;
 
-    beforeAll(function() {
-        awsConfig = {
-            region: 'us-east-1',
+    // This beforeAll is dedicated to setting application config
+    beforeAll(function(done) {
+
+        console.log('In beforeAll');
+        const configurator = new Configurator();
+        const sharedConfig = {
+            secrets: '/opt/sixxy/.watchman.secrets.json',
+            appCreds: '/opt/sixxy/.rcAppCreds.json',
             cwrx: {
                 api: {
-                    root: 'http://33.33.33.10',
-                    productData : {
-                        endpoint: '/api/collateral/product-data'
-                    },
+                    root: API_ROOT,
+                    tracking : 'https://audit.cinema6.com/pixel.gif',
                     campaigns: {
                         endpoint: '/api/campaigns'
                     },
+                    productData : {
+                        endpoint: '/api/collateral/product-data'
+                    }
                 }
             }
         };
-        if(AWS_CREDS) {
-            awsConfig.accessKeyId = AWS_CREDS.accessKeyId;
-            awsConfig.secretAccessKey = AWS_CREDS.secretAccessKey;
-        }
+        const cwrxConfig = {
+            eventHandlers: { }
+        };
+        const timeConfig = {
+            eventHandlers: { }
+        };
+        const watchmanConfig = {
+            eventHandlers: {
+                hourly_campaignPulse: {
+                    actions: ['fetch_product_data']
+                }
+            }
+        };
+
+        this.sharedConfig = sharedConfig;
+
+        Promise.all([
+            configurator.updateConfig(`${PREFIX}CwrxStreamApplication`, sharedConfig, cwrxConfig),
+            configurator.updateConfig(`${PREFIX}TimeStreamApplication`, sharedConfig, timeConfig),
+            configurator.updateConfig(`${PREFIX}WatchmanStreamApplication`, sharedConfig, watchmanConfig)
+        ]).then(done, done.fail);
+
+        var awsConfig = ld.assign({ region: 'us-east-1' }, AWS_CREDS || {});
+
         producer = new JsonProducer(WATCHMAN_STREAM, awsConfig);
     });
 
     beforeEach(function(done) {
         jasmine.DEFAULT_TIMEOUT_INTERVAL = 60000;
         mockAdvert = {
-          'name': 'olivia test advert',
-          'id': 'a-0Gz4jn091PJ1wOSE',
-          'created': '2016-06-20T21:21:27.984Z',
-          'lastUpdated': '2016-06-20T21:21:27.984Z',
-          'status': 'active',
-          'org': 'o-test',
-          'beeswaxIds': {
-            'advertiser': 28265
-          }
+            'name': 'olivia test advert',
+            'id': 'a-0Gz4jn091PJ1wOSE',
+            'created': '2016-06-20T21:21:27.984Z',
+            'lastUpdated': '2016-06-20T21:21:27.984Z',
+            'status': 'active',
+            'org': 'o-test',
+            'beeswaxIds': {
+                'advertiser': 28265
+            }
         };
 
         mockCampaigns = [
@@ -142,55 +173,53 @@ fdescribe('timeStream', function() {
             }
         ];
 
-
-
         var mockApp = {
-        	id: 'app-watchman',
-        	key: APP_CREDS.key,
-        	status: 'active',
-        	secret: APP_CREDS.secret,
-        	permissions: {
-        		campaigns: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
-        		cards: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
-        		users: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
-        		orgs: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
-        		placements: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
-        		advertisers: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
-        		promotions: { read: 'all' },
-        		transactions: { create: 'all' }
-        	},
-        	entitlements: {
-        		directEditCampaigns: true,
-        		makePaymentForAny: true
-        	},
-        	fieldValidation: {
-        		campaigns: {
-        			status: {
-        				__allowed: true
-        			},
-        			cards: {
-        				__length: Infinity
-        			},
-        			pricing: {
-        				dailyLimit: {
-        					__percentMin: 0
-        				}
-        			}
-        		},
-        		orgs: {
-        			paymentPlanStart: { __allowed: true },
-        			paymentPlanId: { __allowed: true },
-        			promotions: { __allowed: true }
-        		},
-        		cards: {
-        			user: {
-        				__allowed: true
-        			},
-        			org: {
-        				__allowed: true
-        			}
-        		}
-        	}
+            id: 'app-watchman',
+            key: APP_CREDS.key,
+            status: 'active',
+            secret: APP_CREDS.secret,
+            permissions: {
+                campaigns: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
+                cards: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
+                users: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
+                orgs: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
+                placements: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
+                advertisers: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
+                promotions: { read: 'all' },
+                transactions: { create: 'all' }
+            },
+            entitlements: {
+                directEditCampaigns: true,
+                makePaymentForAny: true
+            },
+            fieldValidation: {
+                campaigns: {
+                    status: {
+                        __allowed: true
+                    },
+                    cards: {
+                        __length: Infinity
+                    },
+                    pricing: {
+                        dailyLimit: {
+                            __percentMin: 0
+                        }
+                    }
+                },
+                orgs: {
+                    paymentPlanStart: { __allowed: true },
+                    paymentPlanId: { __allowed: true },
+                    promotions: { __allowed: true }
+                },
+                cards: {
+                    user: {
+                        __allowed: true
+                    },
+                    org: {
+                        __allowed: true
+                    }
+                }
+            }
         };
 
         q.all([
@@ -204,19 +233,17 @@ fdescribe('timeStream', function() {
         testUtils.closeDbs().then(done, done.fail);
     });
 
-
-
     describe('the time event prompting campaign data to be fetched', function() {
         var dataEndpoint, campEndpoint, request;
         beforeEach(function(done) {
             request = new CwrxRequest(APP_CREDS);
-            dataEndpoint = resolveURL(awsConfig.cwrx.api.root, awsConfig.cwrx.api.productData.endpoint);
+            dataEndpoint = resolveURL(this.sharedConfig.cwrx.api.root, this.sharedConfig.cwrx.api.productData.endpoint);
+            campEndpoint = resolveURL(this.sharedConfig.cwrx.api.root, this.sharedConfig.cwrx.api.campaigns.endpoint);
+
             producer.produce({ type: 'hourly_campaignPulse', data: { campaign: mockCampaigns[0], date: new Date() } }).then(done, done.fail);
-            campEndpoint = resolveURL(awsConfig.cwrx.api.root, awsConfig.cwrx.api.campaigns.endpoint);
         });
         describe('should update an out-of-date campaign', function(){
             beforeEach(function(done) {
-
 
                 waitUntil(function() {
                     return request.get({
