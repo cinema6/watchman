@@ -246,7 +246,7 @@ describe('timeStream', function() {
 
                 waitUntil(function() {
                     return request.get({
-                        url: campEndpoint + '/' + mockCampaigns[0].id,
+                        url: campEndpoint + '/' + mockCampaigns[0].id
                     }).spread(function(data) {
                         return moment(data.lastUpdated).isSame(moment(), 'day');
                     });
@@ -256,7 +256,7 @@ describe('timeStream', function() {
             it ('should not overwrite the name or description parameters', function(done) {
 
                 request.get({
-                    url: campEndpoint + '/' + mockCampaigns[0].id,
+                    url: campEndpoint + '/' + mockCampaigns[0].id
                 }).spread(function watchmanData(data) {
                     expect(data.product.name).toEqual(mockCampaigns[0].product.name);
                     expect(data.product.description).toEqual(mockCampaigns[0].product.description);
