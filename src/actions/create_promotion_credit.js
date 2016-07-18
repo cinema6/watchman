@@ -37,9 +37,11 @@ module.exports = function(config) {
                     // of the trial (assuming a month is 30 days.)
                     targetUsers,
                     amount: ld.round(price * (targetUsers / paymentPlan.viewsPerMonth), 2),
-                    paymentPlanId: paymentPlan.id,
-                    cycleStart: today.format(),
-                    cycleEnd: moment(today).add(trialLength, 'days').endOf('day').format()
+                    paymentPlanId: trialLength ? paymentPlan.id : null,
+                    cycleStart: trialLength ? today.format() : null,
+                    cycleEnd: trialLength ?
+                        moment(today).add(trialLength, 'days').endOf('day').format() :
+                        null
                 };
             }
             default:

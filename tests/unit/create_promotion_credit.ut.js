@@ -138,6 +138,48 @@ describe('create_promotion_credit.js', function() {
         }).then(done, done.fail);
     });
 
+    it('should create a credit transaction for a freeTrial with no trialLength', function(done) {
+        event.data.paymentPlan = {
+            label: 'Starter',
+            price: 49.51,
+            maxCampaigns: 1,
+            viewsPerMonth: 2000,
+            id: 'pp-0Ekdsm05KVZ43Aqj',
+            created: '2016-07-05T14:18:29.642Z',
+            lastUpdated: '2016-07-05T14:28:57.336Z',
+            status: 'active'
+        };
+        event.data.promotion = {
+            id: 'pro-1',
+            type: 'freeTrial',
+            data: {
+                [event.data.paymentPlan.id]: {
+                    paymentMethodRequired: false,
+                    targetUsers: 1100
+                }
+            }
+        };
+        event.data.target = 'showcase';
+
+        createCredit(event).then(function() {
+            expect(requestUtils.makeSignedRequest).toHaveBeenCalledWith('i am watchman', 'post', {
+                url: 'http://test.com/api/transactions',
+                json: {
+                    amount: 27.23,
+                    org: 'o-1',
+                    promotion: 'pro-1',
+                    application: event.data.target,
+                    paymentPlanId: null,
+                    targetUsers: event.data.promotion.data[event.data.paymentPlan.id].targetUsers,
+                    cycleStart: null,
+                    cycleEnd: null
+                }
+            });
+            expect(mockLog.warn).not.toHaveBeenCalled();
+            expect(mockLog.error).not.toHaveBeenCalled();
+        }).then(done, done.fail);
+    });
+
     it('should warn if there is not config in the promotion for the provided paymentPlan', function(done) {
         event.data.paymentPlan = {
             label: 'Starter',
