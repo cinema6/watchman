@@ -22,14 +22,22 @@ module.exports = function(config) {
             case 'signupReward':
                 return { amount: promotion.data.rewardAmount };
             case 'freeTrial': {
-                const trialLength = promotion.data.trialLength;
+                const trial = promotion.data[paymentPlan.id];
+
+                if (!trial) {
+                    return null;
+                }
+
+                const trialLength = trial.trialLength;
+                const targetUsers = trial.targetUsers;
+                const price = paymentPlan.price;
 
                 return {
                     // Calculate the amount of credit by prorating the monthly price across each day
                     // of the trial (assuming a month is 30 days.)
-                    amount: ld.round((promotion.data.trialLength / 30) * paymentPlan.price, 2),
+                    targetUsers,
+                    amount: ld.round(price * (targetUsers / paymentPlan.viewsPerMonth), 2),
                     paymentPlanId: paymentPlan.id,
-                    targetUsers: promotion.data.targetUsers,
                     cycleStart: today.format(),
                     cycleEnd: moment(today).add(trialLength, 'days').endOf('day').format()
                 };

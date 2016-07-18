@@ -96,15 +96,6 @@ describe('create_promotion_credit.js', function() {
     });
 
     it('should create a credit transaction for a freeTrial', function(done) {
-        event.data.promotion = {
-            id: 'pro-1',
-            type: 'freeTrial',
-            data: {
-                trialLength: 15,
-                paymentMethodRequired: false,
-                targetUsers: 1100
-            }
-        };
         event.data.paymentPlan = {
             label: 'Starter',
             price: 49.51,
@@ -115,24 +106,67 @@ describe('create_promotion_credit.js', function() {
             lastUpdated: '2016-07-05T14:28:57.336Z',
             status: 'active'
         };
+        event.data.promotion = {
+            id: 'pro-1',
+            type: 'freeTrial',
+            data: {
+                [event.data.paymentPlan.id]: {
+                    trialLength: 15,
+                    paymentMethodRequired: false,
+                    targetUsers: 1100
+                }
+            }
+        };
         event.data.target = 'showcase';
 
         createCredit(event).then(function() {
             expect(requestUtils.makeSignedRequest).toHaveBeenCalledWith('i am watchman', 'post', {
                 url: 'http://test.com/api/transactions',
                 json: {
-                    amount: 24.76,
+                    amount: 27.23,
                     org: 'o-1',
                     promotion: 'pro-1',
                     application: event.data.target,
                     paymentPlanId: event.data.paymentPlan.id,
-                    targetUsers: event.data.promotion.data.targetUsers,
+                    targetUsers: event.data.promotion.data[event.data.paymentPlan.id].targetUsers,
                     cycleStart: moment(event.data.date).utcOffset(0).startOf('day').format(),
-                    cycleEnd: moment(event.data.date).utcOffset(0).add(event.data.promotion.data.trialLength, 'days').endOf('day').format()
+                    cycleEnd: moment(event.data.date).utcOffset(0).add(event.data.promotion.data[event.data.paymentPlan.id].trialLength, 'days').endOf('day').format()
                 }
             });
             expect(mockLog.warn).not.toHaveBeenCalled();
             expect(mockLog.error).not.toHaveBeenCalled();
+        }).then(done, done.fail);
+    });
+
+    it('should warn if there is not config in the promotion for the provided paymentPlan', function(done) {
+        event.data.paymentPlan = {
+            label: 'Starter',
+            price: 49.51,
+            maxCampaigns: 1,
+            viewsPerMonth: 2000,
+            id: 'pp-0Ekdsm05KVZ43Aqj',
+            created: '2016-07-05T14:18:29.642Z',
+            lastUpdated: '2016-07-05T14:28:57.336Z',
+            status: 'active'
+        };
+        event.data.promotion = {
+            id: 'pro-1',
+            type: 'freeTrial',
+            data: {
+                'pp-0GK9a70bhh3mmVe6': {
+                    trialLength: 15,
+                    paymentMethodRequired: false,
+                    targetUsers: 1100
+                }
+            }
+        };
+        event.data.target = 'showcase';
+
+        createCredit(event).then(function() {
+            expect(requestUtils.makeSignedRequest).not.toHaveBeenCalled();
+            expect(mockLog.warn).toHaveBeenCalled();
+            expect(mockLog.error).not.toHaveBeenCalled();
+            done();
         }).then(done, done.fail);
     });
 

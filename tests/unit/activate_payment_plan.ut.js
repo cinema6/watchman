@@ -281,22 +281,28 @@ describe('(action factory) activate_payment_plan', function() {
                                 id: org.promotions[0].id,
                                 type: 'freeTrial',
                                 data: {
-                                    trialLength: 14
+                                    [org.paymentPlanId]: {
+                                        trialLength: 14
+                                    }
                                 }
                             };
                             promotions[org.promotions[1].id] = {
                                 id: org.promotions[1].id,
                                 type: 'signupReward',
                                 data: {
-                                    rewardAmount: 50,
-                                    trialLength: 30
+                                    [org.paymentPlanId]: {
+                                        rewardAmount: 50,
+                                        trialLength: 30
+                                    }
                                 }
                             };
                             promotions[org.promotions[2].id] = {
                                 id: org.promotions[2].id,
                                 type: 'freeTrial',
                                 data: {
-                                    trialLength: 5
+                                    [org.paymentPlanId]: {
+                                        trialLength: 5
+                                    }
                                 }
                             };
 
