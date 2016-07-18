@@ -2,12 +2,15 @@
 
 const Configurator = require('../helpers/Configurator.js');
 const Hubspot = require('../../lib/Hubspot.js');
+const enums = require('cwrx/lib/enums.js');
 const ld = require('lodash');
 const rcKinesis = require('rc-kinesis');
 const rcUuid = require('rc-uuid');
+const testUtils = require('cwrx/test/e2e/testUtils.js');
 const waiter = require('../helpers/waiter.js');
 
 const API_ROOT = process.env.apiRoot;
+const APP_CREDS = JSON.parse(process.env.appCreds);
 const AWS_CREDS = JSON.parse(process.env.awsCreds);
 const CWRX_STREAM = process.env.cwrxStream;
 const PREFIX = process.env.appPrefix;
@@ -15,7 +18,7 @@ const SECRETS = JSON.parse(process.env.secrets);
 const WATCHMAN_STREAM = process.env.watchmanStream;
 const HUBSPOT_API_KEY = SECRETS.hubspot.key;
 
-describe('hubspot integration', function() {
+describe('HubSpot integration', function() {
     // This beforeAll is dedicated to setting application config
     beforeAll(function(done) {
         const configurator = new Configurator();
@@ -27,6 +30,12 @@ describe('hubspot integration', function() {
                     root: API_ROOT,
                     users: {
                         endpoint: '/api/account/users'
+                    },
+                    campaigns: {
+                        endpoint: '/api/campaigns'
+                    },
+                    analytics: {
+                        endpoint: '/api/analytics'
                     }
                 }
             },
@@ -137,6 +146,30 @@ describe('hubspot integration', function() {
                             }
                         }
                     ]
+                },
+                morning_orgPulse: {
+                    actions: [
+                        {
+                            name: 'check_views_milestone',
+                            options: {
+                                milestones: [100,200,300]
+                            }
+                        }
+                    ]
+                },
+                views_milestone: {
+                    actions: [
+                        {
+                            name: 'hubspot/update_user',
+                            options: {
+                                properties: {
+                                    applications: 'apps',
+                                    views_milestone: '{{milestone}}',
+                                    e2e: 'true'
+                                }
+                            }
+                        }
+                    ]
                 }
             }
         };
@@ -145,6 +178,24 @@ describe('hubspot integration', function() {
             configurator.updateConfig(`${PREFIX}TimeStreamApplication`, sharedConfig, timeConfig),
             configurator.updateConfig(`${PREFIX}WatchmanStreamApplication`, sharedConfig, watchmanConfig)
         ]).then(done, done.fail);
+    });
+
+    // Create a mock watchman app
+    beforeAll(function(done) {
+        const watchmanApp = {
+            id: 'watchman-app',
+            key: APP_CREDS.key,
+            status: 'active',
+            secret: APP_CREDS.secret,
+            permissions: {
+                campaigns: { read: 'all' },
+                cards: { read: 'all' },
+                users: { read: 'all' }
+            },
+            entitlements: { },
+            fieldValidation: { }
+        };
+        testUtils.resetCollection('applications', [watchmanApp]).then(done, done.fail);
     });
 
     beforeAll(function() {
@@ -347,6 +398,102 @@ describe('hubspot integration', function() {
                 expect(contact.properties.lastname.value).toBe(this.user.lastName);
                 expect(contact.properties.applications.value).toBe('apps');
                 expect(contact.properties.lifecyclestage.value).toBe('salesqualifiedlead');
+            }).then(done, done.fail);
+        });
+    });
+
+    describe('updating the views milestone on a HubSpot contact', function() {
+        beforeEach(function(done) {
+            const campaignId = `cam-${rcUuid.createUuid()}`;
+            const orgId = `o-${rcUuid.createUuid()}`;
+            const today = offset => {
+                const dt = new Date(((new Date()).toISOString()).substr(0,10) + 'T00:00:00.000Z');
+                return (new Date(dt.valueOf() + (86400000 * (offset || 0)))).toISOString().substr(0,10);
+            };
+            this.campaign = {
+                id: campaignId,
+                org: orgId,
+                user: this.user.id,
+                status: enums.Status.Active,
+                application: 'showcase'
+            };
+            this.updateCampaign = () => {
+                return testUtils.resetCollection('campaigns', [this.campaign]);
+            };
+            this.updateViews = views => {
+                this.campaign.id = `cam-${rcUuid.createUuid()}`;
+                return this.updateCampaign().then(() => {
+                    return Promise.all([
+                        testUtils.resetPGTable('rpt.unique_user_views', [
+                            `(\'${this.campaign.id}\',${views},\'${today(-2)}\',\'${today(-1)}\')`
+                        ])
+                    ]);
+                });
+            };
+            this.produceEvent = () => {
+                return this.producers.watchman.produce({
+                    type: 'morning_orgPulse',
+                    data: {
+                        org: {
+                            id: this.campaign.org
+                        }
+                    }
+                });
+            };
+            Promise.all([
+                this.updateViews(123),
+                testUtils.resetCollection('users', [this.user])
+            ]).then(done, done.fail);
+        });
+
+        it('should be able to set the view milestone for the first time', function(done) {
+            this.produceEvent().then(() =>
+                this.waitForHubspotContact(this.user.email, {
+                    email: this.user.email
+                })
+            ).then(contact => {
+                expect(contact.properties.email.value).toBe(this.user.email);
+                expect(contact.properties.firstname.value).toBe(this.user.firstName);
+                expect(contact.properties.lastname.value).toBe(this.user.lastName);
+                expect(contact.properties.applications.value).toBe('apps');
+                expect(contact.properties.lifecyclestage.value).toBe('subscriber');
+                expect(contact.properties.views_milestone.value).toBe('100');
+            }).then(done, done.fail);
+        });
+
+        it('should be able to update the view milestone', function(done) {
+            this.produceEvent().then(() =>
+                this.waitForHubspotContact(this.user.email, {
+                    email: this.user.email,
+                    views_milestone: '100'
+                })
+            ).then(() => this.updateViews(234)).then(() => this.produceEvent()).then(() =>
+                this.waitForHubspotContact(this.user.email, {
+                    email: this.user.email,
+                    views_milestone: '200'
+                })
+            ).then(contact => {
+                expect(contact.properties.email.value).toBe(this.user.email);
+                expect(contact.properties.firstname.value).toBe(this.user.firstName);
+                expect(contact.properties.lastname.value).toBe(this.user.lastName);
+                expect(contact.properties.applications.value).toBe('apps');
+                expect(contact.properties.lifecyclestage.value).toBe('subscriber');
+                expect(contact.properties.views_milestone.value).toBe('200');
+            }).then(done, done.fail);
+        });
+
+        it('should not update the view milestone for a canceled campaign', function(done) {
+            this.campaign.status = enums.Status.Canceled;
+            this.updateCampaign().then(() => this.produceEvent()).then(() => {
+                return Promise.race([
+                    this.waitForHubspotContact(this.user.email, {
+                        email: this.user.email
+                    }),
+                    waiter.delay(5000).then(() => 'delay')
+                ]);
+            }).then(value => {
+                return (value === 'delay') ? Promise.resolve() :
+                    Promise.reject(new Error('should not have created HubSpot contact'));
             }).then(done, done.fail);
         });
     });

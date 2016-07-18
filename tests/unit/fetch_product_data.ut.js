@@ -1,16 +1,22 @@
 'use strict';
 
-var JsonProducer = require('rc-kinesis').JsonProducer;
 var q = require('q');
 var ld = require('lodash');
 var logger = require('cwrx/lib/logger.js');
-var fetchProductDataFactory = require('../../src/actions/fetch_product_data.js');
 var resolveURL = require('url').resolve;
+var proxyquire = require('proxyquire').noCallThru();
+var fetchProductDataFactory;
+var JsonProducer;
 
 describe('fetch_product_data.js', function() {
     var req, mockLog, mockCampaigns, campEndpoint;
 
     beforeEach(function() {
+        const rcKinesis = require('rc-kinesis');
+        fetchProductDataFactory = proxyquire('../../src/actions/fetch_product_data.js', {
+            'rc-kinesis': rcKinesis
+        });
+        JsonProducer = rcKinesis.JsonProducer;
         this.mockOptions = { };
         this.mockConfig = {
             appCreds: {},
