@@ -46,7 +46,7 @@ module.exports = function factory(config) {
                     return cwrxRequest.get(`${analyticsEndpoint}/${campaign.id}`).then(response => {
                         const analytics = response[0];
                         const views = analytics.summary.users;
-                        const sorted = milestones.concat(views).sort();
+                        const sorted = milestones.concat(views).sort((a, b) => a - b);
                         const index = sorted.lastIndexOf(views);
 
                         // If the campaign has not reached a views milestone

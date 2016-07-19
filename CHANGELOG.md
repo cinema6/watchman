@@ -1,6 +1,10 @@
 # Watchman
 
 ## v1.3.0 (July 18, 2016)
+* *[v1.3.0-rc2]*
+  * [FIX]: Fix for an issue where a view milestone may be calculated incorrectly
+* *[/v1.3.0-rc2]*
+
 * *[v1.3.0-rc1]*
   * [FEATURE]: Add the ability to detect view count milestones for campaigns
   * [DESIGN]: Update logo for showcase emails
