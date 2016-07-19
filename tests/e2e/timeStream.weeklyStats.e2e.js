@@ -7,6 +7,7 @@ const rcKinesis = require('rc-kinesis');
 const testUtils = require('cwrx/test/e2e/testUtils.js');
 const uuid = require('rc-uuid');
 
+const APP_CREDS = JSON.parse(process.env.appCreds);
 const API_ROOT = process.env.apiRoot;
 const AWS_CREDS = JSON.parse(process.env.awsCreds);
 const PREFIX = process.env.appPrefix;
@@ -97,6 +98,25 @@ describe('timeStream weeklyStats', function() {
             configurator.updateConfig(`${PREFIX}TimeStreamApplication`, sharedConfig, timeConfig),
             configurator.updateConfig(`${PREFIX}WatchmanStreamApplication`, sharedConfig, watchmanConfig)
         ]).then(done, done.fail);
+    });
+
+    // Create a mock watchman app
+    beforeAll(function(done) {
+        const watchmanApp = {
+            id: 'watchman-app',
+            key: APP_CREDS.key,
+            status: 'active',
+            secret: APP_CREDS.secret,
+            permissions: {
+                campaigns: { read: 'all' },
+                cards: { read: 'all' },
+                orgs: { read: 'all' },
+                users: { read: 'all' }
+            },
+            entitlements: { },
+            fieldValidation: { }
+        };
+        testUtils.resetCollection('applications', [watchmanApp]).then(done, done.fail);
     });
 
     beforeEach(function(done) {
