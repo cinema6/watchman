@@ -5,6 +5,7 @@ var JsonProducer = require('rc-kinesis').JsonProducer;
 var Q = require('q');
 var testUtils = require('cwrx/test/e2e/testUtils.js');
 
+var APP_CREDS = JSON.parse(process.env.appCreds);
 var API_ROOT = process.env.apiRoot;
 var AWS_CREDS = JSON.parse(process.env.awsCreds);
 var PREFIX = process.env.appPrefix;
@@ -114,6 +115,24 @@ describe('timeStream available funds check', function() {
             configurator.updateConfig(`${PREFIX}TimeStreamApplication`, sharedConfig, timeConfig),
             configurator.updateConfig(`${PREFIX}WatchmanStreamApplication`, sharedConfig, watchmanConfig)
         ]).then(done, done.fail);
+    });
+
+    // Create a mock watchman app
+    beforeAll(function(done) {
+        const watchmanApp = {
+            id: 'watchman-app',
+            key: APP_CREDS.key,
+            status: 'active',
+            secret: APP_CREDS.secret,
+            permissions: {
+                campaigns: { read: 'all' },
+                cards: { read: 'all' },
+                orgs: { read: 'all' }
+            },
+            entitlements: { },
+            fieldValidation: { }
+        };
+        testUtils.resetCollection('applications', [watchmanApp]).then(done, done.fail);
     });
 
     beforeAll(function(done) {
