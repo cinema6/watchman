@@ -218,4 +218,60 @@ describe('the check_views_milestone action', function() {
             });
         }).then(done, done.fail);
     });
+
+    it('should work if milestones are not in alphabetical order', function(done) {
+        const milestones = [100, 500, 1000];
+        const orgs = ['o-123', 'o-456', 'o-789'];
+        const campaigns = ['cam-123', 'cam-456', 'cam-789'];
+        CwrxRequest.prototype.get.and.callFake(options => {
+            if (/analytics/.test(options)) {
+                const id = options.match(/(cam-\d+)/)[0];
+                const views = milestones[campaigns.indexOf(id)] + 1;
+                return Promise.resolve([{
+                    summary: {
+                        users: views
+                    }
+                }]);
+            } else {
+                const id = options.qs.org;
+                const campaign = campaigns[orgs.indexOf(id)];
+                return Promise.resolve([[{
+                    id: campaign
+                }]]);
+            }
+        });
+        Promise.all(milestones.map((milestone, index) => {
+            const event = ld.assign({ }, this.event, {
+                data: {
+                    org: {
+                        id: orgs[index]
+                    }
+                },
+                options: {
+                    milestones: milestones
+                }
+            });
+            return this.action(event);
+        })).then(() => {
+            milestones.map((milestone, index) => {
+                expect(rcKinesis.JsonProducer.prototype.produce).toHaveBeenCalledWith({
+                    type: 'views_milestone',
+                    data: {
+                        org: {
+                            id: orgs[index]
+                        },
+                        campaign: {
+                            id: campaigns[index]
+                        },
+                        analytics: {
+                            summary: {
+                                users: milestone + 1
+                            }
+                        },
+                        milestone: milestone
+                    }
+                });
+            });
+        }).then(done, done.fail);
+    });
 });
