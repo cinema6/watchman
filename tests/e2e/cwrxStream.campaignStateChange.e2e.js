@@ -469,7 +469,8 @@ describe('cwrxStream campaignStateChange', function() {
         };
 
         Promise.all([
-            testUtils.resetCollection('applications', [watchmanApp, cwrxApp])
+            testUtils.resetCollection('applications', [watchmanApp, cwrxApp]),
+            testUtils.resetPGTable('fct.billing_transactions')
         ]).then(done, done.fail);
     });
 
