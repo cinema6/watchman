@@ -200,7 +200,7 @@ describe('HubSpot integration', function() {
 
     beforeAll(function() {
         const awsConfig = ld.assign({ region: 'us-east-1' }, AWS_CREDS || { });
-        jasmine.DEFAULT_TIMEOUT_INTERVAL = 120000;
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 240000;
         this.hubspot = new Hubspot(HUBSPOT_API_KEY);
         this.producers = {
             cwrx: new rcKinesis.JsonProducer(CWRX_STREAM, awsConfig),
@@ -212,8 +212,7 @@ describe('HubSpot integration', function() {
                     const prop = contact.properties[key];
                     return prop && prop.value === value;
                 }, true) ? contact : false
-            )
-        );
+            ), 3000);
     });
 
     beforeEach(function() {
