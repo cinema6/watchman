@@ -1,5 +1,11 @@
 # Watchman
 
+* *[v1.4.0-rc1]*
+  * Change the schema of free trial promotions
+  * [FEATURE]: Add support for bonus-view promotion transactions
+  * **Extra Deployment Steps**:
+    * Update `freeTrial` promotions to be keyed by payment plan ids
+
 ## v1.3.0 (July 18, 2016)
 * *[v1.3.0-rc1]*
   * [FEATURE]: Add the ability to detect view count milestones for campaigns
