@@ -18,7 +18,7 @@ const SECRETS = JSON.parse(process.env.secrets);
 const WATCHMAN_STREAM = process.env.watchmanStream;
 const HUBSPOT_API_KEY = SECRETS.hubspot.key;
 
-describe('HubSpot integration', function() {
+fdescribe('HubSpot integration', function() {
     // This beforeAll is dedicated to setting application config
     beforeAll(function(done) {
         const configurator = new Configurator();
@@ -200,7 +200,7 @@ describe('HubSpot integration', function() {
 
     beforeAll(function() {
         const awsConfig = ld.assign({ region: 'us-east-1' }, AWS_CREDS || { });
-        jasmine.DEFAULT_TIMEOUT_INTERVAL = 120000;
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 240000;
         this.hubspot = new Hubspot(HUBSPOT_API_KEY);
         this.producers = {
             cwrx: new rcKinesis.JsonProducer(CWRX_STREAM, awsConfig),
@@ -212,8 +212,7 @@ describe('HubSpot integration', function() {
                     const prop = contact.properties[key];
                     return prop && prop.value === value;
                 }, true) ? contact : false
-            )
-        );
+            ), 3000);
     });
 
     beforeEach(function() {
@@ -271,7 +270,7 @@ describe('HubSpot integration', function() {
         });
     });
 
-    describe('capturing a showcase user as a sales qualified lead in HubSpot', function() {
+    fdescribe('capturing a showcase user as a sales qualified lead in HubSpot', function() {
         it('should occur when an account is created', function(done) {
             this.producers.cwrx.produce({
                 type: 'accountCreated',
