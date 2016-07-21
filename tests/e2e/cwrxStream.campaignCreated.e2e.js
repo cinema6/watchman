@@ -626,6 +626,9 @@ describe('cwrxStream campaignCreated', function() {
                             uri: 'http://is5.mzstatic.com/image/thumb/Purple/v4/ef/a0/f3/efa0f340-225e-e512-1616-8f223c6202ea/source/512x512bb.jpg',
                             type: 'thumbnail'
                         }
+                    ],
+                    websites : [
+                        'http://mechinate.tumblr.com/'
                     ]
                 },
                 status: 'draft',
