@@ -459,7 +459,8 @@ describe('timeStream payment plan billing', function() {
             testUtils.resetCollection('policies', []),
             testUtils.resetCollection('orgs', []),
             testUtils.resetCollection('users', []),
-            testUtils.resetCollection('paymentPlans', [])
+            testUtils.resetCollection('paymentPlans', []),
+            testUtils.resetPGTable('fct.billing_transactions')
         ]).then(function() {
             return createUser();
         }).spread(function(/*user, org, paymentMethod*/) {

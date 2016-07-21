@@ -47,7 +47,9 @@ module.exports = function factory(config) {
                     q([])
             ).spread(promotions => {
                 const freeTrials = ld.filter(promotions, { type: 'freeTrial' });
-                const trialLength = ld.sum(freeTrials.map(ld.property('data.trialLength')));
+                const trialLength = ld.sum(freeTrials.map(ld.property(
+                    `data[${org.paymentPlanId}].trialLength`
+                )));
                 const startDate = moment(today).add(trialLength, 'days').format();
 
                 return request.put({

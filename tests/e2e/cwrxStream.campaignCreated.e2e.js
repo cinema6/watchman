@@ -41,17 +41,17 @@ function wait(time) {
 
 describe('cwrxStream campaignCreated', function() {
     var producer, request, beeswax, mailman;
-    var user, org, paymentPlan, advertiser, promotions, containers, campaign;
+    var user, org, paymentPlans, advertiser, promotions, containers, campaign;
 
     function api(endpoint) {
         return resolveURL(API_ROOT, endpoint);
     }
 
-    function campaignCreatedEvent(time) {
+    function campaignCreatedEvent(time, campaignOverride) {
         return producer.produce({
             type: 'campaignCreated',
             data: {
-                campaign: campaign,
+                campaign: campaignOverride || campaign,
                 date: (time || moment()).format()
             }
         });
@@ -94,23 +94,35 @@ describe('cwrxStream campaignCreated', function() {
     function createUser() {
         var orgId = createId('o');
         var userId = createId('u');
-        var paymentPlanId = createId('pp');
+        var paymentPlanIds = [createId('pp'), createId('pp')];
 
-        return testUtils.resetCollection('paymentPlans', [{
-            id: paymentPlanId,
-            label: 'Starter',
-            price: 39.99,
-            maxCampaigns: 1,
-            viewsPerMonth: 2000,
-            created: '2016-07-05T14:18:29.642Z',
-            lastUpdated: '2016-07-05T14:28:57.336Z',
-            status: 'active'
-        }]).then(function makeOrg() {
+        return testUtils.resetCollection('paymentPlans', [
+            {
+                id: paymentPlanIds[0],
+                label: 'Starter',
+                price: 39.99,
+                maxCampaigns: 1,
+                viewsPerMonth: 2000,
+                created: '2016-07-05T14:18:29.642Z',
+                lastUpdated: '2016-07-05T14:28:57.336Z',
+                status: 'active'
+            },
+            {
+                id: paymentPlanIds[1],
+                label: 'Pro',
+                price: 149.99,
+                maxCampaigns: 5,
+                viewsPerMonth: 7500,
+                created: '2016-07-05T14:18:29.642Z',
+                lastUpdated: '2016-07-05T14:28:57.336Z',
+                status: 'active'
+            }
+        ]).then(function makeOrg() {
             return testUtils.resetCollection('orgs', [{
                 id: orgId,
                 status: 'active',
                 name: 'The Best Org',
-                paymentPlanId: paymentPlanId,
+                paymentPlanId: null,
                 paymentPlanStart: moment().format()
             }]);
         }).then(function makeUser() {
@@ -160,7 +172,10 @@ describe('cwrxStream campaignCreated', function() {
                     url: api('/api/account/advertisers?org=' + orgId)
                 }).then(ld.property('0.0')),
                 request.get({
-                    url: api(`/api/payment-plans/${paymentPlanId}`)
+                    url: api('/api/payment-plans'),
+                    qs: {
+                        ids: paymentPlanIds.join(',')
+                    }
                 }).then(ld.property('0'))
             ]);
         });
@@ -194,7 +209,7 @@ describe('cwrxStream campaignCreated', function() {
         }).spread(function(campaign) {
             if (!ld.get(campaign, 'externalIds.beeswax')) { return; }
 
-            return beeswax.campaigns.delete(campaign.externalIds.beeswax);
+            return beeswax.campaigns.delete(campaign.externalIds.beeswax, false);
         }).then(function() {
             return request.get({
                 url: api('/api/placements?tagParams.campaign=' + campaign.id),
@@ -206,9 +221,9 @@ describe('cwrxStream campaignCreated', function() {
 
                 if (!beeswaxId) { return; }
 
-                return beeswax.creatives.edit(beeswaxId, { active: false })
+                return beeswax.creatives.edit(beeswaxId, { active: false }, false)
                     .then(function() {
-                        return beeswax.creatives.delete(beeswaxId);
+                        return beeswax.creatives.delete(beeswaxId, false);
                     });
             }));
         }).then(() => request.delete({
@@ -468,46 +483,6 @@ describe('cwrxStream campaignCreated', function() {
             }
         };
 
-        promotions = [
-            {
-                id: createId('ref'),
-                status: 'active',
-                created: moment().subtract(6, 'months').format(),
-                lastUpdated: moment().subtract(6, 'months').format(),
-                name: '10-Day Free Trial',
-                type: 'freeTrial',
-                data: {
-                    trialLength: 10,
-                    paymentMethodRequired: false,
-                    targetUsers: 750
-                }
-            },
-            {
-                id: createId('ref'),
-                status: 'active',
-                created: moment().subtract(7, 'months').format(),
-                lastUpdated: moment().subtract(7, 'months').format(),
-                name: '$50 Bonus',
-                type: 'signupReward',
-                data: {
-                    rewardAmount: 50
-                }
-            },
-            {
-                id: createId('ref'),
-                status: 'active',
-                created: moment().subtract(8, 'months').format(),
-                lastUpdated: moment().subtract(8, 'months').format(),
-                name: 'One Week Free Trial',
-                type: 'freeTrial',
-                data: {
-                    trialLength: 7,
-                    paymentMethodRequired: false,
-                    targetUsers: 500
-                }
-            }
-        ];
-
         containers = [
             {
                 created: '2016-03-24T19:18:49.696Z',
@@ -544,7 +519,6 @@ describe('cwrxStream campaignCreated', function() {
             testUtils.resetCollection('policies', []),
             testUtils.resetCollection('orgs', []),
             testUtils.resetCollection('users', []),
-            testUtils.resetCollection('promotions', promotions),
             testUtils.resetCollection('containers', containers),
             testUtils.resetCollection('campaigns', [])
         ]).then(function() {
@@ -553,7 +527,55 @@ describe('cwrxStream campaignCreated', function() {
             user = arguments[0];
             org = arguments[1];
             advertiser = arguments[2];
-            paymentPlan = arguments[3];
+            paymentPlans = arguments[3];
+
+            promotions = [
+                {
+                    id: createId('ref'),
+                    status: 'active',
+                    created: moment().subtract(6, 'months').format(),
+                    lastUpdated: moment().subtract(6, 'months').format(),
+                    name: '10-Day Free Trial',
+                    type: 'freeTrial',
+                    data: {
+                        [paymentPlans[0].id]: {
+                            trialLength: 10,
+                            paymentMethodRequired: false,
+                            targetUsers: 750
+                        },
+                        [paymentPlans[1].id]: {
+                            paymentMethodRequired: true,
+                            targetUsers: 1000
+                        }
+                    }
+                },
+                {
+                    id: createId('ref'),
+                    status: 'active',
+                    created: moment().subtract(7, 'months').format(),
+                    lastUpdated: moment().subtract(7, 'months').format(),
+                    name: '$50 Bonus',
+                    type: 'signupReward',
+                    data: {
+                        rewardAmount: 50
+                    }
+                },
+                {
+                    id: createId('ref'),
+                    status: 'active',
+                    created: moment().subtract(8, 'months').format(),
+                    lastUpdated: moment().subtract(8, 'months').format(),
+                    name: 'One Week Free Trial',
+                    type: 'freeTrial',
+                    data: {
+                        [paymentPlans[0].id]: {
+                            trialLength: 7,
+                            paymentMethodRequired: false,
+                            targetUsers: 500
+                        }
+                    }
+                }
+            ];
 
             campaign = {
                 id: createId('cam'),
@@ -628,7 +650,11 @@ describe('cwrxStream campaignCreated', function() {
                 }
             };
 
-            return testUtils.resetCollection('campaigns', [campaign]);
+            return Promise.all([
+                testUtils.resetCollection('campaigns', ld.cloneDeep([campaign])),
+                testUtils.resetCollection('promotions', promotions),
+                testUtils.resetPGTable('fct.billing_transactions')
+            ]);
         }).then(done, done.fail);
     });
 
@@ -1134,10 +1160,12 @@ describe('cwrxStream campaignCreated', function() {
         });
 
         describe('and has a paymentPlan', function() {
-            var now;
+            var now, paymentPlan;
 
             beforeEach(function(done) {
                 now = moment();
+
+                paymentPlan = paymentPlans[0];
 
                 updatePaymentPlan(paymentPlan.id).then(function() {
                     return getOrg();
@@ -1221,7 +1249,7 @@ describe('cwrxStream campaignCreated', function() {
                         transaction_id: jasmine.any(String),
                         transaction_ts: jasmine.any(Date),
                         org_id: org.id,
-                        amount: '9.3300',
+                        amount: '10.0000',
                         sign: 1,
                         units: 1,
                         campaign_id: null,
@@ -1242,7 +1270,7 @@ describe('cwrxStream campaignCreated', function() {
                         transaction_id: jasmine.any(String),
                         transaction_ts: jasmine.any(Date),
                         org_id: org.id,
-                        amount: '13.3300',
+                        amount: '15.0000',
                         sign: 1,
                         units: 1,
                         campaign_id: null,
@@ -1256,6 +1284,75 @@ describe('cwrxStream campaignCreated', function() {
                     }));
                     expect(moment(transactions[1].cycle_start).utcOffset(0).format()).toBe(moment(now).utcOffset(0).startOf('day').format(), 'cycle_start is not correct.');
                     expect(moment(transactions[1].cycle_end).utcOffset(0).format()).toBe(moment(now).utcOffset(0).add(10, 'days').endOf('day').format(), 'cycle_end is not correct.');
+                });
+
+                describe('and the promotion should be for bonus views', function() {
+                    let campaign2;
+
+                    beforeEach(function(done) {
+                        paymentPlan = paymentPlans[1];
+
+                        campaign2 = ld.cloneDeep(campaign);
+                        campaign2.id = createId('cam');
+
+                        Promise.all([
+                            updatePaymentPlan(paymentPlan.id).then(() => updatePaymentPlanStart(null)),
+                            testUtils.mongoUpsert('campaigns', { id: campaign2.id }, campaign2),
+                            testUtils.pgQuery('DELETE FROM fct.billing_transactions')
+                        ]).then(ld.spread(function(/*org*/) {
+                            org = arguments[0];
+
+                            return campaignCreatedEvent(now, campaign2);
+                        })).then(function() {
+                            return waitUntil(function() {
+                                return q.all([
+                                    testUtils.pgQuery(
+                                        'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY amount',
+                                        [org.id]
+                                    ),
+                                    getOrg()
+                                ]).spread(function(queryResult, org) {
+                                    return org.paymentPlanStart && queryResult.rows.length > 0 && [org, queryResult.rows];
+                                });
+                            });
+                        }).then(ld.spread(function(/*org, transaction*/) {
+                            org = arguments[0];
+                            transactions = arguments[1];
+                        })).then(done, done.fail);
+                    });
+
+                    afterEach(function(done) {
+                        Promise.all([
+                            deleteCampaign(campaign2)
+                        ]).then(done, done.fail);
+                    });
+
+                    it('should give the org a paymentPlanStart of now', function() {
+                        expect(moment(org.paymentPlanStart).utcOffset(0).format()).toBe(moment(now).utcOffset(0).startOf('day').format());
+                        expect(moment(org.nextPaymentDate).utcOffset(0).format()).toBe(moment(now).utcOffset(0).startOf('day').format());
+                    });
+
+                    it('should create a transaction', function() {
+                        expect(transactions.length).toBe(1);
+                        expect(transactions[0]).toEqual(jasmine.objectContaining({
+                            rec_key: jasmine.any(String),
+                            rec_ts: jasmine.any(Date),
+                            transaction_id: jasmine.any(String),
+                            transaction_ts: jasmine.any(Date),
+                            org_id: org.id,
+                            amount: '20.0000',
+                            sign: 1,
+                            units: 1,
+                            campaign_id: null,
+                            braintree_id: null,
+                            promotion_id: promotions[0].id,
+                            application: 'showcase',
+                            paymentplan_id: null,
+                            view_target: 1000,
+                            cycle_start: null,
+                            cycle_end: null
+                        }));
+                    });
                 });
             });
         });
