@@ -5,6 +5,7 @@
   * [FEATURE]: Add support for bonus-view promotion transactions
   * **Extra Deployment Steps**:
     * Update `freeTrial` promotions to be keyed by payment plan ids
+  * [FIX]: Use product.websites for setting advertiser_domain in beeswax creatives
 
 ## v1.3.0 (July 18, 2016)
 * *[v1.3.0-rc2]*

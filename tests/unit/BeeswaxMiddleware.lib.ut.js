@@ -1,11 +1,12 @@
 'use strict';
 
 const proxyquire = require('proxyquire').noCallThru();
+const logger = require('cwrx/lib/logger');
 
 describe('BeeswaxMiddleware(config)', function() {
 
     describe('instance:', function() {
-        var url, q, ld;
+        var url, q, ld, log;
         var BeeswaxClient, BeeswaxMiddleware, CwrxRequest;
         var middleWare, request, beeswax, advertiser, campaign, placements;
         var bwCreateAdvertiserDeferred, bwCreateCampaignDeferred,
@@ -69,7 +70,8 @@ describe('BeeswaxMiddleware(config)', function() {
                     name    : 'Revengus Extremis',
                     type    : 'app',
                     platform: 'iOS',
-                    categories : [ 'Music', 'Business' ]
+                    categories : [ 'Music', 'Business' ],
+                    websites   : [ 'https://1', 'https://2' ]
                 }
             };
 
@@ -118,6 +120,13 @@ describe('BeeswaxMiddleware(config)', function() {
                 }
             ];
 
+            spyOn(logger, 'getLog').and.returnValue(log = jasmine.createSpyObj('log', [
+                'info',
+                'trace',
+                'warn',
+                'error'
+            ]));
+
             middleWare  = new BeeswaxMiddleware(
                 {
                     api: { root: 'http://33.33.33.10/' },
@@ -152,7 +161,7 @@ describe('BeeswaxMiddleware(config)', function() {
             updatedCampaign             = {};
             updatedPlacement            = [{},{}];
             result                      = null;
-
+            
             spyOn(beeswax.advertisers,'create')
                 .and.returnValue(bwCreateAdvertiserDeferred.promise);
 
@@ -436,7 +445,7 @@ describe('BeeswaxMiddleware(config)', function() {
                                 'network={{INVENTORY_SOURCE}}&cb={{CACHEBUSTER}}'
                             );
                         expect(req.creative_attributes.advertiser).toEqual({
-                            advertiser_domain : [ 'https://itunes.apple.com' ],
+                            advertiser_domain : [ 'https://1' ],
                             landing_page_url: [ 
                                 'https://itunes.apple.com/us/app/revex/id1093924230'
                             ], 
@@ -469,8 +478,9 @@ describe('BeeswaxMiddleware(config)', function() {
                     });
                 });
 
-                describe('one beeswax placement not mraid',function(){
+                describe('one beeswax placement not mraid, no product.websites',function(){
                     beforeEach(function(done){
+                        delete campaign.product.websites;
                         placements[0].tagType = 'other';
                         middleWare.createCreatives({
                             campaign   : campaign,
@@ -496,6 +506,21 @@ describe('BeeswaxMiddleware(config)', function() {
                                 { id : 'p-2222222', externalIds : { beeswax : 2 }}
                             )
                         );
+                        
+                        var req = beeswax.creatives.create.calls.argsFor(0)[0];
+                        expect(req.creative_attributes.advertiser).toEqual({
+                            advertiser_domain : [ 'https://itunes.apple.com' ],
+                            landing_page_url: [ 
+                                'https://itunes.apple.com/us/app/revex/id1093924230'
+                            ], 
+                            advertiser_category: [ 'IAB1_6', 'IAB3_4' ]
+                        });
+                        expect(log.warn.calls.mostRecent().args).toEqual([
+                            'Campaign %1 (%2) has no product.websites, falling ' +
+                            'back to product.uri, but this may cause issues with Mopub. '+
+                            'Replace advertiser_domain with actual site ASAP.',
+                            'c-1234567', 'Revengus Extremis'         
+                        ]);
                     });
                 });
 
