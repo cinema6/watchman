@@ -1,11 +1,13 @@
 # Watchman
 
+## v1.4.0 (July 21, 2016)
 * *[v1.4.0-rc1]*
   * Change the schema of free trial promotions
   * [FEATURE]: Add support for bonus-view promotion transactions
   * **Extra Deployment Steps**:
     * Update `freeTrial` promotions to be keyed by payment plan ids
   * [FIX]: Use product.websites for setting advertiser_domain in beeswax creatives
+* *[/v1.4.0-rc1]*
 
 ## v1.3.0 (July 18, 2016)
 * *[v1.3.0-rc2]*
