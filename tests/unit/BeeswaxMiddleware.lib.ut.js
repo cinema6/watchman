@@ -3,12 +3,12 @@
 const proxyquire = require('proxyquire').noCallThru();
 const logger = require('cwrx/lib/logger');
 
-describe('BeeswaxMiddleware(config)', function() {
+fdescribe('BeeswaxMiddleware(config)', function() {
 
     describe('instance:', function() {
         var url, q, ld, log;
         var BeeswaxClient, BeeswaxMiddleware, CwrxRequest;
-        var middleWare, request, beeswax, advertiser, campaign, placements;
+        var middleWare, request, beeswax, advertiser, campaign, placements, transaction;
         var bwCreateAdvertiserDeferred, bwCreateCampaignDeferred,
             bwCreateCreativeDeferred, bwUploadAssetDeferred;
         var putAdvertiserDeferred, getAdvertiserDeferred,
@@ -119,6 +119,22 @@ describe('BeeswaxMiddleware(config)', function() {
                     thumbnail: 'http://is3.mzstatic.com/image/thumb/2.jpg'
                 }
             ];
+
+            transaction = {
+                application: 'showcase',
+                transactionId: 't-0aZ1z90bw5Snihpq',
+                transactionTimestamp: '2016-07-21T15:00:44.962Z',
+                orgId: 'o-0iY5h40ajlO1U03K',
+                amount: '49.9900',
+                braintreeId: 'msac53hk',
+                promotionId: null,
+                paymentPlanId: 'pp-0Ekdsm05KVZ43Aqj',
+                cycleStart: '2016-07-21T00:00:00.000Z',
+                cycleEnd: '2016-08-20T23:59:59.000Z',
+                planViews: 2000,
+                bonusViews: 0,
+                totalViews: 2000
+            };
 
             spyOn(logger, 'getLog').and.returnValue(log = jasmine.createSpyObj('log', [
                 'info',
@@ -710,7 +726,9 @@ describe('BeeswaxMiddleware(config)', function() {
                     placements  : placements
                 })
                 .then(done.fail,function(e){ 
-                    expect(e.message).toEqual('Cannot initShowcaseAppsCampaign without beeswax placement.');
+                    expect(e.message).toEqual(
+                        'Cannot initShowcaseAppsCampaign without beeswax placement.'
+                    );
                     expect(middleWare.createAdvertiser).not.toHaveBeenCalled();
                     expect(middleWare.createCampaign).not.toHaveBeenCalled();
                     expect(middleWare.createCreatives).not.toHaveBeenCalled();
@@ -718,5 +736,29 @@ describe('BeeswaxMiddleware(config)', function() {
                 .then(done,done.fail);
             });
         });
+
+        describe('method: upsertCampaignActiveLineItems', function(){
+            it('complains if it does not receive campaign',function(done){
+                middleWare.upsertCampaignActiveLineItems()
+                .then(done.fail,function(e){
+                    expect(e.message).toEqual(
+                        'Object containing a campaign, startDate and endDate is required.'
+                    );
+                })
+                .then(done,done.fail);
+            });
+            it('complains if it does not receive startDate and endDate',function(done){
+                middleWare.upsertCampaignActiveLineItems({
+                    campaign : campaign
+                })
+                .then(done.fail,function(e){
+                    expect(e.message).toEqual(
+                        'Object containing a campaign, startDate and endDate is required.'
+                    );
+                })
+                .then(done,done.fail);
+            });
+        });
+
     });
 });
