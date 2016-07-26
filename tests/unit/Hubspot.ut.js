@@ -1,8 +1,11 @@
 'use strict';
 
-var Hubspot = require('../../lib/Hubspot.js');
-var Q = require('q');
-var requestUtils = require('cwrx/lib/requestUtils.js');
+const Hubspot = require('../../lib/Hubspot.js');
+const Q = require('q');
+const requestUtils = require('cwrx/lib/requestUtils.js');
+const ld = require('lodash');
+
+const wait = global.setTimeout;
 
 describe('Hubspot', function() {
     beforeEach(function() {
@@ -198,6 +201,124 @@ describe('Hubspot', function() {
                 foo: 'bar'
             }).then(done.fail).catch(function(error) {
                 expect(error).toBe('epic fail');
+            }).then(done, done.fail);
+        });
+    });
+
+    describe('making a hubspot request', function() {
+        beforeEach(function() {
+            this.waitZero = () => new Promise(function(resolve) {
+                wait(() => {
+                    resolve();
+                }, 0);
+            });
+            spyOn(ld, 'random').and.callThrough();
+            jasmine.clock().install();
+        });
+
+        afterEach(function() {
+            jasmine.clock().uninstall();
+        });
+
+        it('should retry the request if it was rate limited', function(done) {
+            let calls = 0;
+            requestUtils.qRequest.and.callFake(() => {
+                return Promise.resolve({
+                    response: {
+                        statusCode: calls++ === 0 ? 429 : 200
+                    }
+                });
+            });
+            this.hubspot.getContactByEmail('foo@bar.com');
+            expect(requestUtils.qRequest.calls.count()).toBe(1);
+            this.waitZero().then(() => {
+                expect(ld.random).toHaveBeenCalledWith(1000, 2000);
+                jasmine.clock().tick(2000);
+                return this.waitZero();
+            }).then(() => {
+                expect(requestUtils.qRequest.calls.count()).toBe(2);
+            }).then(done, done.fail);
+        });
+
+        it('should be able to retry the request more than once with increasing random delay times', function(done) {
+            let calls = 0;
+            requestUtils.qRequest.and.callFake(() => {
+                return Promise.resolve({
+                    response: {
+                        statusCode: calls++ < 2 ? 429 : 200
+                    }
+                });
+            });
+            this.hubspot.getContactByEmail('foo@bar.com');
+            expect(requestUtils.qRequest.calls.count()).toBe(1);
+            this.waitZero().then(() => {
+                expect(ld.random).toHaveBeenCalledWith(1000, 2000);
+                jasmine.clock().tick(2000);
+                return this.waitZero();
+            }).then(() => {
+                expect(requestUtils.qRequest.calls.count()).toBe(2);
+                expect(ld.random).toHaveBeenCalledWith(1000, 3000);
+                jasmine.clock().tick(3000);
+                return this.waitZero();
+            }).then(() => {
+                expect(requestUtils.qRequest.calls.count()).toBe(3);
+            }).then(done, done.fail);
+        });
+
+        it('should be able to resolve once the request succeeds', function(done) {
+            let calls = 0;
+            requestUtils.qRequest.and.callFake(() => {
+                return Promise.resolve({
+                    response: {
+                        statusCode: calls++ < 3 ? 429 : 200
+                    }
+                });
+            });
+            const promise = this.hubspot.getContactByEmail('foo@bar.com');
+            this.waitZero().then(() => {
+                expect(ld.random).toHaveBeenCalledWith(1000, 2000);
+                jasmine.clock().tick(2000);
+                return this.waitZero();
+            }).then(() => {
+                expect(ld.random).toHaveBeenCalledWith(1000, 3000);
+                jasmine.clock().tick(3000);
+                return this.waitZero();
+            }).then(() => {
+                expect(ld.random).toHaveBeenCalledWith(1000, 4000);
+                jasmine.clock().tick(4000);
+                return this.waitZero();
+            }).then(() => {
+                return promise;
+            }).then(() => {
+                expect(requestUtils.qRequest.calls.count()).toBe(4);
+            }).then(done, done.fail);
+        });
+
+        it('should retry the request up to a max number of times before it rejects', function(done) {
+            requestUtils.qRequest.and.callFake(() => {
+                return Promise.resolve({
+                    response: {
+                        statusCode: 429
+                    }
+                });
+            });
+            const promise = this.hubspot.getContactByEmail('foo@bar.com');
+            this.waitZero().then(() => {
+                expect(ld.random).toHaveBeenCalledWith(1000, 2000);
+                jasmine.clock().tick(2000);
+                return this.waitZero();
+            }).then(() => {
+                expect(ld.random).toHaveBeenCalledWith(1000, 3000);
+                jasmine.clock().tick(3000);
+                return this.waitZero();
+            }).then(() => {
+                expect(ld.random).toHaveBeenCalledWith(1000, 4000);
+                jasmine.clock().tick(4000);
+                return this.waitZero();
+            }).then(() => {
+                return promise;
+            }).then(done.fail, error => {
+                expect(error.code).toBe(429);
             }).then(done, done.fail);
         });
     });
