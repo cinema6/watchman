@@ -12,7 +12,8 @@ fdescribe('BeeswaxMiddleware(config)', function() {
         var bwCreateAdvertiserDeferred, bwCreateCampaignDeferred, bwFindCampaignDeferred,
             bwCreateCreativeDeferred, bwQueryCreativeDeferred, bwUploadAssetDeferred,
             bwQueryLineItemDeferred, bwCreateLineItemDeferred, bwEditLineItemDeferred,
-            bwCreateTargetingTemplDeferred, bwCreateLineItemCreativeDeferred;
+            bwCreateTargetingTemplDeferred, bwCreateLineItemCreativeDeferred,
+            bwEditCampaignDeferred;
         var putAdvertiserDeferred, getAdvertiserDeferred,
             putCampaignDeferred, putPlacementDeferred;
         var updatedAdvert, updatedCampaign, updatedPlacement, result;
@@ -41,6 +42,7 @@ fdescribe('BeeswaxMiddleware(config)', function() {
                     advertisers : { create : function() { return null; }},
                     campaigns : { 
                         create : function() { return null; },
+                        edit : function() { return null; },
                         find : function() { return null; }
                     },
                     creatives : { 
@@ -171,8 +173,9 @@ fdescribe('BeeswaxMiddleware(config)', function() {
                             mobile_app: [ {
                                 exclude: { app_bundle_list: [ 1533, 1547, 1548, 2977 ] }
                             }]
-                        }
-                    }
+                        },
+                    },
+                    bid : { values: { cpm_bid: 11 } }
                 },
                 {
                     api: {
@@ -198,6 +201,7 @@ fdescribe('BeeswaxMiddleware(config)', function() {
         beforeEach(function(){
             bwCreateAdvertiserDeferred  = q.defer();
             bwCreateCampaignDeferred    = q.defer();
+            bwEditCampaignDeferred    = q.defer();
             bwFindCampaignDeferred      = q.defer();
             bwQueryLineItemDeferred     = q.defer();
             bwCreateLineItemDeferred    = q.defer();
@@ -221,6 +225,10 @@ fdescribe('BeeswaxMiddleware(config)', function() {
 
             spyOn(beeswax.campaigns,'create')
                 .and.returnValue(bwCreateCampaignDeferred.promise);
+            
+            spyOn(beeswax.campaigns,'edit').and.callFake(function(){
+                return bwEditCampaignDeferred.promise;
+            });
             
             spyOn(beeswax.campaigns,'find').and.callFake(function(){
                 return bwFindCampaignDeferred.promise;
@@ -324,6 +332,11 @@ fdescribe('BeeswaxMiddleware(config)', function() {
                 }]
             });
             expect(middleWare.defaultMultiplier).toEqual(2);
+
+            expect(middleWare.defaultBid).toEqual({
+                bidding_strategy : 'CPM_PACED',
+                values : { cpm_bid: 11 }
+            });
         });
 
         describe('method: toBeeswaxDate', function(){
@@ -829,6 +842,58 @@ fdescribe('BeeswaxMiddleware(config)', function() {
                 .then(done,done.fail);
             });
         });
+        
+        describe('method: adjustCampaignBudget', function(){
+            beforeEach(function(){
+                delete campaign.externalIds;
+                delete campaign.externalCampaigns;
+
+                bwFindCampaignDeferred = q.defer();
+                bwFindCampaignDeferred.fulfill({ 
+                    payload : {
+                        campaign_id : 11,
+                        campaign_budget : 1000
+                    }
+                });
+
+                bwEditCampaignDeferred = q.defer();
+            });
+
+            it('increases campaign budgets',function(done){
+                campaign.externalIds = { beeswax : 11 };
+                bwEditCampaignDeferred.fulfill({ payload : { 
+                    campaign_id: 11, campaign_budget: 1500 } });
+                middleWare.adjustCampaignBudget(campaign,500)
+                .then(function(){
+                    expect(beeswax.campaigns.find).toHaveBeenCalledWith(11);
+                    expect(beeswax.campaigns.edit).toHaveBeenCalledWith(11,
+                        { campaign_budget: 1500});
+                    expect(log.info).toHaveBeenCalledWith(
+                        'Adjusted budget of beeswaxCampaign(%1): %2 => %3.',
+                        11, 1000, 1500
+                    );
+                })
+                .then(done,done.fail);
+            });
+
+            it('decreases campaign budgets',function(done){
+                campaign.externalCampaigns = { beeswax : { externalId : 11 } };
+                bwEditCampaignDeferred.fulfill({ payload : { 
+                    campaign_id: 11, campaign_budget: 500 } });
+                middleWare.adjustCampaignBudget(campaign,-500)
+                .then(function(){
+                    expect(beeswax.campaigns.find).toHaveBeenCalledWith(11);
+                    expect(beeswax.campaigns.edit).toHaveBeenCalledWith(11,
+                        { campaign_budget: 500});
+                    expect(log.info).toHaveBeenCalledWith(
+                        'Adjusted budget of beeswaxCampaign(%1): %2 => %3.',
+                        11, 1000, 500
+                    );
+                })
+                .then(done,done.fail);
+            });
+
+        });
 
         describe('method: upsertCampaignActiveLineItems', function(){
             var args;
@@ -1001,7 +1066,7 @@ fdescribe('BeeswaxMiddleware(config)', function() {
 
                 });
 
-                it ('creates line item, leaves campaign if has sufficient budget',function(done){
+                it ('creates line item if none exist',function(done){
                     middleWare.upsertCampaignActiveLineItems(args)
                     .then(function (res){
                         expect(beeswax.campaigns.find).toHaveBeenCalledWith(11);
@@ -1044,7 +1109,7 @@ fdescribe('BeeswaxMiddleware(config)', function() {
                             budget_type : 1,
                             bidding : { 
                                 bidding_strategy: 'CPM_PACED', 
-                                values : { cpm_bid : 10 }
+                                values : { cpm_bid : 11 }
                             },
                             start_date: '2016-06-30 20:00:00',
                             end_date : '2016-07-31 19:59:59',
@@ -1068,23 +1133,15 @@ fdescribe('BeeswaxMiddleware(config)', function() {
                     .then(done,done.fail);
                 });
             });
-           
-            describe('increasing targetUsers',function(){
+
+            describe('updating existing LineItem',function(){
                 beforeEach(function(){
-                    bwFindCampaignDeferred = q.defer();
-                    bwFindCampaignDeferred.fulfill({ 
-                        payload : {
-                            campaign_id : 11,
-                            advertiser_id : 55,
-                            campaign_name : "my campaign",
-                            campaign_budget : 6000,
-                            start_date : '2016-01-27 00:00:00',
-                            budget_type : 1
-                        }
-                    });
-                    args.campaign.targetUsers = 1000;
-                });
-                it('increases line item budget, leaves campaign alone if budget is large enough',function(){
+                    // bw campaign has budget of 1000 impressions
+                    args.campaign.targetUsers = 2000;
+                    
+                    bwQueryLineItemDeferred = q.defer();
+                    bwQueryCreativeDeferred = q.defer();
+                    
                     bwQueryLineItemDeferred.fulfill({
                         payload : [
                             { 
@@ -1094,23 +1151,32 @@ fdescribe('BeeswaxMiddleware(config)', function() {
                             } 
                         ]
                     });
+
+                    bwQueryCreativeDeferred.fulfill({ 
+                        payload : [
+                            { creative_id : 1000, advertiser_id : 55 },
+                            { creative_id : 1001, advertiser_id : 55 }
+                        ]
+                    });
                 });
-                it('increases line item budget, increases campaign budget if not large enough',function(){
-
-
+                it('logs an error if an update is required.',function(done){
+                    middleWare.upsertCampaignActiveLineItems(args)
+                    .then(function (){
+                        expect(beeswax.campaigns.find).toHaveBeenCalledWith(11);
+                        expect(beeswax.creatives.query).toHaveBeenCalledWith({
+                            advertiser_id : 55, active : true    
+                        });
+                        expect(beeswax.lineItems.query).toHaveBeenCalledWith({
+                            campaign_id : 11,
+                            active : true, 
+                            start_date : '2016-06-30 20:00:00',
+                            end_date : '2016-07-31 19:59:59'
+                        });
+                        expect(log.error).toHaveBeenCalledWith('Manual Beeswax Update required for Campaign %1 (%2) line items. New impressions target is %3', 'c-1234567', 11, 4000);
+                    })
+                    .then(done,done.fail);
                 });
             });
-
-            describe('decreasing targetUsers',function(){
-                beforeEach(function(){
-                    args.campaign.targetUsers = 1000;
-                });
-                it('decreases line item budget',function(){
-
-
-                });
-            });
-
         });
     });
 });
