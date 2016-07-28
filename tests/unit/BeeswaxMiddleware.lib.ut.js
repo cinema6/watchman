@@ -868,10 +868,6 @@ fdescribe('BeeswaxMiddleware(config)', function() {
                     expect(beeswax.campaigns.find).toHaveBeenCalledWith(11);
                     expect(beeswax.campaigns.edit).toHaveBeenCalledWith(11,
                         { campaign_budget: 1500});
-                    expect(log.info).toHaveBeenCalledWith(
-                        'Adjusted budget of beeswaxCampaign(%1): %2 => %3.',
-                        11, 1000, 1500
-                    );
                 })
                 .then(done,done.fail);
             });
@@ -885,10 +881,6 @@ fdescribe('BeeswaxMiddleware(config)', function() {
                     expect(beeswax.campaigns.find).toHaveBeenCalledWith(11);
                     expect(beeswax.campaigns.edit).toHaveBeenCalledWith(11,
                         { campaign_budget: 500});
-                    expect(log.info).toHaveBeenCalledWith(
-                        'Adjusted budget of beeswaxCampaign(%1): %2 => %3.',
-                        11, 1000, 500
-                    );
                 })
                 .then(done,done.fail);
             });

@@ -13,15 +13,15 @@ const q = require('q');
 const Status = require('cwrx/lib/enums').Status;
 const logger = require('cwrx/lib/logger');
 const inspect = require('util').inspect;
-const BeeswaxClient = require('beeswax-client');
+const BeeswaxMiddleware = require('../../../../lib/BeeswaxMiddleware');
 
 module.exports = function factory(config) {
     const log = logger.getLog();
     const request = new CwrxRequest(config.appCreds);
-    const beeswax = new BeeswaxClient({
-        apiRoot: config.beeswax.apiRoot,
-        creds: config.state.secrets.beeswax
-    });
+    const beeswax = new BeeswaxMiddleware(
+        { apiRoot: config.beeswax.apiRoot, creds: config.state.secrets.beeswax},
+        { creds: config.appCreds, api: config.cwrx.api }
+    );
 
     const campaignsEndpoint = resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint);
 
@@ -68,8 +68,7 @@ module.exports = function factory(config) {
                 const externalImpressions = targetUsers * externalMultiplier;
                 const cost = round(budget / (targetUsers * internalMultiplier), 3);
 
-                return Promise.all([
-                    request.put({
+                return request.put({
                         url: campaignsEndpoint + '/' + campaign.id,
                         json: assign({}, campaign, {
                             status: Status.Active,
@@ -80,28 +79,23 @@ module.exports = function factory(config) {
                                 dailyLimit: dailyLimit
                             })
                         })
-                    }).then(spread(identity)),
-                    beeswax.campaigns.find(
-                        get(campaign, 'externalIds.beeswax') ||
-                        get(campaign, 'externalCampaigns.beeswax.externalId')
-                    ).then(response => response.payload)
-                ]).then(spread((newCampaign, beeswaxCampaign) => (
-                    beeswax.campaigns.edit(beeswaxCampaign.campaign_id, {
-                        campaign_budget: beeswaxCampaign.campaign_budget + externalImpressions
-                    }).then(response => response.payload).then(updatedBeeswaxCampaign => {
-                        log.info(
-                            'Increased budget of campaign(%1): %2 => %3.',
-                            campaign.id, get(campaign, 'pricing.budget', 0),
-                            get(newCampaign, 'pricing.budget', 0)
-                        );
-                        log.info(
-                            'Increased budget of beeswaxCampaign(%1): %2 => %3.',
-                            beeswaxCampaign.campaign_id,
-                            beeswaxCampaign.campaign_budget,
-                            updatedBeeswaxCampaign.campaign_budget
-                        );
                     })
-                )));
+                    .spread(newCampaign => {
+                        return beeswax.adjustCampaignBudget(newCampaign,externalImpressions)
+                            .spread((beeswaxCampaign, updatedBeeswaxCampaign) => {
+                            log.info(
+                                'Increased budget of campaign(%1): %2 => %3.',
+                                campaign.id, get(campaign, 'pricing.budget', 0),
+                                get(newCampaign, 'pricing.budget', 0)
+                            );
+                            log.info(
+                                'Increased budget of beeswaxCampaign(%1): %2 => %3.',
+                                beeswaxCampaign.campaign_id,
+                                beeswaxCampaign.campaign_budget,
+                                updatedBeeswaxCampaign.campaign_budget
+                            );
+                        });
+                    });
             }));
         });
     }).catch(reason => (
