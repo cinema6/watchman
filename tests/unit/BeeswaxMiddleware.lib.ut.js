@@ -1012,7 +1012,7 @@ fdescribe('BeeswaxMiddleware(config)', function() {
                 bwQueryCreativeDeferred.fulfill({ payload : [] });
                 middleWare.upsertCampaignActiveLineItems(args)
                 .then(done.fail,function (e){
-                    expect(e.message).toEqual('No active creatives found for campaign');
+                    expect(e.message).toEqual('upsertCampaignActiveLineItems fails: No active creatives found for campaign');
                 })
                 .then(done,done.fail);
             });
@@ -1121,6 +1121,8 @@ fdescribe('BeeswaxMiddleware(config)', function() {
                         expect(beeswax.lineItems.edit).toHaveBeenCalledWith(111,{
                             active : true
                         });
+                        expect(res.createdLineItems.length).toEqual(1);
+                        expect(res.updatedLineItems.length).toEqual(0);
                     })
                     .then(done,done.fail);
                 });

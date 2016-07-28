@@ -39,7 +39,8 @@ fdescribe('(action factory) showcase/apps/auto_increase_budget', function() {
         }(require('../../lib/CwrxRequest')));
         
         BeeswaxMiddleware = jasmine.createSpy('BeeswaxMiddleware()').and.callFake(() => ({
-            adjustCampaignBudget: () => null
+            adjustCampaignBudget: () => null,
+            upsertCampaignActiveLineItems: () => null
         }));
 
         factory = proxyquire('../../src/actions/showcase/apps/auto_increase_budget', {
@@ -133,19 +134,28 @@ fdescribe('(action factory) showcase/apps/auto_increase_budget', function() {
         });
 
         it('should create a BeeswaxMiddleware', function() {
-            expect(BeeswaxMiddleware).toHaveBeenCalledWith( {
-                apiRoot: config.beeswax.apiRoot,
-                creds  : config.state.secrets.beeswax
-            },{
-                creds: config.appCreds,
-                api: config.cwrx.api
-            });
+            expect(BeeswaxMiddleware).toHaveBeenCalledWith( 
+                {
+                    apiRoot: config.beeswax.apiRoot,
+                    creds  : config.state.secrets.beeswax,
+                    bid : undefined
+                },
+                {
+                    creds: config.appCreds,
+                    api: config.cwrx.api
+                },
+                {
+                    conversionMultipliers : {
+                        internal : 1.1, external : 1.25
+                    }
+                }
+            );
         });
 
         describe('the action', function() {
             var data, options, event;
             var getCampaignsDeferred;
-            let adjustBeeswaxCampaignBudgetDeferreds;
+            let adjustBeeswaxCampaignBudgetDeferreds, upsertBeeswaxLineItemsDeferreds;
             var success, failure;
 
             beforeEach(function(done) {
@@ -184,6 +194,12 @@ fdescribe('(action factory) showcase/apps/auto_increase_budget', function() {
                 spyOn(beeswax, 'adjustCampaignBudget').and.callFake(() => {
                     return adjustBeeswaxCampaignBudgetDeferreds[
                         adjustBeeswaxCampaignBudgetDeferreds.push(q.defer()) - 1].promise;
+                });
+
+                upsertBeeswaxLineItemsDeferreds = [];
+                spyOn(beeswax, 'upsertCampaignActiveLineItems').and.callFake(() => {
+                    return upsertBeeswaxLineItemsDeferreds[
+                        upsertBeeswaxLineItemsDeferreds.push(q.defer()) - 1].promise;
                 });
 
                 autoIncreaseBudget(event).then(success, failure);
@@ -319,7 +335,8 @@ fdescribe('(action factory) showcase/apps/auto_increase_budget', function() {
                                 cost: 0.020,
                                 budget: 51,
                                 dailyLimit: options.dailyLimit
-                            })
+                            }),
+                            targetUsers: 1000
                         })
                     });
                     expect(request.put).toHaveBeenCalledWith({
@@ -331,13 +348,14 @@ fdescribe('(action factory) showcase/apps/auto_increase_budget', function() {
                                 cost: 0.023,
                                 budget: 25,
                                 dailyLimit: options.dailyLimit
-                            }
+                            },
+                            targetUsers: 1000
                         })
                     });
                 });
 
                 describe('when the campaigns have been updated', function() {
-                    let beeswaxCampaigns, updatedBeeswaxCampaigns;
+                    let beeswaxCampaigns, updatedBeeswaxCampaigns, lineItems;
 
                     beforeEach(function(done) {
                         putCampaignDeferreds[campaigns[1].id].fulfill([request.put.calls.all()[0].args[0].json, { statusCode: 200 }]);
@@ -362,6 +380,19 @@ fdescribe('(action factory) showcase/apps/auto_increase_budget', function() {
                             {
                                 campaign_id: campaigns[2].externalIds.beeswax,
                                 campaign_budget: 1250
+                            }
+                        ];
+
+                        lineItems = [
+                            {
+                                campaign_id: campaigns[1].externalCampaigns.beeswax.externalId,
+                                line_item_id : 1,
+                                line_item_budget: 2500
+                            },
+                            {
+                                campaign_id: campaigns[2].externalIds.beeswax,
+                                line_item_id : 2,
+                                line_item_budget: 1250
                             }
                         ];
 
@@ -392,12 +423,52 @@ fdescribe('(action factory) showcase/apps/auto_increase_budget', function() {
                             setTimeout(done);
                         });
 
-                        it('should not log an error', function() {
-                            expect(log.error).not.toHaveBeenCalled();
+                        describe('when the line item upserts succeed', function(){
+                            beforeEach(function(done){
+                                upsertBeeswaxLineItemsDeferreds.forEach( (deferred, index) => {
+                                    deferred.fulfill({
+                                        createdLineItems : [ lineItems[index] ],
+                                        updatedLineItems : []
+                                    });
+                                });
+
+                                setTimeout(done);
+                            });
+
+                            it('should call upsertCampaignActiveLineItems',function(){
+                                expect(beeswax.upsertCampaignActiveLineItems.calls.count())
+                                    .toEqual(2);
+                            });
+
+                            it('should not log an error', function() {
+                                expect(log.error).not.toHaveBeenCalled();
+                            });
+
+                            it('should fulfill with undefined', function() {
+                                expect(success).toHaveBeenCalledWith(undefined);
+                            });
                         });
 
-                        it('should fulfill with undefined', function() {
-                            expect(success).toHaveBeenCalledWith(undefined);
+                        describe('when the line item upserts fail', function(){
+                            beforeEach(function(done){
+                                upsertBeeswaxLineItemsDeferreds[0].fulfill({
+                                    createdLineItems : [ lineItems[0] ],
+                                    updatedLineItems : []
+                                });
+
+                                upsertBeeswaxLineItemsDeferreds[1].reject(
+                                    new Error('Failure is not an option.')
+                                );
+                                setTimeout(done);
+                            });
+
+                            it('should log an error', function() {
+                                expect(log.error).toHaveBeenCalled();
+                            });
+
+                            it('should fulfill with undefined', function() {
+                                expect(success).toHaveBeenCalledWith(undefined);
+                            });
                         });
                     });
 

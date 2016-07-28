@@ -19,8 +19,10 @@ module.exports = function factory(config) {
     const log = logger.getLog();
     const request = new CwrxRequest(config.appCreds);
     const beeswax = new BeeswaxMiddleware(
-        { apiRoot: config.beeswax.apiRoot, creds: config.state.secrets.beeswax},
-        { creds: config.appCreds, api: config.cwrx.api }
+        { apiRoot: config.beeswax.apiRoot, creds: config.state.secrets.beeswax,
+            bid : config.beeswax.bid },
+        { creds: config.appCreds, api: config.cwrx.api },
+        { conversionMultipliers : get(config,'campaign.conversionMultipliers')  }
     );
 
     const campaignsEndpoint = resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint);
@@ -77,24 +79,46 @@ module.exports = function factory(config) {
                                 model: 'cpv',
                                 budget: get(campaign, 'pricing.budget', 0) + budget,
                                 dailyLimit: dailyLimit
-                            })
+                            }),
+                            targetUsers : targetUsers
                         })
                     })
                     .spread(newCampaign => {
                         return beeswax.adjustCampaignBudget(newCampaign,externalImpressions)
                             .spread((beeswaxCampaign, updatedBeeswaxCampaign) => {
-                            log.info(
-                                'Increased budget of campaign(%1): %2 => %3.',
-                                campaign.id, get(campaign, 'pricing.budget', 0),
-                                get(newCampaign, 'pricing.budget', 0)
-                            );
-                            log.info(
-                                'Increased budget of beeswaxCampaign(%1): %2 => %3.',
-                                beeswaxCampaign.campaign_id,
-                                beeswaxCampaign.campaign_budget,
-                                updatedBeeswaxCampaign.campaign_budget
-                            );
-                        });
+                                log.info(
+                                    'Increased budget of campaign(%1): %2 => %3.',
+                                    campaign.id, get(campaign, 'pricing.budget', 0),
+                                    get(newCampaign, 'pricing.budget', 0)
+                                );
+                                log.info(
+                                    'Increased budget of beeswaxCampaign(%1): %2 => %3.',
+                                    beeswaxCampaign.campaign_id,
+                                    beeswaxCampaign.campaign_budget,
+                                    updatedBeeswaxCampaign.campaign_budget
+                                );
+                                return beeswax.upsertCampaignActiveLineItems({
+                                    campaign  : newCampaign,
+                                    startDate : transaction.cycleStart,
+                                    endDate   : transaction.cycleEnd
+                                });
+                            })
+                            .then(function(result){
+                                result.createdLineItems.forEach(function(item){
+                                    log.info(
+                                        'Created lineItem (%1) for campaign %2 (%3)',
+                                            item.line_item_id, item.campaign_id,
+                                            newCampaign.id
+                                            );
+                                });
+                                result.updatedLineItems.forEach(function(item){
+                                    log.info(
+                                        'Updated lineItem (%1) for campaign %2 (%3)',
+                                            item.line_item_id, item.campaign_id,
+                                            newCampaign.id
+                                            );
+                                });
+                            });
                     });
             }));
         });

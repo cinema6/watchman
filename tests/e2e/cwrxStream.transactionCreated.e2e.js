@@ -36,9 +36,10 @@ function waitUntil(predicate) {
     return check();
 }
 
-describe('cwrxStream transactionCreated', function() {
+fdescribe('cwrxStream transactionCreated', function() {
     var producer, request, beeswax;
-    var advertiser, campaigns, beeswaxCampaigns, targetCampaignIds, otherCampaignIds, ourCampaignIds;
+    var advertiser, campaigns, beeswaxCampaigns, beeswaxCreative, 
+        targetCampaignIds, otherCampaignIds, ourCampaignIds;
     var targetOrg, transaction;
 
     function api(endpoint) {
@@ -83,8 +84,60 @@ describe('cwrxStream transactionCreated', function() {
         });
     }
 
+    function setupCreative(advertiser) {
+        var advertiser_id = advertiser.beeswaxIds.advertiser;
+
+        return beeswax.uploadCreativeAsset({
+            sourceUrl: 'https://reelcontent.com/images/logo-nav.png',
+            advertiser_id: advertiser_id
+        }).then(asset => (
+            beeswax.creatives.create({
+                advertiser_id: advertiser_id,
+                creative_type: 0,
+                creative_template_id: 13,
+                width: 300,
+                height: 250,
+                sizeless: true,
+                secure: true,
+                creative_name: `E2E Test Creative (${uuid.createUuid()})`,
+                creative_attributes: {
+                    mobile: { mraid_playable: [true] },
+                    technical: {
+                        banner_mime: ['text/javascript', 'application/javascript'],
+                        tag_type: [3]
+                    },
+                    advertiser: {
+                        advertiser_app_bundle: ['com.rc.test-app'],
+                        advertiser_domain: ['https://apps.reelcontent.com'],
+                        landing_page_url: ['https://apps.reelcontent.com/site/'],
+                        advertiser_category: ['IAB24']
+                    },
+                    video: { video_api: [3] }
+                },
+                creative_content: {
+                    TAG: `
+                        <script>
+                            document.write([
+                                '<a href="{{CLICK_URL}}" target="_blank">',
+                                '    <img src="https://reelcontent.com/images/logo-nav.png" width="300" height="250" />,
+                                '</a>'
+                            ].join('\\n');
+                        </script>
+                    `
+                },
+                creative_thumbnail_url: asset.path_to_asset,
+                active: true
+            }).then(response => response.payload)
+        ));
+    }
+
     function cleanupCampaign(campaign) {
         return beeswax.campaigns.delete(campaign.externalIds.beeswax, true);
+    }
+
+    function cleanupCreative(creative) {
+        return beeswax.creatives.edit(creative.creative_id, { active : false } )
+            .then(() => beeswax.creatives.delete(creative.creative_id));
     }
 
     function transactionCreatedEvent(time) {
@@ -103,12 +156,28 @@ describe('cwrxStream transactionCreated', function() {
         const sharedConfig = {
             secrets: '/opt/sixxy/.watchman.secrets.json',
             appCreds: '/opt/sixxy/.rcAppCreds.json',
+            beeswax : {
+                bid : { bidding_strategy: 'CPM', values: { cpm_bid: 10 } }
+            },
             cwrx: {
                 api: {
                     root: API_ROOT,
+                    tracking : 'https://audit.cinema6.com/pixel.gif',
                     campaigns: {
                         endpoint: '/api/campaigns'
+                    },
+                    placements: {
+                        endpoint: '/api/placements'
+                    },
+                    advertisers: {
+                        endpoint: '/api/account/advertisers'
                     }
+                }
+            },
+            campaign: {
+                conversionMultipliers: {
+                    internal: 1.1,
+                    external: 1.25
                 }
             },
             emails: {
@@ -391,6 +460,8 @@ describe('cwrxStream transactionCreated', function() {
             });
 
             return testUtils.resetCollection('campaigns', campaigns);
+        }).then(function(){
+            return setupCreative(advertiser).then(function(c){ beeswaxCreative = c; });
         }).then(done, done.fail);
     });
 
@@ -398,14 +469,18 @@ describe('cwrxStream transactionCreated', function() {
         q.all([
             q.all(campaigns.map(function(campaign) {
                 return cleanupCampaign(campaign);
-            })).then(function() {
+            }))
+            .then(function() {
+                return cleanupCreative(beeswaxCreative);
+            })
+            .then(function() {
                 return deleteAdvertiser(advertiser);
             })
         ]).then(done, done.fail);
     });
 
     describe('when produced', function() {
-        var updatedCampaigns, updatedBeeswaxCampaigns;
+        var updatedCampaigns, updatedBeeswaxCampaigns, updatedBeeswaxLineItems;
 
         beforeEach(function(done) {
             transaction = {
@@ -428,36 +503,66 @@ describe('cwrxStream transactionCreated', function() {
 
             transactionCreatedEvent().then(function() {
                 return waitUntil(() => Promise.all([
-                    Promise.all(targetCampaignIds.map(id => (
-                        request.get({
-                            url: api('/api/campaigns/' + id),
-                            json: true
-                        }).spread(campaign => (
-                            (
-                                moment(campaign.lastUpdated).isAfter(moment().subtract(1, 'day'))
-                            ) && campaign
-                        ))
-                    ))).then(campaigns => campaigns.every(campaign => !!campaign) && campaigns),
-                    Promise.all(targetCampaignIds.map(id => {
-                        const campaign = ld.find(campaigns, { id });
+                        Promise.all(targetCampaignIds.map(id => (
+                            request.get({
+                                url: api('/api/campaigns/' + id),
+                                json: true
+                            }).spread(campaign => (
+                                (
+                                    moment(campaign.lastUpdated).isAfter(
+                                        moment().subtract(1, 'day'))
+                                ) && campaign
+                            ))
+                        )))
+                        .then(campaigns => 
+                            campaigns.every(campaign => !!campaign) && campaigns
+                        ),
+                        Promise.all(targetCampaignIds.map(id => {
+                            const campaign = ld.find(campaigns, { id });
 
-                        return beeswax.campaigns.find(campaign.externalIds.beeswax).then(response => {
-                            const beeswaxCampaign = response.payload;
-                            const oldBeeswaxCampaign = ld.find(beeswaxCampaigns, { campaign_id: beeswaxCampaign.campaign_id });
+                            return beeswax.campaigns.find(campaign.externalIds.beeswax)
+                                .then(response => {
+                                    const beeswaxCampaign = response.payload;
+                                    const oldBeeswaxCampaign = ld.find(
+                                        beeswaxCampaigns, 
+                                        { campaign_id: beeswaxCampaign.campaign_id }
+                                    );
 
-                            return (
-                                beeswaxCampaign.campaign_budget !== oldBeeswaxCampaign.campaign_budget
-                            ) && beeswaxCampaign;
-                        });
-                    })).then(beeswaxCampaigns => beeswaxCampaigns.every(beeswaxCampaign => !!beeswaxCampaign) && beeswaxCampaigns)
-                ]).then(items => items.every(item => !!item) && items)).spread(function(/*updatedCampaigns, updatedBeeswaxCampaigns*/) {
+                                    return (
+                                        beeswaxCampaign.campaign_budget !==
+                                            oldBeeswaxCampaign.campaign_budget
+                                    ) && beeswaxCampaign;
+                                });
+                        }))
+                        .then(beeswaxCampaigns => 
+                            beeswaxCampaigns.every(beeswaxCampaign => !!beeswaxCampaign)
+                                && beeswaxCampaigns
+                        ),
+                        Promise.all(targetCampaignIds.map(id => {
+                            const campaign = ld.find(campaigns, { id });
+
+                            return beeswax.lineItems.query({
+                                    campaign_id : campaign.externalIds.beeswax
+                                })
+                                .then(response => {
+                                    return response.payload;
+
+                                });
+                        }))
+                        .then(beeswaxLineItems => 
+                            beeswaxLineItems.every(item => !!item) && beeswaxLineItems
+                        )
+                    ])
+                    .then(items => items.every(item => !!item) && items)
+                ).spread(function(/*updatedCampaigns, updatedBeeswaxCampaigns*/) {
                     updatedCampaigns = arguments[0];
                     updatedBeeswaxCampaigns = arguments[1];
+                    updatedBeeswaxLineItems = arguments[2];
                 });
             }).then(done, done.fail);
         });
 
-        it('should update each showcase campaign for the org', function() {
+        fit('should update each showcase campaign for the org', function() {
             expect(updatedCampaigns.length).toBe(targetCampaignIds.length);
             updatedCampaigns.forEach(function(campaign) {
                 expect(moment(campaign.lastUpdated).isBefore(moment().subtract(1, 'week'))).toBe(false, 'campaign(' + campaign.id + ') was not updated recently!');
@@ -489,6 +594,9 @@ describe('cwrxStream transactionCreated', function() {
         it('should increase the impressions of every beeswax campaign', function() {
             expect(updatedBeeswaxCampaigns[0].campaign_budget).toBe(2750);
             expect(updatedBeeswaxCampaigns[1].campaign_budget).toBe(2000);
+
+            expect(updatedBeeswaxLineItems[0][0].line_item_budget).toBe(2750);
+            expect(updatedBeeswaxLineItems[1][0].line_item_budget).toBe(2750);
         });
 
         it('should set every showcase campaign\'s status to active', function() {
