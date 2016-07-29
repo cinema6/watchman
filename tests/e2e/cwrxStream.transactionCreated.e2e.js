@@ -10,7 +10,7 @@ var resolveURL = require('url').resolve;
 var uuid = require('rc-uuid');
 var moment = require('moment');
 var Status = require('cwrx/lib/enums').Status;
-var BeeswaxClient = require('beeswax-client');
+var BeeswaxHelper = require('../helpers/BeeswaxHelper');
 
 var API_ROOT = process.env.apiRoot;
 var APP_CREDS = JSON.parse(process.env.appCreds);
@@ -57,12 +57,8 @@ fdescribe('cwrxStream transactionCreated', function() {
         }).then(ld.property(0));
     }
 
-    function deleteAdvertiser(advertiser) {
-        return beeswax.advertisers.delete(advertiser.beeswaxIds.advertiser);
-    }
-
     function setupCampaign(campaign) {
-        return beeswax.campaigns.create({
+        return beeswax.api.campaigns.create({
             advertiser_id: advertiser.beeswaxIds.advertiser,
             campaign_name: `E2E Test Campaign (${uuid.createUuid()})`,
             campaign_budget: 750,
@@ -87,11 +83,11 @@ fdescribe('cwrxStream transactionCreated', function() {
     function setupCreative(advertiser) {
         var advertiser_id = advertiser.beeswaxIds.advertiser;
 
-        return beeswax.uploadCreativeAsset({
+        return beeswax.api.uploadCreativeAsset({
             sourceUrl: 'https://reelcontent.com/images/logo-nav.png',
             advertiser_id: advertiser_id
         }).then(asset => (
-            beeswax.creatives.create({
+            beeswax.api.creatives.create({
                 advertiser_id: advertiser_id,
                 creative_type: 0,
                 creative_template_id: 13,
@@ -129,15 +125,6 @@ fdescribe('cwrxStream transactionCreated', function() {
                 active: true
             }).then(response => response.payload)
         ));
-    }
-
-    function cleanupCampaign(campaign) {
-        return beeswax.campaigns.delete(campaign.externalIds.beeswax, true);
-    }
-
-    function cleanupCreative(creative) {
-        return beeswax.creatives.edit(creative.creative_id, { active : false } )
-            .then(() => beeswax.creatives.delete(creative.creative_id));
     }
 
     function transactionCreatedEvent(time) {
@@ -227,15 +214,10 @@ fdescribe('cwrxStream transactionCreated', function() {
 
         producer = new JsonProducer(CWRX_STREAM, awsConfig);
         request = new CwrxRequest(APP_CREDS);
-        beeswax = new BeeswaxClient({
-            creds: {
-                email: 'ops@cinema6.com',
-                password: '07743763902206f2b511bead2d2bf12292e2af82'
-            }
-        });
+        beeswax = new BeeswaxHelper();
     });
 
-    beforeEach(function(done) {
+    beforeAll(function(done) {
         var cwrxApp = {
             id: 'app-cwrx',
             created: new Date(),
@@ -465,24 +447,14 @@ fdescribe('cwrxStream transactionCreated', function() {
         }).then(done, done.fail);
     });
 
-    afterEach(function(done) {
-        q.all([
-            q.all(campaigns.map(function(campaign) {
-                return cleanupCampaign(campaign);
-            }))
-            .then(function() {
-                return cleanupCreative(beeswaxCreative);
-            })
-            .then(function() {
-                return deleteAdvertiser(advertiser);
-            })
-        ]).then(done, done.fail);
+    afterAll(function(done) {
+        beeswax.cleanupAdvertiser(advertiser.beeswaxIds.advertiser).then(done, done.fail);
     });
 
     describe('when produced', function() {
         var updatedCampaigns, updatedBeeswaxCampaigns, updatedBeeswaxLineItems;
 
-        beforeEach(function(done) {
+        beforeAll(function(done) {
             transaction = {
                 id: createId('t'),
                 created: new Date().toISOString(),
@@ -520,7 +492,7 @@ fdescribe('cwrxStream transactionCreated', function() {
                         Promise.all(targetCampaignIds.map(id => {
                             const campaign = ld.find(campaigns, { id });
 
-                            return beeswax.campaigns.find(campaign.externalIds.beeswax)
+                            return beeswax.api.campaigns.find(campaign.externalIds.beeswax)
                                 .then(response => {
                                     const beeswaxCampaign = response.payload;
                                     const oldBeeswaxCampaign = ld.find(
@@ -541,16 +513,16 @@ fdescribe('cwrxStream transactionCreated', function() {
                         Promise.all(targetCampaignIds.map(id => {
                             const campaign = ld.find(campaigns, { id });
 
-                            return beeswax.lineItems.query({
+                            return beeswax.api.lineItems.query({
                                     campaign_id : campaign.externalIds.beeswax
                                 })
                                 .then(response => {
                                     return response.payload;
-
                                 });
                         }))
                         .then(beeswaxLineItems => 
-                            beeswaxLineItems.every(item => !!item) && beeswaxLineItems
+                            beeswaxLineItems.every(item => (!!item && item.length)) &&
+                                beeswaxLineItems
                         )
                     ])
                     .then(items => items.every(item => !!item) && items)
@@ -562,7 +534,7 @@ fdescribe('cwrxStream transactionCreated', function() {
             }).then(done, done.fail);
         });
 
-        fit('should update each showcase campaign for the org', function() {
+        it('should update each showcase campaign for the org', function() {
             expect(updatedCampaigns.length).toBe(targetCampaignIds.length);
             updatedCampaigns.forEach(function(campaign) {
                 expect(moment(campaign.lastUpdated).isBefore(moment().subtract(1, 'week'))).toBe(false, 'campaign(' + campaign.id + ') was not updated recently!');
@@ -595,8 +567,8 @@ fdescribe('cwrxStream transactionCreated', function() {
             expect(updatedBeeswaxCampaigns[0].campaign_budget).toBe(2750);
             expect(updatedBeeswaxCampaigns[1].campaign_budget).toBe(2000);
 
-            expect(updatedBeeswaxLineItems[0][0].line_item_budget).toBe(2750);
-            expect(updatedBeeswaxLineItems[1][0].line_item_budget).toBe(2750);
+            expect(updatedBeeswaxLineItems[0][0].line_item_budget).toBe(2000);
+            expect(updatedBeeswaxLineItems[1][0].line_item_budget).toBe(1250);
         });
 
         it('should set every showcase campaign\'s status to active', function() {
