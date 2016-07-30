@@ -2,6 +2,7 @@
 
 const BeeswaxClient = require('beeswax-client');
 const ld = require('lodash');
+const uuid = require('rc-uuid');
 
 class BeeswaxHelper {
     constructor(options) {
@@ -88,6 +89,53 @@ class BeeswaxHelper {
             return Promise.all(toDelete.map((item) => 
                 this.cleanupAdvertiser(item.advertiser_id)));
         });
+    }
+
+    createAdvertiserMRAIDCreative(advertiserId) {
+        return this.api.uploadCreativeAsset({
+            sourceUrl: 'https://reelcontent.com/images/logo-nav.png',
+            advertiser_id: advertiserId
+        })
+        .then(asset => (
+            this.api.creatives.create({
+                advertiser_id: advertiserId,
+                creative_type: 0,
+                creative_template_id: 13,
+                width: 300,
+                height: 250,
+                sizeless: true,
+                secure: true,
+                creative_name: `E2E Test Creative (${uuid.createUuid()})`,
+                creative_attributes: {
+                    mobile: { mraid_playable: [true] },
+                    technical: {
+                        banner_mime: ['text/javascript', 'application/javascript'],
+                        tag_type: [3]
+                    },
+                    advertiser: {
+                        advertiser_app_bundle: ['com.rc.test-app'],
+                        advertiser_domain: ['https://apps.reelcontent.com'],
+                        landing_page_url: ['https://apps.reelcontent.com/site/'],
+                        advertiser_category: ['IAB24']
+                    },
+                    video: { video_api: [3] }
+                },
+                creative_content: {
+                    TAG: `
+                        <script>
+                            document.write([
+                                '<a href="{{CLICK_URL}}" target="_blank">',
+                                '    <img src="https://reelcontent.com/images/logo-nav.png" width="300" height="250" />,
+                                '</a>'
+                            ].join('\\n'));
+                        </script>
+                    `
+                },
+                creative_thumbnail_url: asset.path_to_asset,
+                active: true
+            })
+            .then(response => response.payload)
+        ));
     }
 
 };
