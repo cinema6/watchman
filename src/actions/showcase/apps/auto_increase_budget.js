@@ -7,8 +7,6 @@ const filter = ld.filter;
 const assign = ld.assign;
 const get = ld.get;
 const round = ld.round;
-const identity = ld.identity;
-const spread = ld.spread;
 const q = require('q');
 const Status = require('cwrx/lib/enums').Status;
 const logger = require('cwrx/lib/logger');
@@ -71,55 +69,55 @@ module.exports = function factory(config) {
                 const cost = round(budget / (targetUsers * internalMultiplier), 3);
 
                 return request.put({
-                        url: campaignsEndpoint + '/' + campaign.id,
-                        json: assign({}, campaign, {
-                            status: Status.Active,
-                            pricing: assign({}, campaign.pricing, {
-                                cost,
-                                model: 'cpv',
-                                budget: get(campaign, 'pricing.budget', 0) + budget,
-                                dailyLimit: dailyLimit
-                            }),
-                            targetUsers : targetUsers
-                        })
+                    url: campaignsEndpoint + '/' + campaign.id,
+                    json: assign({}, campaign, {
+                        status: Status.Active,
+                        pricing: assign({}, campaign.pricing, {
+                            cost,
+                            model: 'cpv',
+                            budget: get(campaign, 'pricing.budget', 0) + budget,
+                            dailyLimit: dailyLimit
+                        }),
+                        targetUsers : targetUsers
                     })
-                    .spread(newCampaign => {
-                        return beeswax.adjustCampaignBudget(newCampaign,externalImpressions)
-                            .spread((beeswaxCampaign, updatedBeeswaxCampaign) => {
-                                log.info(
-                                    'Increased budget of campaign(%1): %2 => %3.',
-                                    campaign.id, get(campaign, 'pricing.budget', 0),
-                                    get(newCampaign, 'pricing.budget', 0)
-                                );
-                                log.info(
-                                    'Increased budget of beeswaxCampaign(%1): %2 => %3.',
-                                    beeswaxCampaign.campaign_id,
-                                    beeswaxCampaign.campaign_budget,
-                                    updatedBeeswaxCampaign.campaign_budget
-                                );
-                                return beeswax.upsertCampaignActiveLineItems({
-                                    campaign  : newCampaign,
-                                    startDate : transaction.cycleStart,
-                                    endDate   : transaction.cycleEnd
-                                });
-                            })
-                            .then(function(result){
-                                result.createdLineItems.forEach(function(item){
-                                    log.info(
-                                        'Created lineItem (%1) for campaign %2 (%3)',
-                                            item.line_item_id, item.campaign_id,
-                                            newCampaign.id
-                                            );
-                                });
-                                result.updatedLineItems.forEach(function(item){
-                                    log.info(
-                                        'Updated lineItem (%1) for campaign %2 (%3)',
-                                            item.line_item_id, item.campaign_id,
-                                            newCampaign.id
-                                            );
-                                });
+                })
+                .spread(newCampaign => {
+                    return beeswax.adjustCampaignBudget(newCampaign,externalImpressions)
+                        .spread((beeswaxCampaign, updatedBeeswaxCampaign) => {
+                            log.info(
+                                'Increased budget of campaign(%1): %2 => %3.',
+                                campaign.id, get(campaign, 'pricing.budget', 0),
+                                get(newCampaign, 'pricing.budget', 0)
+                            );
+                            log.info(
+                                'Increased budget of beeswaxCampaign(%1): %2 => %3.',
+                                beeswaxCampaign.campaign_id,
+                                beeswaxCampaign.campaign_budget,
+                                updatedBeeswaxCampaign.campaign_budget
+                            );
+                            return beeswax.upsertCampaignActiveLineItems({
+                                campaign  : newCampaign,
+                                startDate : transaction.cycleStart,
+                                endDate   : transaction.cycleEnd
                             });
-                    });
+                        })
+                        .then(function(result){
+                            result.createdLineItems.forEach(function(item){
+                                log.info(
+                                    'Created lineItem (%1) for campaign %2 (%3)',
+                                        item.line_item_id, item.campaign_id,
+                                        newCampaign.id
+                                        );
+                            });
+                            result.updatedLineItems.forEach(function(item){
+                                log.info(
+                                    'Updated lineItem (%1) for campaign %2 (%3)',
+                                        item.line_item_id, item.campaign_id,
+                                        newCampaign.id
+                                        );
+                            });
+                        });
+                });
             }));
         });
     }).catch(reason => (

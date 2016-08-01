@@ -10,7 +10,7 @@ const Status = require('cwrx/lib/enums').Status;
 const logger = require('cwrx/lib/logger');
 
 describe('showcase lib', function() {
-    let CwrxRequest, BeeswaxClient;
+    let CwrxRequest, BeeswaxMiddleware;
     let config;
     let showcase;
     let request, beeswax;
@@ -25,7 +25,11 @@ describe('showcase lib', function() {
                 return request;
             });
         }(require('../../lib/CwrxRequest')));
-        BeeswaxClient = (BeeswaxClient => jasmine.createSpy('BeeswaxClient()').and.callFake(config => new BeeswaxClient(config)))(require('beeswax-client'));
+
+        BeeswaxMiddleware = jasmine.createSpy('BeeswaxMiddleware()').and.callFake(() => ({
+            adjustCampaignBudget: () => null,
+            upsertCampaignActiveLineItems: () => null
+        }));
 
         config = {
             appCreds: {
@@ -74,11 +78,11 @@ describe('showcase lib', function() {
 
         showcase = proxyquire('../../lib/showcase', {
             './CwrxRequest': CwrxRequest,
-            'beeswax-client': BeeswaxClient
+            './BeeswaxMiddleware': BeeswaxMiddleware
         })(config);
 
         request = CwrxRequest.calls.mostRecent().returnValue;
-        beeswax = BeeswaxClient.calls.mostRecent().returnValue;
+        beeswax = BeeswaxMiddleware.calls.mostRecent().returnValue;
     });
 
     it('should exist', function() {
@@ -89,20 +93,32 @@ describe('showcase lib', function() {
         expect(CwrxRequest).toHaveBeenCalledWith(config.appCreds);
     });
 
-    it('should create a BeeswaxClient', function() {
-        expect(BeeswaxClient).toHaveBeenCalledWith({
-            apiRoot: config.beeswax.apiRoot,
-            creds: config.state.secrets.beeswax
-        });
+    it('should create a BeeswaxMiddleware', function() {
+        expect(BeeswaxMiddleware).toHaveBeenCalledWith( 
+            {
+                apiRoot: config.beeswax.apiRoot,
+                creds  : config.state.secrets.beeswax,
+                bid : undefined
+            },
+            {
+                creds: config.appCreds,
+                api: config.cwrx.api
+            },
+            {
+                conversionMultipliers : {
+                    internal : 1.1, external : 1.25
+                }
+            }
+        );
     });
+
 
     describe('rebalance(orgId)', function() {
         let orgId;
         let success, failure;
         let getCampaignsDeferred, getTransactionsDeferred, getAnalyticsDeferreds, putExternalCampaignDeferreds;
         let putCampaignDeferreds;
-        let getBeeswaxCampaignDeferreds;
-        let editBeeswaxCampaignDeferreds;
+        let adjustBeeswaxCampaignBudgetDeferreds, upsertBeeswaxLineItemsDeferreds;
 
         beforeEach(function(done) {
             orgId = `o-${createUuid()}`;
@@ -141,14 +157,16 @@ describe('showcase lib', function() {
                 return q.reject(new Error(`Unknown URL: ${requestConfig.url}`));
             });
 
-            getBeeswaxCampaignDeferreds = [];
-            spyOn(beeswax.campaigns, 'find').and.callFake(() => {
-                return getBeeswaxCampaignDeferreds[getBeeswaxCampaignDeferreds.push(q.defer()) - 1].promise;
+            adjustBeeswaxCampaignBudgetDeferreds = [];
+            spyOn(beeswax, 'adjustCampaignBudget').and.callFake(() => {
+                return adjustBeeswaxCampaignBudgetDeferreds[
+                    adjustBeeswaxCampaignBudgetDeferreds.push(q.defer()) - 1].promise;
             });
 
-            editBeeswaxCampaignDeferreds = [];
-            spyOn(beeswax.campaigns, 'edit').and.callFake(() => {
-                return editBeeswaxCampaignDeferreds[editBeeswaxCampaignDeferreds.push(q.defer()) - 1].promise;
+            upsertBeeswaxLineItemsDeferreds = [];
+            spyOn(beeswax, 'upsertCampaignActiveLineItems').and.callFake(() => {
+                return upsertBeeswaxLineItemsDeferreds[
+                    upsertBeeswaxLineItemsDeferreds.push(q.defer()) - 1].promise;
             });
 
             showcase.rebalance(orgId).then(success, failure);
@@ -165,18 +183,18 @@ describe('showcase lib', function() {
             });
         });
 
-        it('should get the org\'s transactions', function() {
+        it('should get the org\'s current payment transaction', function() {
             expect(request.get).toHaveBeenCalledWith({
-                url: resolveURL(config.cwrx.api.root, config.cwrx.api.transactions.endpoint),
+                url: resolveURL(config.cwrx.api.root, 
+                        `${config.cwrx.api.transactions.endpoint}/showcase/current-payment`),
                 qs: {
-                    org: orgId,
-                    sort: 'cycleEnd,-1'
+                    org: orgId
                 }
             });
         });
 
         describe('if the org has no transaction', function() {
-            let campaigns, activeCampaigns, canceledCampaigns, transactions;
+            let campaigns, activeCampaigns, canceledCampaigns ;
 
             beforeEach(function(done) {
                 activeCampaigns = Array.apply([], new Array(5)).map(() => ({
@@ -196,10 +214,10 @@ describe('showcase lib', function() {
 
                 campaigns = [].concat(activeCampaigns, canceledCampaigns);
 
-                transactions = [];
-
                 getCampaignsDeferred.resolve([campaigns, { statusCode: 200 }]);
-                getTransactionsDeferred.resolve([transactions, { statusCode: 200 }]);
+                getTransactionsDeferred.reject(
+                    new Error('404 - Unable to locate currentPayment.'));
+
                 setTimeout(done);
             });
 
@@ -209,7 +227,7 @@ describe('showcase lib', function() {
         });
 
         describe('when the campaigns and transactions are fetched', function() {
-            let campaigns, activeCampaigns, canceledCampaigns, targetCampaigns, targetCanceledCampaigns, appCampaigns, transactions;
+            let campaigns, activeCampaigns, canceledCampaigns, targetCampaigns, targetCanceledCampaigns, appCampaigns, transaction;
 
             beforeEach(function(done) {
                 targetCampaigns = [
@@ -364,54 +382,26 @@ describe('showcase lib', function() {
                 );
                 campaigns = [].concat(activeCampaigns, canceledCampaigns);
                 appCampaigns = [].concat(targetCampaigns, targetCanceledCampaigns);
-
-                transactions = [
-                    {
-                        id: `t-${createUuid()}`,
-                        application: 'showcase',
-                        paymentPlanId: `pp-${createUuid()}`,
-                        targetUsers: 500,
-                        cycleEnd: null,
-                        amount: 10
-                    },
-                    {
-                        id: `t-${createUuid()}`,
-                        application: 'selfie',
-                        paymentPlanId: `pp-${createUuid()}`,
-                        targetUsers: 750,
-                        cycleEnd: moment().add(5, 'days').format(),
-                        amount: 15
-                    },
-                    {
-                        id: `t-${createUuid()}`,
-                        application: 'showcase',
-                        paymentPlanId: null,
-                        targetUsers: 750,
-                        cycleEnd: moment().add(5, 'days').format(),
-                        amount: 15
-                    },
-                    {
-                        id: `t-${createUuid()}`,
-                        application: 'showcase',
-                        paymentPlanId: `pp-${createUuid()}`,
-                        targetUsers: 2000,
-                        cycleEnd: moment().add(5, 'days').format(),
-                        amount: 50
-                    },
-                    {
-                        id: `t-${createUuid()}`,
-                        application: 'showcase',
-                        paymentPlanId: `pp-${createUuid()}`,
-                        targetUsers: 1000,
-                        cycleEnd: moment().subtract(5, 'days').format(),
-                        amount: 25
-                    }
-                ];
+                transaction = {
+                    application: 'showcase',
+                    transactionId: 't-123',
+                    transactionTimestamp: new Date().toISOString(),
+                    orgId: orgId,
+                    amount: 50,
+                    braintreeId: 'abc123',
+                    promotionId: null,
+                    paymentPlanId: 'p-1234',
+                    cycleStart: moment().subtract(5, 'days').format(),
+                    cycleEnd: moment().add(5, 'days').format(),
+                    planViews: 2000,
+                    bonusViews : 0,
+                    totalViews : 2000
+                };
 
                 request.get.calls.reset();
 
                 getCampaignsDeferred.resolve([campaigns, { statusCode: 200 }]);
-                getTransactionsDeferred.resolve([transactions, { statusCode: 200 }]);
+                getTransactionsDeferred.resolve([transaction, { statusCode: 200 }]);
 
                 setTimeout(done);
             });
@@ -421,13 +411,6 @@ describe('showcase lib', function() {
                     url: resolveURL(config.cwrx.api.root, `${config.cwrx.api.analytics.endpoint}/campaigns/showcase/apps/${campaign.id}`)
                 }));
                 expect(request.get.calls.count()).toBe(appCampaigns.length);
-            });
-
-            it('should get the beeswax campaigns', function() {
-                expect(beeswax.campaigns.find.calls.count()).toBe(targetCampaigns.length);
-                targetCampaigns.forEach(campaign => expect(beeswax.campaigns.find).toHaveBeenCalledWith(
-                    _.get(campaign, 'externalIds.beeswax') || _.get(campaign, 'externalCampaigns.beeswax.externalId')
-                ));
             });
 
             describe('when the analytics and beeswax campaigns are fetched', function() {
@@ -456,30 +439,43 @@ describe('showcase lib', function() {
                     ];
 
                     beeswaxCampaigns = [
-                        {
-                            campaign_id: targetCampaigns[0].externalIds.beeswax,
-                            campaign_budget: 2000
-                        },
-                        {
-                            campaign_id: targetCampaigns[1].externalIds.beeswax,
-                            campaign_budget: 500
-                        },
-                        {
-                            campaign_id: targetCampaigns[2].externalCampaigns.beeswax.externalId,
-                            campaign_budget: 0
-                        }
+                        [
+                            {
+                                campaign_id: targetCampaigns[0].externalIds.beeswax,
+                                campaign_budget: 2000
+                            },
+                            {
+                                campaign_id: targetCampaigns[0].externalIds.beeswax,
+                                campaign_budget: 1750
+                            }
+                        ],
+                        [
+                            {
+                                campaign_id: targetCampaigns[1].externalIds.beeswax,
+                                campaign_budget: 500
+                            },
+                            {
+                                campaign_id: targetCampaigns[1].externalIds.beeswax,
+                                campaign_budget: 291
+                            }
+                        ],
+                        [
+                            {
+                                campaign_id: targetCampaigns[2].externalCampaigns.beeswax.externalId,
+                                campaign_budget: 0
+                            },
+                            {
+                                campaign_id: targetCampaigns[2].externalCampaigns.beeswax.externalId,
+                                campaign_budget: 416 
+                            }
+                        ]
                     ];
 
                     getAnalyticsDeferreds.forEach((deferred, index) => deferred.resolve([
                         analytics[index],
                         { statusCode: 200 }
                     ]));
-
-                    getBeeswaxCampaignDeferreds.forEach((deferred, index) => deferred.resolve({
-                        success: true,
-                        payload: beeswaxCampaigns[index]
-                    }));
-
+        
                     setTimeout(done);
                 });
 
@@ -535,38 +531,69 @@ describe('showcase lib', function() {
                         setTimeout(done);
                     });
 
-                    it('should update the external campaigns', function() {
-                        expect(beeswax.campaigns.edit).toHaveBeenCalledWith(beeswaxCampaigns[0].campaign_id, {
-                            campaign_budget: 1750
-                        });
+                    it('should update the external campaign budgets', function() {
+                        expect(beeswax.adjustCampaignBudget)
+                            .toHaveBeenCalledWith(updatedCampaigns[0], -250 );
 
-                        expect(beeswax.campaigns.edit).toHaveBeenCalledWith(beeswaxCampaigns[1].campaign_id, {
-                            campaign_budget: 291
-                        });
+                        expect(beeswax.adjustCampaignBudget)
+                            .toHaveBeenCalledWith(updatedCampaigns[1], -209 );
+                        
+                        expect(beeswax.adjustCampaignBudget)
+                            .toHaveBeenCalledWith(updatedCampaigns[2], 416 );
 
-                        expect(beeswax.campaigns.edit).toHaveBeenCalledWith(beeswaxCampaigns[2].campaign_id, {
-                            campaign_budget: 416
-                        });
-
-                        expect(beeswax.campaigns.edit.calls.count()).toBe(targetCampaigns.length, 'Incorrect number of edits.');
+                        expect(beeswax.adjustCampaignBudget.calls.count())
+                            .toBe(targetCampaigns.length, 'Incorrect number of edits.');
                     });
 
                     describe('when the external campaigns are updated', function() {
                         beforeEach(function(done) {
-                            editBeeswaxCampaignDeferreds.forEach((deferred, index) => deferred.resolve({
-                                success: true,
-                                payload: _.assign(
-                                    {},
-                                    beeswaxCampaigns[index],
-                                    beeswax.campaigns.edit.calls.all()[index].args[1]
-                                )
-                            }));
+                            adjustBeeswaxCampaignBudgetDeferreds.forEach((deferred, index) =>
+                                deferred.resolve(beeswaxCampaigns[index]));
 
                             setTimeout(done);
                         });
 
-                        it('should fulfill with the campaigns', function() {
-                            expect(success).toHaveBeenCalledWith(updatedCampaigns);
+                        it('should upsert the external line items', function() {
+                            expect(beeswax.upsertCampaignActiveLineItems)
+                                .toHaveBeenCalledWith({
+                                    campaign : updatedCampaigns[0], 
+                                    startDate : transaction.cycleStart,
+                                    endDate : transaction.cycleEnd 
+                                });
+
+                            expect(beeswax.upsertCampaignActiveLineItems)
+                                .toHaveBeenCalledWith({
+                                    campaign : updatedCampaigns[1], 
+                                    startDate : transaction.cycleStart,
+                                    endDate : transaction.cycleEnd 
+                                });
+
+                            expect(beeswax.upsertCampaignActiveLineItems)
+                                .toHaveBeenCalledWith({
+                                    campaign : updatedCampaigns[2], 
+                                    startDate : transaction.cycleStart,
+                                    endDate : transaction.cycleEnd 
+                                });
+
+                            expect(beeswax.upsertCampaignActiveLineItems.calls.count())
+                                .toBe(targetCampaigns.length, 'Incorrect number of upserts.');
+                        });
+
+                        describe('when the external line items are upserted.',function(){
+                            beforeEach(function(done){
+                                upsertBeeswaxLineItemsDeferreds.forEach( deferred  => {
+                                    deferred.fulfill({
+                                        createdLineItems : [ ],
+                                        updatedLineItems : [ ]
+                                    });
+                                });
+
+                                setTimeout(done);
+                            });
+
+                            it('should fulfill with the campaigns', function() {
+                                expect(success).toHaveBeenCalledWith(updatedCampaigns);
+                            });
                         });
                     });
                 });

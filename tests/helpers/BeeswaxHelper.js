@@ -138,6 +138,6 @@ class BeeswaxHelper {
         ));
     }
 
-};
+}
 
 module.exports  = BeeswaxHelper;

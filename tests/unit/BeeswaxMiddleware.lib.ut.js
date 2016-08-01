@@ -3,12 +3,12 @@
 const proxyquire = require('proxyquire').noCallThru();
 const logger = require('cwrx/lib/logger');
 
-fdescribe('BeeswaxMiddleware(config)', function() {
+describe('BeeswaxMiddleware(config)', function() {
 
     describe('instance:', function() {
         var url, q, ld, log;
         var BeeswaxClient, BeeswaxMiddleware, CwrxRequest;
-        var middleWare, request, beeswax, advertiser, campaign, placements, transaction;
+        var middleWare, request, beeswax, advertiser, campaign, placements ;
         var bwCreateAdvertiserDeferred, bwCreateCampaignDeferred, bwFindCampaignDeferred,
             bwCreateCreativeDeferred, bwQueryCreativeDeferred, bwUploadAssetDeferred,
             bwQueryLineItemDeferred, bwCreateLineItemDeferred, bwEditLineItemDeferred,
@@ -141,22 +141,6 @@ fdescribe('BeeswaxMiddleware(config)', function() {
                 }
             ];
 
-            transaction = {
-                application: 'showcase',
-                transactionId: 't-0aZ1z90bw5Snihpq',
-                transactionTimestamp: '2016-07-21T15:00:44.962Z',
-                orgId: 'o-0iY5h40ajlO1U03K',
-                amount: '49.9900',
-                braintreeId: 'msac53hk',
-                promotionId: null,
-                paymentPlanId: 'pp-0Ekdsm05KVZ43Aqj',
-                cycleStart: '2016-07-21T00:00:00.000Z',
-                cycleEnd: '2016-08-20T23:59:59.000Z',
-                planViews: 2000,
-                bonusViews: 0,
-                totalViews: 2000
-            };
-
             spyOn(logger, 'getLog').and.returnValue(log = jasmine.createSpyObj('log', [
                 'info',
                 'trace',
@@ -173,7 +157,7 @@ fdescribe('BeeswaxMiddleware(config)', function() {
                             mobile_app: [ {
                                 exclude: { app_bundle_list: [ 1533, 1547, 1548, 2977 ] }
                             }]
-                        },
+                        }
                     },
                     bid : { values: { cpm_bid: 11 } }
                 },
@@ -259,7 +243,7 @@ fdescribe('BeeswaxMiddleware(config)', function() {
             });
             
             spyOn(beeswax.creativeLineItems,'create').and.callFake(function(){
-                return bwCreateLineItemCreative.promise;
+                return bwCreateLineItemCreativeDeferred.promise;
             });
             
             spyOn(beeswax.creatives,'query').and.callFake(function(){
@@ -321,7 +305,7 @@ fdescribe('BeeswaxMiddleware(config)', function() {
                 inventory: [ {
                     include: {
                         inventory_source: [ 3, 0 ], interstitial: [ true ], 
-                            environment_type: [ 1 ]
+                        environment_type: [ 1 ]
                     }
                 } ],
                 geo: [ { include: { country: [ 'USA' ] } } ],
@@ -900,7 +884,7 @@ fdescribe('BeeswaxMiddleware(config)', function() {
                     payload : {
                         campaign_id : 11,
                         advertiser_id : 55,
-                        campaign_name : "my campaign",
+                        campaign_name : 'my campaign',
                         campaign_budget : 1000,
                         start_date : '2016-01-27 00:00:00',
                         budget_type : 1
@@ -963,7 +947,7 @@ fdescribe('BeeswaxMiddleware(config)', function() {
             });
             it('looks up the beeswax campaign',function(done){
                 middleWare.upsertCampaignActiveLineItems(args)
-                .then(function (res){
+                .then(function (){
                     expect(beeswax.campaigns.find).toHaveBeenCalledWith(11);
                 })
                 .then(done,done.fail);
@@ -971,14 +955,14 @@ fdescribe('BeeswaxMiddleware(config)', function() {
             
             it('lookups up the beeswax campaign line items',function(done){
                 middleWare.upsertCampaignActiveLineItems(args)
-                .then(function (res){
+                .then(function (){
                     expect(beeswax.campaigns.find).toHaveBeenCalledWith(11);
                     expect(beeswax.creatives.query).toHaveBeenCalledWith({
                         advertiser_id : 55, active : true    
                     });
                     expect(beeswax.lineItems.query).toHaveBeenCalledWith({
                         campaign_id : 11, active : true, start_date : '2016-06-30 20:00:00',
-                            end_date : '2016-07-31 19:59:59'
+                        end_date : '2016-07-31 19:59:59'
                     });
                 })
                 .then(done,done.fail);
@@ -998,7 +982,7 @@ fdescribe('BeeswaxMiddleware(config)', function() {
 
             it('lookups up the beeswax campaign advertiser creatives',function(done){
                 middleWare.upsertCampaignActiveLineItems(args)
-                .then(function (res){
+                .then(function (){
                     expect(beeswax.campaigns.find).toHaveBeenCalledWith(11);
                     expect(beeswax.creatives.query).toHaveBeenCalledWith({
                         advertiser_id : 55, active : true    
@@ -1077,7 +1061,7 @@ fdescribe('BeeswaxMiddleware(config)', function() {
                                 inventory: [ {
                                     include: {
                                         inventory_source: [ 3, 0 ], interstitial: [ true ], 
-                                            environment_type: [ 1 ]
+                                        environment_type: [ 1 ]
                                     }
                                 } ],
                                 geo: [ { include: { country: [ 'USA' ] } } ],

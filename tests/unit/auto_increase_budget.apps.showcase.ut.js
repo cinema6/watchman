@@ -4,7 +4,7 @@ const Status = require('cwrx/lib/enums').Status;
 const moment = require('moment');
 const proxyquire = require('proxyquire');
 
-fdescribe('(action factory) showcase/apps/auto_increase_budget', function() {
+describe('(action factory) showcase/apps/auto_increase_budget', function() {
     var q, uuid, resolveURL, ld, logger;
     var JsonProducer, CwrxRequest, BeeswaxMiddleware;
     var factory;

@@ -36,9 +36,9 @@ function waitUntil(predicate) {
     return check();
 }
 
-fdescribe('cwrxStream transactionCreated', function() {
+describe('cwrxStream transactionCreated', function() {
     var producer, request, beeswax;
-    var advertiser, campaigns, beeswaxCampaigns, beeswaxCreative, 
+    var advertiser, campaigns, beeswaxCampaigns,
         targetCampaignIds, otherCampaignIds, ourCampaignIds;
     var targetOrg, transaction;
 
@@ -396,8 +396,7 @@ fdescribe('cwrxStream transactionCreated', function() {
 
             return testUtils.resetCollection('campaigns', campaigns);
         }).then(function(){
-            return beeswax.createAdvertiserMRAIDCreative(advertiser.beeswaxIds.advertiser)
-                .then(function(c){ beeswaxCreative = c; });
+            return beeswax.createAdvertiserMRAIDCreative(advertiser.beeswaxIds.advertiser);
         }).then(done, done.fail);
     });
 
@@ -429,57 +428,56 @@ fdescribe('cwrxStream transactionCreated', function() {
 
             transactionCreatedEvent().then(function() {
                 return waitUntil(() => Promise.all([
-                        Promise.all(targetCampaignIds.map(id => (
-                            request.get({
-                                url: api('/api/campaigns/' + id),
-                                json: true
-                            }).spread(campaign => (
-                                (
-                                    moment(campaign.lastUpdated).isAfter(
-                                        moment().subtract(1, 'day'))
-                                ) && campaign
-                            ))
-                        )))
-                        .then(campaigns => 
-                            campaigns.every(campaign => !!campaign) && campaigns
-                        ),
-                        Promise.all(targetCampaignIds.map(id => {
-                            const campaign = ld.find(campaigns, { id });
+                    Promise.all(targetCampaignIds.map(id => (
+                        request.get({
+                            url: api('/api/campaigns/' + id),
+                            json: true
+                        }).spread(campaign => (
+                            (
+                                moment(campaign.lastUpdated).isAfter(
+                                    moment().subtract(1, 'day'))
+                            ) && campaign
+                        ))
+                    )))
+                    .then(campaigns => 
+                        campaigns.every(campaign => !!campaign) && campaigns
+                    ),
+                    Promise.all(targetCampaignIds.map(id => {
+                        const campaign = ld.find(campaigns, { id });
 
-                            return beeswax.api.campaigns.find(campaign.externalIds.beeswax)
-                                .then(response => {
-                                    const beeswaxCampaign = response.payload;
-                                    const oldBeeswaxCampaign = ld.find(
-                                        beeswaxCampaigns, 
-                                        { campaign_id: beeswaxCampaign.campaign_id }
-                                    );
+                        return beeswax.api.campaigns.find(campaign.externalIds.beeswax)
+                            .then(response => {
+                                const beeswaxCampaign = response.payload;
+                                const oldBeeswaxCampaign = ld.find(
+                                    beeswaxCampaigns, 
+                                    { campaign_id: beeswaxCampaign.campaign_id }
+                                );
 
-                                    return (
-                                        beeswaxCampaign.campaign_budget !==
-                                            oldBeeswaxCampaign.campaign_budget
-                                    ) && beeswaxCampaign;
-                                });
-                        }))
-                        .then(beeswaxCampaigns => 
-                            beeswaxCampaigns.every(beeswaxCampaign => !!beeswaxCampaign)
-                                && beeswaxCampaigns
-                        ),
-                        Promise.all(targetCampaignIds.map(id => {
-                            const campaign = ld.find(campaigns, { id });
+                                return (
+                                    beeswaxCampaign.campaign_budget !==
+                                        oldBeeswaxCampaign.campaign_budget
+                                ) && beeswaxCampaign;
+                            });
+                    }))
+                    .then(beeswaxCampaigns => 
+                        beeswaxCampaigns.every(beeswaxCampaign => !!beeswaxCampaign)
+                            && beeswaxCampaigns
+                    ),
+                    Promise.all(targetCampaignIds.map(id => {
+                        const campaign = ld.find(campaigns, { id });
 
-                            return beeswax.api.lineItems.query({
-                                    campaign_id : campaign.externalIds.beeswax
-                                })
-                                .then(response => {
-                                    return response.payload;
-                                });
-                        }))
-                        .then(beeswaxLineItems => 
-                            beeswaxLineItems.every(item => (!!item && item.length)) &&
-                                beeswaxLineItems
-                        )
-                    ])
-                    .then(items => items.every(item => !!item) && items)
+                        return beeswax.api.lineItems.query({
+                            campaign_id : campaign.externalIds.beeswax
+                        })
+                        .then(response => {
+                            return response.payload;
+                        });
+                    }))
+                    .then(beeswaxLineItems => 
+                        beeswaxLineItems.every(item => (!!item && item.length)) &&
+                            beeswaxLineItems
+                    )
+                ]).then(items => items.every(item => !!item) && items)
                 ).spread(function(/*updatedCampaigns, updatedBeeswaxCampaigns*/) {
                     updatedCampaigns = arguments[0];
                     updatedBeeswaxCampaigns = arguments[1];
