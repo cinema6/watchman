@@ -396,7 +396,9 @@ describe('cwrxStream transactionCreated', function() {
 
             return testUtils.resetCollection('campaigns', campaigns);
         }).then(function(){
-            return beeswax.createAdvertiserMRAIDCreative(advertiser.beeswaxIds.advertiser);
+            return beeswax.createMRAIDCreative({
+                advertiser_id : advertiser.beeswaxIds.advertiser
+            });
         }).then(done, done.fail);
     });
 

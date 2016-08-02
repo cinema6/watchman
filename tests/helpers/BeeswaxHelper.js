@@ -3,6 +3,7 @@
 const BeeswaxClient = require('beeswax-client');
 const ld = require('lodash');
 const uuid = require('rc-uuid');
+const moment = require('moment');
 
 class BeeswaxHelper {
     constructor(options) {
@@ -91,14 +92,14 @@ class BeeswaxHelper {
         });
     }
 
-    createAdvertiserMRAIDCreative(advertiserId) {
+    createMRAIDCreative(opts) {
         return this.api.uploadCreativeAsset({
             sourceUrl: 'https://reelcontent.com/images/logo-nav.png',
-            advertiser_id: advertiserId
+            advertiser_id: opts.advertiser_id
         })
         .then(asset => (
             this.api.creatives.create({
-                advertiser_id: advertiserId,
+                advertiser_id: opts.advertiser_id,
                 creative_type: 0,
                 creative_template_id: 13,
                 width: 300,
@@ -138,6 +139,85 @@ class BeeswaxHelper {
         ));
     }
 
+    createAdvertiser() {
+        let opts = ld.assign({
+            advertiser_name : `E2E Test Advertiser (${uuid.createUuid()})`,
+            active: true
+        }, arguments[0]);
+        return this.api.advertisers.create(opts).then(result => result.payload);
+    }
+
+    createCampaign() {
+        let opts = ld.assign({
+            campaign_name   : `E2E Test Campaign (${uuid.createUuid()})`,
+            campaign_budget : 1000,
+            budget_type     : 1,
+            start_date      : moment().format('YYYY-MM-DD 00:00:00'),
+            pacing: 0,
+            active: true
+        }, arguments[0]);
+        return this.api.campaigns.create(opts).then(result => result.payload);
+    }
+
+    createLineItem(opts) {
+        const targeting = {
+            targeting : {
+                inventory: [ {
+                    include: {
+                        inventory_source: [3,0], interstitial: [true], environment_type: [1]
+                    }
+                } ],
+                geo: [ { include: { country: [ 'USA' ] } } ],
+                platform: [ { include: { os: [ 'iOS' ], device_model: [ 'iPhone' ] } } ],
+                segment: [ { include: { user_id: [ true ] } } ]
+            }
+        };
+        return this.api.targetingTemplates.create(ld.assign({}, targeting, {
+            template_name: `E2E Test Template (${uuid.createUuid()})`,
+            strategy_id: 1,
+            active: true
+        })).then(response => {
+            const targetingTemplate = response.payload;
+            return this.api.lineItems.create(ld.assign({
+                line_item_type_id: 0,
+                targeting_template_id: targetingTemplate.targeting_template_id,
+                line_item_name: `E2E Test Line Item (${uuid.createUuid()})`,
+                line_item_budget: 1000,
+                budget_type: 1,
+                bidding: {
+                    bidding_strategy: 'cpm',
+                    values: {
+                        cpm_bid: 1
+                    }
+                },
+                pacing: 1,
+                start_date: moment().format('YYYY-MM-DD 00:00:00'),
+                end_date: moment().add(1, 'week').format('YYYY-MM-DD 23:59:59'),
+                active: false
+            },opts));
+        })
+        .then(response => {
+            const lineItem = response.payload;
+            return this.api.creatives.query({
+                advertiser_id : opts.advertiser_id, creative_type: 0, creative_template_id: 13
+            })
+            .then(response => {
+                const creative = response.payload[0];
+                if (!creative) {
+                    return lineItem;
+                }
+                return this.api.creativeLineItems.create({
+                    creative_id: creative.creative_id,
+                    line_item_id: lineItem.line_item_id,
+                    active: true
+                })
+                .then(() => 
+                    this.api.lineItems.edit(lineItem.line_item_id, { active: true })
+                    .then(response => response.payload)
+                );
+            });
+        });
+    }
 }
 
 module.exports  = BeeswaxHelper;
