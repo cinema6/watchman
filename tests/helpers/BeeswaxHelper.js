@@ -18,6 +18,47 @@ class BeeswaxHelper {
         this.api = new BeeswaxClient(opts);
     }
 
+    cleanupCampaign(campaignId) {
+        let lineItems = [];
+        let mappings  = [];
+
+        // 1. Get Campaign Line Items
+        return this.api.lineItems.query({ campaign_id : campaignId })
+
+        //2. Get the LineItem Creative mappings
+        .then((results) => {
+            lineItems = results.payload;
+
+            return Promise.all(
+                lineItems.map((item) => 
+                    this.api.creativeLineItems.query({line_item_id : item.line_item_id })
+                        .then((result) => result.payload) ) );
+        })
+        
+        // 3. Set all the line items to inactive.
+        .then((results) => {
+            mappings = ld.flattenDeep(results);
+
+            return Promise.all(
+                lineItems.map((item) => this.api.lineItems.edit(item.line_item_id,
+                    { active : false } )) );
+        })
+        
+        // 4. Remove line item / creative mappings
+        .then(()=> Promise.all(mappings.map((item) =>
+                this.api.creativeLineItems.delete(item.cli_id))))
+
+        // 5. Delete Line Items
+        .then(()=> Promise.all(lineItems.map((item) =>
+                this.api.lineItems.delete(item.line_item_id))))
+
+        // 6. Set campaigns to inactive
+        .then(()=> this.api.campaigns.edit(campaignId,{ active : false }))
+            
+        // 7. Delete campaigns
+        .then(()=> this.api.campaigns.delete(campaignId));
+    }
+
     cleanupAdvertiser(advertiserId) {
         let lineItems = [];
         let campaigns = [];

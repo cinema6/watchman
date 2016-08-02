@@ -474,7 +474,7 @@ describe('BeeswaxMiddleware(config)', function() {
                         start_date : '2016-01-27 00:00:00',
                         budget_type : 1,
                         campaign_budget : 1,
-                        active : false
+                        active : true
                     });
                     expect(request.put).toHaveBeenCalled();
                     expect(res.campaign.externalIds.beeswax).toEqual(11);
