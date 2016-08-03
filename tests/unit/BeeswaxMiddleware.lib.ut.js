@@ -471,7 +471,7 @@ describe('BeeswaxMiddleware(config)', function() {
                         advertiser_id : 22,
                         alternative_id : 'c-1234567',
                         campaign_name : 'Revengus Extremis',
-                        start_date : '2016-01-27 00:00:00',
+                        start_date : '2016-01-26 19:00:00',
                         budget_type : 1,
                         campaign_budget : 1,
                         active : true
