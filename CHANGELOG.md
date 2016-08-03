@@ -1,5 +1,10 @@
 # Watchman
 
+## v1.4.2 (August 3, 2016)
+* *[v1.4.2-rc1]*
+  * [FIX]: Fix for an issue that would cause fetching the product data for some apps to fail
+* *[/v1.4.2-rc1]*
+
 ## v1.4.1 (July 29, 2016)
 * *[v1.4.1-rc1]*
   * [FIX]: Fix for an issue that would cause too many HubSpot requests to be sent and rate limited
