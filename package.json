@@ -24,7 +24,7 @@
     "canvas": "^1.4.0",
     "chart.js": "^2.1.6",
     "commander": "^2.9.0",
-    "cwrx": "cinema6/cwrx#ads-5.4.0",
+    "cwrx": "cinema6/cwrx#collateral-2.6.3",
     "handlebars": "^4.0.5",
     "highland": "^2.7.3",
     "html-to-text": "^2.0.0",
