@@ -122,7 +122,7 @@ class BeeswaxHelper {
     }
 
     cleanupAllTestAdvertisers() {
-        const regex = /(^e2e-advertiser--|^\d+ - placements.e2e)/;
+        const regex = /(^E2E Test Advertiser |^e2e-advertiser--|^\d+ - placements.e2e)/;
 
         return this.api.advertisers.queryAll({}).then((resp) => {
             var toDelete = (resp.payload || []).filter(function(advert) {
