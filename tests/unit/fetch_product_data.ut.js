@@ -478,7 +478,16 @@ describe('fetch_product_data.js', function() {
             ]
         };
 
+        // Stop time
+        jasmine.clock().install();
+        jasmine.clock().mockDate(new Date());
+
         this.fetchProductData = fetchProductDataFactory(this.mockConfig);
+    });
+
+    afterEach(function() {
+        // Resume time
+        jasmine.clock().uninstall();
     });
 
     describe('fetching product data', function() {
@@ -661,10 +670,6 @@ describe('fetch_product_data.js', function() {
                 });
             });
 
-            it('should not update the campaign name or description', function() {
-
-            });
-
             it ('should produce a new record', function() {
                 expect(JsonProducer.prototype.produce).toHaveBeenCalledWith({
                     type: 'campaignRefreshed',
@@ -675,7 +680,6 @@ describe('fetch_product_data.js', function() {
                 });
                 expect(mockLog.info).toHaveBeenCalled();
             });
-
         });
     });
 });

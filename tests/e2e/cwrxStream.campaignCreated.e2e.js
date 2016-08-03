@@ -904,7 +904,12 @@ describe('cwrxStream campaignCreated', function() {
                 ]).then(() => request.get({
                     url: api('/api/campaigns'),
                     qs: { ids: ids.join(',') }
-                })).spread(campaigns => [campaigns, beeswaxCampaigns]);
+                })).spread(campaigns => (
+                    [
+                        campaigns.sort(campaign => (campaign.id === ids[0] ? -1 : 1)),
+                        beeswaxCampaigns
+                    ]
+                ));
             });
         }
 
