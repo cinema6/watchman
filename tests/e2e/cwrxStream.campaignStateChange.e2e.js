@@ -129,7 +129,6 @@ describe('cwrxStream campaignStateChange', function() {
                                         cpm_bid: 1
                                     }
                                 },
-                                pacing: 1,
                                 start_date: moment().format('YYYY-MM-DD'),
                                 end_date: moment().add(1, 'week').format('YYYY-MM-DD'),
                                 active: false
