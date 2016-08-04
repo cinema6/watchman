@@ -60,6 +60,9 @@ class BeeswaxHelper {
     }
 
     cleanupAdvertiser(advertiserId) {
+        if (advertiserId === undefined){
+            throw new Error('Must provide an advertiser id!');
+        }
         let lineItems = [];
         let campaigns = [];
         let creatives = [];
@@ -67,6 +70,7 @@ class BeeswaxHelper {
 
         // 1. Get Advertisers Line Items, Campaigns and Creatives
         return Promise.all([
+            this.api.advertisers.find( advertiserId ),
             this.api.lineItems.query({ advertiser_id : advertiserId }),
             this.api.campaigns.query({ advertiser_id : advertiserId }),
             this.api.creatives.query({ advertiser_id : advertiserId })
@@ -74,9 +78,14 @@ class BeeswaxHelper {
         
         //2. Get the LineItem Creative mappings
         .then((results) => {
-            lineItems = results[0].payload;
-            campaigns = results[1].payload;
-            creatives = results[2].payload;
+            let advertiser = results[0].payload;
+            if (!advertiser) {
+                throw new Error('Unable to locate advertiser: ' + advertiserId);
+            }
+
+            lineItems = results[1].payload;
+            campaigns = results[2].payload;
+            creatives = results[3].payload;
 
             return Promise.all(
                 lineItems.map((item) => 
@@ -194,7 +203,6 @@ class BeeswaxHelper {
             campaign_budget : 1000,
             budget_type     : 1,
             start_date      : moment().format('YYYY-MM-DD 00:00:00'),
-            pacing: 0,
             active: true
         }, arguments[0]);
         return this.api.campaigns.create(opts).then(result => result.payload);
@@ -226,12 +234,11 @@ class BeeswaxHelper {
                 line_item_budget: 1000,
                 budget_type: 1,
                 bidding: {
-                    bidding_strategy: 'cpm',
+                    bidding_strategy: 'CPM_PACED',
                     values: {
                         cpm_bid: 1
                     }
                 },
-                pacing: 1,
                 start_date: moment().format('YYYY-MM-DD 00:00:00'),
                 end_date: moment().add(1, 'week').format('YYYY-MM-DD 23:59:59'),
                 active: false

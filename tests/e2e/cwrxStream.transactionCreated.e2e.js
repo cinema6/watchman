@@ -47,19 +47,25 @@ describe('cwrxStream transactionCreated', function() {
     }
 
     function createAdvertiser() {
-        return request.post({
-            url: api('/api/account/advertisers'),
-            json: {
-                name: 'e2e-advertiser--' + uuid.createUuid(),
-                defaultLinks: {},
-                defaultLogos: {}
-            }
-        }).then(ld.property(0));
+        return beeswax.createAdvertiser()
+        .then(function(result){
+            return request.post({
+                url: api('/api/account/advertisers'),
+                json: {
+                    name: result.advertiser_name,
+                    externalIds : {
+                        beeswax : result.advertiser_id
+                    },
+                    defaultLinks: {},
+                    defaultLogos: {}
+                }
+            }).then(ld.property(0));
+        });
     }
 
     function setupCampaign(campaign) {
         return beeswax.api.campaigns.create({
-            advertiser_id: advertiser.beeswaxIds.advertiser,
+            advertiser_id: advertiser.externalIds.beeswax,
             campaign_name: `E2E Test Campaign (${uuid.createUuid()})`,
             campaign_budget: 750,
             budget_type: 1,
@@ -96,9 +102,6 @@ describe('cwrxStream transactionCreated', function() {
         const sharedConfig = {
             secrets: '/opt/sixxy/.watchman.secrets.json',
             appCreds: '/opt/sixxy/.rcAppCreds.json',
-            beeswax : {
-                bid : { bidding_strategy: 'CPM', values: { cpm_bid: 10 } }
-            },
             cwrx: {
                 api: {
                     root: API_ROOT,
@@ -163,7 +166,7 @@ describe('cwrxStream transactionCreated', function() {
     beforeAll(function() {
         var awsConfig = ld.assign({ region: 'us-east-1' }, AWS_CREDS || {});
 
-        jasmine.DEFAULT_TIMEOUT_INTERVAL = 120000;
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000;
 
         producer = new JsonProducer(CWRX_STREAM, awsConfig);
         request = new CwrxRequest(APP_CREDS);
@@ -397,13 +400,14 @@ describe('cwrxStream transactionCreated', function() {
             return testUtils.resetCollection('campaigns', campaigns);
         }).then(function(){
             return beeswax.createMRAIDCreative({
-                advertiser_id : advertiser.beeswaxIds.advertiser
+                advertiser_id : advertiser.externalIds.beeswax
             });
         }).then(done, done.fail);
     });
 
     afterAll(function(done) {
-        beeswax.cleanupAdvertiser(advertiser.beeswaxIds.advertiser).then(done, done.fail);
+        beeswax.cleanupAdvertiser(advertiser.externalIds.beeswax)
+        .then(done, done.fail);
     });
 
     describe('when produced', function() {
@@ -477,7 +481,7 @@ describe('cwrxStream transactionCreated', function() {
                     }))
                     .then(beeswaxLineItems => 
                         beeswaxLineItems.every(item => (!!item && item.length)) &&
-                            beeswaxLineItems
+                            (beeswaxLineItems.length === 2 ) && beeswaxLineItems
                     )
                 ]).then(items => items.every(item => !!item) && items)
                 ).spread(function(/*updatedCampaigns, updatedBeeswaxCampaigns*/) {

@@ -1,7 +1,6 @@
 module.exports = {
     options: {
-        specNameSuffix: '.js',
-        stopOnFailure: false
+        specNameSuffix: '.js'
     },
     unit: {
         specs: 'tests/unit/**/*.ut.js',
@@ -21,7 +20,6 @@ module.exports = {
     e2e: {
         specs: 'tests/e2e/**/*.e2e.js',
         options: {
-            stopOnFailure : true,
             reporters: {
                 console: {
                     colors: true,

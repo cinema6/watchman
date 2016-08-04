@@ -59,7 +59,8 @@ describe('cwrxStream campaignCreated', function() {
                 })
                 .then(response => response.payload[0] && camp)
             )
-        ));
+        ))
+        .catch(() => undefined);
     }
 
     function campaignCreatedEvent(time, campaignOverride) {
@@ -166,15 +167,21 @@ describe('cwrxStream campaignCreated', function() {
                 jar: true
             });
         }).then(function makeAdvertiser() {
-            return request.post({
-                url: api('/api/account/advertisers'),
-                json: {
-                    name: 'e2e-advertiser--' + uuid.createUuid(),
-                    defaultLinks: {},
-                    defaultLogos: {}
-                },
-                jar: true
-            }).then(ld.property(0));
+            return beeswax.createAdvertiser()
+            .then(function(result){
+                return request.post({
+                    url: api('/api/account/advertisers'),
+                    json: {
+                        name: result.advertiser_name,
+                        externalIds : {
+                            beeswax : result.advertiser_id
+                        },
+                        defaultLinks: {},
+                        defaultLogos: {}
+                    },
+                    jar: true
+                }).then(ld.property(0));
+            });
         }).then(function fetchEntities() {
             return q.all([
                 request.get({
@@ -406,7 +413,7 @@ describe('cwrxStream campaignCreated', function() {
     beforeAll(function() {
         var awsConfig = ld.assign({ region: 'us-east-1' }, AWS_CREDS || {});
 
-        jasmine.DEFAULT_TIMEOUT_INTERVAL = 120000;
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 60000;
 
         producer = new JsonProducer(CWRX_STREAM, awsConfig);
         request = new CwrxRequest(APP_CREDS);
@@ -534,7 +541,6 @@ describe('cwrxStream campaignCreated', function() {
             org = arguments[1];
             advertiser = arguments[2];
             paymentPlans = arguments[3];
-
             promotions = [
                 {
                     id: createId('ref'),
@@ -708,7 +714,7 @@ describe('cwrxStream campaignCreated', function() {
                         return advertiser.externalIds && advertiser;
                     });
                 });
-            }).then(function(/*placements*/) {
+            }).then(function(/*advertiser*/) {
                 advertiser = arguments[0];
                 return waitUntil(() => 
                     findBeeswaxCampaign(campaign).then(beeswaxCampaign => !!beeswaxCampaign)
@@ -843,12 +849,12 @@ describe('cwrxStream campaignCreated', function() {
             return Promise.resolve().then(() => {
                 return Promise.all([
                     beeswax.createCampaign({
-                        advertiser_id: advertiser.beeswaxIds.advertiser,
+                        advertiser_id: advertiser.externalIds.beeswax,
                         campaign_budget: 4500,
                         start_date : start_date
                     }),
                     beeswax.createCampaign({
-                        advertiser_id: advertiser.beeswaxIds.advertiser,
+                        advertiser_id: advertiser.externalIds.beeswax,
                         campaign_budget: 2500,
                         start_date : start_date
                     })
