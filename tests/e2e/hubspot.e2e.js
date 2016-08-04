@@ -72,17 +72,6 @@ describe('HubSpot integration', function() {
                                 portal: '2041560',
                                 form: '73472e84-6426-4fab-b092-936c0f692da6',
                                 data: {
-                                    applications: 'apps'
-                                }
-                            },
-                            ifData: {
-                                target: '^showcase$'
-                            }
-                        },
-                        {
-                            name: 'hubspot/update_user',
-                            options: {
-                                properties: {
                                     applications: 'apps',
                                     lifecyclestage: 'salesqualifiedlead',
                                     e2e: 'true'
