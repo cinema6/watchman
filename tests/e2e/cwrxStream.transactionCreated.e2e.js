@@ -10,7 +10,7 @@ var resolveURL = require('url').resolve;
 var uuid = require('rc-uuid');
 var moment = require('moment');
 var Status = require('cwrx/lib/enums').Status;
-var BeeswaxClient = require('beeswax-client');
+var BeeswaxHelper = require('../helpers/BeeswaxHelper');
 
 var API_ROOT = process.env.apiRoot;
 var APP_CREDS = JSON.parse(process.env.appCreds);
@@ -38,7 +38,8 @@ function waitUntil(predicate) {
 
 describe('cwrxStream transactionCreated', function() {
     var producer, request, beeswax;
-    var advertiser, campaigns, beeswaxCampaigns, targetCampaignIds, otherCampaignIds, ourCampaignIds;
+    var advertiser, campaigns, beeswaxCampaigns,
+        targetCampaignIds, otherCampaignIds, ourCampaignIds;
     var targetOrg, transaction;
 
     function api(endpoint) {
@@ -56,12 +57,8 @@ describe('cwrxStream transactionCreated', function() {
         }).then(ld.property(0));
     }
 
-    function deleteAdvertiser(advertiser) {
-        return beeswax.advertisers.delete(advertiser.beeswaxIds.advertiser);
-    }
-
     function setupCampaign(campaign) {
-        return beeswax.campaigns.create({
+        return beeswax.api.campaigns.create({
             advertiser_id: advertiser.beeswaxIds.advertiser,
             campaign_name: `E2E Test Campaign (${uuid.createUuid()})`,
             campaign_budget: 750,
@@ -83,10 +80,6 @@ describe('cwrxStream transactionCreated', function() {
         });
     }
 
-    function cleanupCampaign(campaign) {
-        return beeswax.campaigns.delete(campaign.externalIds.beeswax, true);
-    }
-
     function transactionCreatedEvent(time) {
         return producer.produce({
             type: 'transactionCreated',
@@ -103,12 +96,28 @@ describe('cwrxStream transactionCreated', function() {
         const sharedConfig = {
             secrets: '/opt/sixxy/.watchman.secrets.json',
             appCreds: '/opt/sixxy/.rcAppCreds.json',
+            beeswax : {
+                bid : { bidding_strategy: 'CPM', values: { cpm_bid: 10 } }
+            },
             cwrx: {
                 api: {
                     root: API_ROOT,
+                    tracking : 'https://audit.cinema6.com/pixel.gif',
                     campaigns: {
                         endpoint: '/api/campaigns'
+                    },
+                    placements: {
+                        endpoint: '/api/placements'
+                    },
+                    advertisers: {
+                        endpoint: '/api/account/advertisers'
                     }
+                }
+            },
+            campaign: {
+                conversionMultipliers: {
+                    internal: 1.1,
+                    external: 1.25
                 }
             },
             emails: {
@@ -158,15 +167,10 @@ describe('cwrxStream transactionCreated', function() {
 
         producer = new JsonProducer(CWRX_STREAM, awsConfig);
         request = new CwrxRequest(APP_CREDS);
-        beeswax = new BeeswaxClient({
-            creds: {
-                email: 'ops@cinema6.com',
-                password: '07743763902206f2b511bead2d2bf12292e2af82'
-            }
-        });
+        beeswax = new BeeswaxHelper();
     });
 
-    beforeEach(function(done) {
+    beforeAll(function(done) {
         var cwrxApp = {
             id: 'app-cwrx',
             created: new Date(),
@@ -391,23 +395,21 @@ describe('cwrxStream transactionCreated', function() {
             });
 
             return testUtils.resetCollection('campaigns', campaigns);
+        }).then(function(){
+            return beeswax.createMRAIDCreative({
+                advertiser_id : advertiser.beeswaxIds.advertiser
+            });
         }).then(done, done.fail);
     });
 
-    afterEach(function(done) {
-        q.all([
-            q.all(campaigns.map(function(campaign) {
-                return cleanupCampaign(campaign);
-            })).then(function() {
-                return deleteAdvertiser(advertiser);
-            })
-        ]).then(done, done.fail);
+    afterAll(function(done) {
+        beeswax.cleanupAdvertiser(advertiser.beeswaxIds.advertiser).then(done, done.fail);
     });
 
     describe('when produced', function() {
-        var updatedCampaigns, updatedBeeswaxCampaigns;
+        var updatedCampaigns, updatedBeeswaxCampaigns, updatedBeeswaxLineItems;
 
-        beforeEach(function(done) {
+        beforeAll(function(done) {
             transaction = {
                 id: createId('t'),
                 created: new Date().toISOString(),
@@ -434,25 +436,54 @@ describe('cwrxStream transactionCreated', function() {
                             json: true
                         }).spread(campaign => (
                             (
-                                moment(campaign.lastUpdated).isAfter(moment().subtract(1, 'day'))
+                                moment(campaign.lastUpdated).isAfter(
+                                    moment().subtract(1, 'day'))
                             ) && campaign
                         ))
-                    ))).then(campaigns => campaigns.every(campaign => !!campaign) && campaigns),
+                    )))
+                    .then(campaigns => 
+                        campaigns.every(campaign => !!campaign) && campaigns
+                    ),
                     Promise.all(targetCampaignIds.map(id => {
                         const campaign = ld.find(campaigns, { id });
 
-                        return beeswax.campaigns.find(campaign.externalIds.beeswax).then(response => {
-                            const beeswaxCampaign = response.payload;
-                            const oldBeeswaxCampaign = ld.find(beeswaxCampaigns, { campaign_id: beeswaxCampaign.campaign_id });
+                        return beeswax.api.campaigns.find(campaign.externalIds.beeswax)
+                            .then(response => {
+                                const beeswaxCampaign = response.payload;
+                                const oldBeeswaxCampaign = ld.find(
+                                    beeswaxCampaigns, 
+                                    { campaign_id: beeswaxCampaign.campaign_id }
+                                );
 
-                            return (
-                                beeswaxCampaign.campaign_budget !== oldBeeswaxCampaign.campaign_budget
-                            ) && beeswaxCampaign;
+                                return (
+                                    beeswaxCampaign.campaign_budget !==
+                                        oldBeeswaxCampaign.campaign_budget
+                                ) && beeswaxCampaign;
+                            });
+                    }))
+                    .then(beeswaxCampaigns => 
+                        beeswaxCampaigns.every(beeswaxCampaign => !!beeswaxCampaign)
+                            && beeswaxCampaigns
+                    ),
+                    Promise.all(targetCampaignIds.map(id => {
+                        const campaign = ld.find(campaigns, { id });
+
+                        return beeswax.api.lineItems.query({
+                            campaign_id : campaign.externalIds.beeswax
+                        })
+                        .then(response => {
+                            return response.payload;
                         });
-                    })).then(beeswaxCampaigns => beeswaxCampaigns.every(beeswaxCampaign => !!beeswaxCampaign) && beeswaxCampaigns)
-                ]).then(items => items.every(item => !!item) && items)).spread(function(/*updatedCampaigns, updatedBeeswaxCampaigns*/) {
+                    }))
+                    .then(beeswaxLineItems => 
+                        beeswaxLineItems.every(item => (!!item && item.length)) &&
+                            beeswaxLineItems
+                    )
+                ]).then(items => items.every(item => !!item) && items)
+                ).spread(function(/*updatedCampaigns, updatedBeeswaxCampaigns*/) {
                     updatedCampaigns = arguments[0];
                     updatedBeeswaxCampaigns = arguments[1];
+                    updatedBeeswaxLineItems = arguments[2];
                 });
             }).then(done, done.fail);
         });
@@ -489,6 +520,9 @@ describe('cwrxStream transactionCreated', function() {
         it('should increase the impressions of every beeswax campaign', function() {
             expect(updatedBeeswaxCampaigns[0].campaign_budget).toBe(2750);
             expect(updatedBeeswaxCampaigns[1].campaign_budget).toBe(2000);
+
+            expect(updatedBeeswaxLineItems[0][0].line_item_budget).toBe(2000);
+            expect(updatedBeeswaxLineItems[1][0].line_item_budget).toBe(1250);
         });
 
         it('should set every showcase campaign\'s status to active', function() {

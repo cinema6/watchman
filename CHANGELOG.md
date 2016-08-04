@@ -1,5 +1,11 @@
 # Watchman
 
+* *[v1.4.3-rc1]*
+  * [FEATURE]: Added campaign budget adjustment func to beeswax middleware
+  * [FEATURE]: Added upsert method to create (and eventually update) line items.
+  * [DEV]: Added BeeswaxHelper for e2e tests that work with beeswax.
+  * [DEV]: Added grunt beeswax:clean task to cleanup lingering test advertisers.
+
 ## v1.4.2 (August 3, 2016)
 * *[v1.4.2-rc1]*
   * [FIX]: Fix for an issue that would cause fetching the product data for some apps to fail

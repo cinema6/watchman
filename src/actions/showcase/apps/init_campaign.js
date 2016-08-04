@@ -109,8 +109,9 @@ module.exports = function factory(config) {
                     campaign: campaign,
                     placements: placements
                 });
-            }).then(bwResponse => (
-                showcase.rebalance(bwResponse.campaign.org).then(() => {
+            }).then(bwResponse => {
+                log.trace('Rebalance after campaign %1 created in beeswax!', campaign.id);
+                return showcase.rebalance(bwResponse.campaign.org).then(() => {
                     log.trace(
                         'Producing "initializedShowcaseCampaign" for showcase (app) campaign(%1).',
                         campaign.id
@@ -124,8 +125,8 @@ module.exports = function factory(config) {
                             date: data.date
                         }
                     });
-                })
-            ));
+                });
+            });
         }).tap(() => (
             log.info('Successfully initialized showcase (app) campaign(%1).', campaign.id)
         )).catch(reason => log.error(

@@ -8,9 +8,12 @@ describe('BeeswaxMiddleware(config)', function() {
     describe('instance:', function() {
         var url, q, ld, log;
         var BeeswaxClient, BeeswaxMiddleware, CwrxRequest;
-        var middleWare, request, beeswax, advertiser, campaign, placements;
-        var bwCreateAdvertiserDeferred, bwCreateCampaignDeferred,
-            bwCreateCreativeDeferred, bwUploadAssetDeferred;
+        var middleWare, request, beeswax, advertiser, campaign, placements ;
+        var bwCreateAdvertiserDeferred, bwCreateCampaignDeferred, bwFindCampaignDeferred,
+            bwCreateCreativeDeferred, bwQueryCreativeDeferred, bwUploadAssetDeferred,
+            bwQueryLineItemDeferred, bwCreateLineItemDeferred, bwEditLineItemDeferred,
+            bwCreateTargetingTemplDeferred, bwCreateLineItemCreativeDeferred,
+            bwEditCampaignDeferred;
         var putAdvertiserDeferred, getAdvertiserDeferred,
             putCampaignDeferred, putPlacementDeferred;
         var updatedAdvert, updatedCampaign, updatedPlacement, result;
@@ -37,8 +40,26 @@ describe('BeeswaxMiddleware(config)', function() {
             BeeswaxClient = jasmine.createSpy('BeeswaxClient()').and.callFake(function(){
                 return {
                     advertisers : { create : function() { return null; }},
-                    campaigns : { create : function() { return null; }},
-                    creatives : { create : function() { return null; }},
+                    campaigns : { 
+                        create : function() { return null; },
+                        edit : function() { return null; },
+                        find : function() { return null; }
+                    },
+                    creatives : { 
+                        create : function() { return null; },
+                        query  : function() { return null; } 
+                    },
+                    lineItems : { 
+                        create : function() { return null; },
+                        edit   : function() { return null; },
+                        query  : function() { return null; } 
+                    },
+                    targetingTemplates : { 
+                        create : function() { return null; }
+                    },
+                    creativeLineItems : {
+                        create : function() { return null; }
+                    },
                     uploadCreativeAsset : function(){ return null; }
                 };
             });
@@ -130,7 +151,15 @@ describe('BeeswaxMiddleware(config)', function() {
             middleWare  = new BeeswaxMiddleware(
                 {
                     api: { root: 'http://33.33.33.10/' },
-                    creds: { email : 'bu@g.z', password : 'x' }
+                    creds: { email : 'bu@g.z', password : 'x' },
+                    templates : {
+                        targeting : {
+                            mobile_app: [ {
+                                exclude: { app_bundle_list: [ 1533, 1547, 1548, 2977 ] }
+                            }]
+                        }
+                    },
+                    bid : { values: { cpm_bid: 11 } }
                 },
                 {
                     api: {
@@ -141,6 +170,11 @@ describe('BeeswaxMiddleware(config)', function() {
                         advertisers: { endpoint: '/api/account/advertisers' }
                     },
                     creds : { key: 'watchman-dev', secret: 'dwei9fhj3489ghr7834909r' }
+                },
+                { 
+                    conversionMultipliers : {
+                        external : 2
+                    }
                 }
             );
 
@@ -151,6 +185,14 @@ describe('BeeswaxMiddleware(config)', function() {
         beforeEach(function(){
             bwCreateAdvertiserDeferred  = q.defer();
             bwCreateCampaignDeferred    = q.defer();
+            bwEditCampaignDeferred    = q.defer();
+            bwFindCampaignDeferred      = q.defer();
+            bwQueryLineItemDeferred     = q.defer();
+            bwCreateLineItemDeferred    = q.defer();
+            bwEditLineItemDeferred      = q.defer();
+            bwCreateTargetingTemplDeferred = q.defer();
+            bwCreateLineItemCreativeDeferred = q.defer();
+            bwQueryCreativeDeferred     = q.defer();
             bwCreateCreativeDeferred    = [ q.defer(), q.defer() ];
             bwUploadAssetDeferred       = [ q.defer(), q.defer() ];
             getAdvertiserDeferred       = q.defer();
@@ -168,6 +210,14 @@ describe('BeeswaxMiddleware(config)', function() {
             spyOn(beeswax.campaigns,'create')
                 .and.returnValue(bwCreateCampaignDeferred.promise);
             
+            spyOn(beeswax.campaigns,'edit').and.callFake(function(){
+                return bwEditCampaignDeferred.promise;
+            });
+            
+            spyOn(beeswax.campaigns,'find').and.callFake(function(){
+                return bwFindCampaignDeferred.promise;
+            });
+            
             spyOn(beeswax,'uploadCreativeAsset').and.callFake(function(opts){
                 var def = bwUploadAssetDeferred[ ld.findIndex( placements,
                     function(v) { return v.thumbnail === opts.sourceUrl; }) ];
@@ -176,6 +226,30 @@ describe('BeeswaxMiddleware(config)', function() {
                     new Error('Unexpected creative url: ' + opts.sourceUrl));
             });
 
+            spyOn(beeswax.lineItems,'create').and.callFake(function(){
+                return bwCreateLineItemDeferred.promise;
+            });
+            
+            spyOn(beeswax.lineItems,'edit').and.callFake(function(){
+                return bwEditLineItemDeferred.promise;
+            });
+            
+            spyOn(beeswax.lineItems,'query').and.callFake(function(){
+                return bwQueryLineItemDeferred.promise;
+            });
+            
+            spyOn(beeswax.targetingTemplates,'create').and.callFake(function(){
+                return bwCreateTargetingTemplDeferred.promise;
+            });
+            
+            spyOn(beeswax.creativeLineItems,'create').and.callFake(function(){
+                return bwCreateLineItemCreativeDeferred.promise;
+            });
+            
+            spyOn(beeswax.creatives,'query').and.callFake(function(){
+                return bwQueryCreativeDeferred.promise;
+            });
+            
             spyOn(beeswax.creatives,'create').and.callFake(function(opts){
                 var def = bwCreateCreativeDeferred[ld.findIndex( placements,
                     function(v) { return v.id === opts.alternative_id; })];
@@ -227,6 +301,38 @@ describe('BeeswaxMiddleware(config)', function() {
                 'http://33.33.33.10/api/campaigns');
             expect(middleWare.placementsEndpoint).toEqual(
                 'http://33.33.33.10/api/placements');
+            expect(middleWare.defaultTargetingTempl).toEqual({
+                inventory: [ {
+                    include: {
+                        inventory_source: [ 3, 0 ], interstitial: [ true ], 
+                        environment_type: [ 1 ]
+                    }
+                } ],
+                geo: [ { include: { country: [ 'USA' ] } } ],
+                platform: [ { include: { os: [ 'iOS' ], device_model: [ 'iPhone' ] } } ],
+                segment: [ { include: { user_id: [ true ] } } ],
+                mobile_app: [ {
+                    exclude: { app_bundle_list: [ 1533, 1547, 1548, 2977 ] }
+                }]
+            });
+            expect(middleWare.defaultMultiplier).toEqual(2);
+
+            expect(middleWare.defaultBid).toEqual({
+                bidding_strategy : 'CPM_PACED',
+                values : { cpm_bid: 11 }
+            });
+        });
+
+        describe('method: toBeeswaxDate', function(){
+            it('converts date object',function(){
+                expect(middleWare.toBeeswaxDate(new Date('2016-02-26T23:59:59.999Z')))
+                    .toEqual('2016-02-26 18:59:59');
+            });
+
+            it('converts date string',function(){
+                expect(middleWare.toBeeswaxDate('2016-02-27T03:59:59.999Z'))
+                    .toEqual('2016-02-26 22:59:59');
+            });
         });
 
         describe('method: createAdvertiser',function(){
@@ -365,10 +471,10 @@ describe('BeeswaxMiddleware(config)', function() {
                         advertiser_id : 22,
                         alternative_id : 'c-1234567',
                         campaign_name : 'Revengus Extremis',
-                        start_date : '2016-01-27 00:00:00',
+                        start_date : '2016-01-26 19:00:00',
                         budget_type : 1,
                         campaign_budget : 1,
-                        active : false
+                        active : true
                     });
                     expect(request.put).toHaveBeenCalled();
                     expect(res.campaign.externalIds.beeswax).toEqual(11);
@@ -710,12 +816,344 @@ describe('BeeswaxMiddleware(config)', function() {
                     placements  : placements
                 })
                 .then(done.fail,function(e){ 
-                    expect(e.message).toEqual('Cannot initShowcaseAppsCampaign without beeswax placement.');
+                    expect(e.message).toEqual(
+                        'Cannot initShowcaseAppsCampaign without beeswax placement.'
+                    );
                     expect(middleWare.createAdvertiser).not.toHaveBeenCalled();
                     expect(middleWare.createCampaign).not.toHaveBeenCalled();
                     expect(middleWare.createCreatives).not.toHaveBeenCalled();
                 })
                 .then(done,done.fail);
+            });
+        });
+        
+        describe('method: adjustCampaignBudget', function(){
+            beforeEach(function(){
+                delete campaign.externalIds;
+                delete campaign.externalCampaigns;
+
+                bwFindCampaignDeferred = q.defer();
+                bwFindCampaignDeferred.fulfill({ 
+                    payload : {
+                        campaign_id : 11,
+                        campaign_budget : 1000
+                    }
+                });
+
+                bwEditCampaignDeferred = q.defer();
+            });
+
+            it('increases campaign budgets',function(done){
+                campaign.externalIds = { beeswax : 11 };
+                bwEditCampaignDeferred.fulfill({ payload : { 
+                    campaign_id: 11, campaign_budget: 1500 } });
+                middleWare.adjustCampaignBudget(campaign,500)
+                .then(function(){
+                    expect(beeswax.campaigns.find).toHaveBeenCalledWith(11);
+                    expect(beeswax.campaigns.edit).toHaveBeenCalledWith(11,
+                        { campaign_budget: 1500});
+                })
+                .then(done,done.fail);
+            });
+
+            it('decreases campaign budgets',function(done){
+                campaign.externalCampaigns = { beeswax : { externalId : 11 } };
+                bwEditCampaignDeferred.fulfill({ payload : { 
+                    campaign_id: 11, campaign_budget: 500 } });
+                middleWare.adjustCampaignBudget(campaign,-500)
+                .then(function(){
+                    expect(beeswax.campaigns.find).toHaveBeenCalledWith(11);
+                    expect(beeswax.campaigns.edit).toHaveBeenCalledWith(11,
+                        { campaign_budget: 500});
+                })
+                .then(done,done.fail);
+            });
+
+        });
+
+        describe('method: upsertCampaignActiveLineItems', function(){
+            var args;
+            beforeEach(function(){
+                campaign.externalIds = { beeswax : 11 };
+                args = {
+                    campaign : campaign,
+                    startDate : '2016-07-01T00:00:00.000Z',
+                    endDate : '2016-07-31T23:59:59.999Z'
+                };
+                bwFindCampaignDeferred.fulfill({ 
+                    payload : {
+                        campaign_id : 11,
+                        advertiser_id : 55,
+                        campaign_name : 'my campaign',
+                        campaign_budget : 1000,
+                        start_date : '2016-01-27 00:00:00',
+                        budget_type : 1
+                    }
+                });
+                bwQueryCreativeDeferred.fulfill({ 
+                    payload : [
+                        { creative_id : 1000, advertiser_id : 55 }
+                    ]
+                });
+                bwQueryLineItemDeferred.fulfill({
+                    payload : [
+                        { 
+                            line_item_id : 100,
+                            line_item_budget : 1000,
+                            budget_type : 1
+                        } 
+                    ]
+                });
+            });
+            it('complains if it does not receive campaign',function(done){
+                delete args.campaign;
+                middleWare.upsertCampaignActiveLineItems(args)
+                .then(done.fail,function(e){
+                    expect(e.message).toEqual(
+                        'Object containing a campaign, startDate, endDate, multiplier is required.'
+                    );
+                })
+                .then(done,done.fail);
+            });
+            it('complains if it does not receive startDate',function(done){
+                delete args.startDate;
+                middleWare.upsertCampaignActiveLineItems(args)
+                .then(done.fail,function(e){
+                    expect(e.message).toEqual(
+                        'Object containing a campaign, startDate, endDate, multiplier is required.'
+                    );
+                })
+                .then(done,done.fail);
+            });
+            it('complains if it does not receive endDate',function(done){
+                delete args.endDate;
+                middleWare.upsertCampaignActiveLineItems(args)
+                .then(done.fail,function(e){
+                    expect(e.message).toEqual(
+                        'Object containing a campaign, startDate, endDate, multiplier is required.'
+                    );
+                })
+                .then(done,done.fail);
+            });
+            it('complains if it does not receive multiplier',function(done){
+                delete middleWare.defaultMultiplier;
+                middleWare.upsertCampaignActiveLineItems(args)
+                .then(done.fail,function(e){
+                    expect(e.message).toEqual(
+                        'Object containing a campaign, startDate, endDate, multiplier is required.'
+                    );
+                })
+                .then(done,done.fail);
+            });
+            it('looks up the beeswax campaign',function(done){
+                middleWare.upsertCampaignActiveLineItems(args)
+                .then(function (){
+                    expect(beeswax.campaigns.find).toHaveBeenCalledWith(11);
+                })
+                .then(done,done.fail);
+            });
+            
+            it('lookups up the beeswax campaign line items',function(done){
+                middleWare.upsertCampaignActiveLineItems(args)
+                .then(function (){
+                    expect(beeswax.campaigns.find).toHaveBeenCalledWith(11);
+                    expect(beeswax.creatives.query).toHaveBeenCalledWith({
+                        advertiser_id : 55, active : true    
+                    });
+                    expect(beeswax.lineItems.query).toHaveBeenCalledWith({
+                        campaign_id : 11, active : true, start_date : '2016-06-30 20:00:00',
+                        end_date : '2016-07-31 19:59:59'
+                    });
+                })
+                .then(done,done.fail);
+            });
+
+            it('complains if it cannot find the beeswax campaign',function(done){
+                bwFindCampaignDeferred = q.defer();
+                bwFindCampaignDeferred.reject(new Error(
+                    'No campaign found with that criteria'
+                ));
+                middleWare.upsertCampaignActiveLineItems(args)
+                .then(done.fail,function (e){
+                    expect(e.message).toEqual('No campaign found with that criteria');
+                })
+                .then(done,done.fail);
+            });
+
+            it('lookups up the beeswax campaign advertiser creatives',function(done){
+                middleWare.upsertCampaignActiveLineItems(args)
+                .then(function (){
+                    expect(beeswax.campaigns.find).toHaveBeenCalledWith(11);
+                    expect(beeswax.creatives.query).toHaveBeenCalledWith({
+                        advertiser_id : 55, active : true    
+                    });
+                })
+                .then(done,done.fail);
+            });
+            
+            it('complains if it cannot find the beeswax creatives',function(done){
+                bwQueryCreativeDeferred = q.defer();
+                bwQueryCreativeDeferred.fulfill({ payload : [] });
+                middleWare.upsertCampaignActiveLineItems(args)
+                .then(done.fail,function (e){
+                    expect(e.message).toEqual('upsertCampaignActiveLineItems fails: No active creatives found for campaign');
+                })
+                .then(done,done.fail);
+            });
+
+            describe('inserting new lineItem',function(){
+                beforeEach(function(){
+                    // bw campaign has budget of 1000 impressions
+                    args.campaign.targetUsers = 500;
+                    bwQueryLineItemDeferred = q.defer();
+                    bwCreateLineItemDeferred = q.defer();
+                    bwEditLineItemDeferred = q.defer();
+                    bwQueryCreativeDeferred = q.defer();
+                    bwCreateTargetingTemplDeferred = q.defer();
+                    
+                    bwQueryLineItemDeferred.fulfill({ payload : [] });
+                    bwCreateTargetingTemplDeferred.fulfill({
+                        payload : { targeting_template_id : 999 }
+                    });
+                    bwCreateLineItemDeferred.fulfill({
+                        payload : { line_item_id : 111, active : false }
+                    });
+                    bwEditLineItemDeferred.fulfill({
+                        payload : { line_item_id : 111, active : true }
+                    });
+                    bwQueryCreativeDeferred.fulfill({ 
+                        payload : [
+                            { creative_id : 1000, advertiser_id : 55 },
+                            { creative_id : 1001, advertiser_id : 55 }
+                        ]
+                    });
+                    bwCreateLineItemCreativeDeferred = [q.defer(),q.defer()];
+                    bwCreateLineItemCreativeDeferred[0].fulfill({
+                        payload : { id : 1 }
+                    });
+                    bwCreateLineItemCreativeDeferred[1].fulfill({
+                        payload : { id : 2 }
+                    });
+
+                    beeswax.creativeLineItems.create =
+                        jasmine.createSpy().and.callFake(function(){
+                            return bwCreateLineItemCreativeDeferred.shift().promise;
+                        });
+
+                });
+
+                it ('creates line item if none exist',function(done){
+                    middleWare.upsertCampaignActiveLineItems(args)
+                    .then(function (res){
+                        expect(beeswax.campaigns.find).toHaveBeenCalledWith(11);
+                        expect(beeswax.creatives.query).toHaveBeenCalledWith({
+                            advertiser_id : 55, active : true    
+                        });
+                        expect(beeswax.lineItems.query).toHaveBeenCalledWith({
+                            campaign_id : 11,
+                            active : true, 
+                            start_date : '2016-06-30 20:00:00',
+                            end_date : '2016-07-31 19:59:59'
+                        });
+                        expect(beeswax.targetingTemplates.create).toHaveBeenCalledWith({
+                            template_name : 'Revengus Extremis 2016-01-27T21:22:47.464Z',
+                            targeting : {
+                                inventory: [ {
+                                    include: {
+                                        inventory_source: [ 3, 0 ], interstitial: [ true ], 
+                                        environment_type: [ 1 ]
+                                    }
+                                } ],
+                                geo: [ { include: { country: [ 'USA' ] } } ],
+                                platform: [ { include: { os: [ 'iOS' ],
+                                    device_model: [ 'iPhone' ] } } ],
+                                segment: [ { include: { user_id: [ true ] } } ],
+                                mobile_app: [ {
+                                    exclude: { app_bundle_list: [ 1533, 1547, 1548, 2977 ] }
+                                }]
+                            },
+                            strategy_id : 1,
+                            active : true
+                        });
+                        expect(beeswax.lineItems.create).toHaveBeenCalledWith({
+                            campaign_id : 11,
+                            advertiser_id : 55,
+                            line_item_type_id : 0,
+                            targeting_template_id : 999,
+                            line_item_name: 'my campaign 2016-06-30',
+                            line_item_budget: 1000,
+                            budget_type : 1,
+                            bidding : { 
+                                bidding_strategy: 'CPM_PACED', 
+                                values : { cpm_bid : 11 }
+                            },
+                            start_date: '2016-06-30 20:00:00',
+                            end_date : '2016-07-31 19:59:59',
+                            active : false
+                        });
+                        expect(beeswax.creativeLineItems.create.calls.count()).toEqual(2);
+                        expect(beeswax.creativeLineItems.create.calls.argsFor(0)).toEqual([{
+                            creative_id:    1000,
+                            line_item_id:   111,
+                            active:         true
+                        }]);
+                        expect(beeswax.creativeLineItems.create.calls.argsFor(1)).toEqual([{
+                            creative_id:    1001,
+                            line_item_id:   111,
+                            active:         true
+                        }]);
+                        expect(beeswax.lineItems.edit).toHaveBeenCalledWith(111,{
+                            active : true
+                        });
+                        expect(res.createdLineItems.length).toEqual(1);
+                        expect(res.updatedLineItems.length).toEqual(0);
+                    })
+                    .then(done,done.fail);
+                });
+            });
+
+            describe('updating existing LineItem',function(){
+                beforeEach(function(){
+                    // bw campaign has budget of 1000 impressions
+                    args.campaign.targetUsers = 2000;
+                    
+                    bwQueryLineItemDeferred = q.defer();
+                    bwQueryCreativeDeferred = q.defer();
+                    
+                    bwQueryLineItemDeferred.fulfill({
+                        payload : [
+                            { 
+                                line_item_id : 100,
+                                line_item_budget : 1000,
+                                budget_type : 1
+                            } 
+                        ]
+                    });
+
+                    bwQueryCreativeDeferred.fulfill({ 
+                        payload : [
+                            { creative_id : 1000, advertiser_id : 55 },
+                            { creative_id : 1001, advertiser_id : 55 }
+                        ]
+                    });
+                });
+                it('logs an error if an update is required.',function(done){
+                    middleWare.upsertCampaignActiveLineItems(args)
+                    .then(function (){
+                        expect(beeswax.campaigns.find).toHaveBeenCalledWith(11);
+                        expect(beeswax.creatives.query).toHaveBeenCalledWith({
+                            advertiser_id : 55, active : true    
+                        });
+                        expect(beeswax.lineItems.query).toHaveBeenCalledWith({
+                            campaign_id : 11,
+                            active : true, 
+                            start_date : '2016-06-30 20:00:00',
+                            end_date : '2016-07-31 19:59:59'
+                        });
+                        expect(log.error).toHaveBeenCalledWith('Manual Beeswax Update required for Campaign %1 (%2) line items. New impressions target is %3', 'c-1234567', 11, 4000);
+                    })
+                    .then(done,done.fail);
+                });
             });
         });
     });

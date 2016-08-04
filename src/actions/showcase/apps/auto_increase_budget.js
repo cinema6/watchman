@@ -7,21 +7,21 @@ const filter = ld.filter;
 const assign = ld.assign;
 const get = ld.get;
 const round = ld.round;
-const identity = ld.identity;
-const spread = ld.spread;
 const q = require('q');
 const Status = require('cwrx/lib/enums').Status;
 const logger = require('cwrx/lib/logger');
 const inspect = require('util').inspect;
-const BeeswaxClient = require('beeswax-client');
+const BeeswaxMiddleware = require('../../../../lib/BeeswaxMiddleware');
 
 module.exports = function factory(config) {
     const log = logger.getLog();
     const request = new CwrxRequest(config.appCreds);
-    const beeswax = new BeeswaxClient({
-        apiRoot: config.beeswax.apiRoot,
-        creds: config.state.secrets.beeswax
-    });
+    const beeswax = new BeeswaxMiddleware(
+        { apiRoot: config.beeswax.apiRoot, creds: config.state.secrets.beeswax,
+            bid : config.beeswax.bid },
+        { creds: config.appCreds, api: config.cwrx.api },
+        { conversionMultipliers : get(config,'campaign.conversionMultipliers')  }
+    );
 
     const campaignsEndpoint = resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint);
 
@@ -68,40 +68,56 @@ module.exports = function factory(config) {
                 const externalImpressions = targetUsers * externalMultiplier;
                 const cost = round(budget / (targetUsers * internalMultiplier), 3);
 
-                return Promise.all([
-                    request.put({
-                        url: campaignsEndpoint + '/' + campaign.id,
-                        json: assign({}, campaign, {
-                            status: Status.Active,
-                            pricing: assign({}, campaign.pricing, {
-                                cost,
-                                model: 'cpv',
-                                budget: get(campaign, 'pricing.budget', 0) + budget,
-                                dailyLimit: dailyLimit
-                            })
-                        })
-                    }).then(spread(identity)),
-                    beeswax.campaigns.find(
-                        get(campaign, 'externalIds.beeswax') ||
-                        get(campaign, 'externalCampaigns.beeswax.externalId')
-                    ).then(response => response.payload)
-                ]).then(spread((newCampaign, beeswaxCampaign) => (
-                    beeswax.campaigns.edit(beeswaxCampaign.campaign_id, {
-                        campaign_budget: beeswaxCampaign.campaign_budget + externalImpressions
-                    }).then(response => response.payload).then(updatedBeeswaxCampaign => {
-                        log.info(
-                            'Increased budget of campaign(%1): %2 => %3.',
-                            campaign.id, get(campaign, 'pricing.budget', 0),
-                            get(newCampaign, 'pricing.budget', 0)
-                        );
-                        log.info(
-                            'Increased budget of beeswaxCampaign(%1): %2 => %3.',
-                            beeswaxCampaign.campaign_id,
-                            beeswaxCampaign.campaign_budget,
-                            updatedBeeswaxCampaign.campaign_budget
-                        );
+                return request.put({
+                    url: campaignsEndpoint + '/' + campaign.id,
+                    json: assign({}, campaign, {
+                        status: Status.Active,
+                        pricing: assign({}, campaign.pricing, {
+                            cost,
+                            model: 'cpv',
+                            budget: get(campaign, 'pricing.budget', 0) + budget,
+                            dailyLimit: dailyLimit
+                        }),
+                        targetUsers : targetUsers
                     })
-                )));
+                })
+                .spread(newCampaign => {
+                    return beeswax.adjustCampaignBudget(newCampaign,externalImpressions)
+                        .spread((beeswaxCampaign, updatedBeeswaxCampaign) => {
+                            log.info(
+                                'Increased budget of campaign(%1): %2 => %3.',
+                                campaign.id, get(campaign, 'pricing.budget', 0),
+                                get(newCampaign, 'pricing.budget', 0)
+                            );
+                            log.info(
+                                'Increased budget of beeswaxCampaign(%1): %2 => %3.',
+                                beeswaxCampaign.campaign_id,
+                                beeswaxCampaign.campaign_budget,
+                                updatedBeeswaxCampaign.campaign_budget
+                            );
+                            return beeswax.upsertCampaignActiveLineItems({
+                                campaign  : newCampaign,
+                                startDate : transaction.cycleStart,
+                                endDate   : transaction.cycleEnd
+                            });
+                        })
+                        .then(function(result){
+                            result.createdLineItems.forEach(function(item){
+                                log.info(
+                                    'Created lineItem (%1) for campaign %2 (%3)',
+                                        item.line_item_id, item.campaign_id,
+                                        newCampaign.id
+                                        );
+                            });
+                            result.updatedLineItems.forEach(function(item){
+                                log.info(
+                                    'Updated lineItem (%1) for campaign %2 (%3)',
+                                        item.line_item_id, item.campaign_id,
+                                        newCampaign.id
+                                        );
+                            });
+                        });
+                });
             }));
         });
     }).catch(reason => (

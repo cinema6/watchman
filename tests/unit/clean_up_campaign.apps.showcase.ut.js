@@ -105,6 +105,12 @@ describe('cleanUpCampaignFactory', function() {
                         },
                         analytics: {
                             endpoint: '/api/analytics'
+                        },
+                        placements: {
+                            endpoint: '/api/placements'
+                        },
+                        advertisers: {
+                            endpoint: '/api/account/advertisers'
                         }
                     }
                 }

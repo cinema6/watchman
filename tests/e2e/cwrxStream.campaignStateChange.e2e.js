@@ -5,8 +5,8 @@ const JsonProducer = require('rc-kinesis').JsonProducer;
 const q = require('q');
 const ld = require('lodash');
 const uuid = require('rc-uuid');
-const moment = require('moment');
-const BeeswaxClient = require('beeswax-client');
+const moment = require('moment-timezone');
+const BeeswaxHelper = require('../helpers/BeeswaxHelper');
 const testUtils = require('cwrx/test/e2e/testUtils');
 const resolveURL = require('url').resolve;
 const CwrxRequest = require('../../lib/CwrxRequest');
@@ -16,7 +16,6 @@ const APP_CREDS = JSON.parse(process.env.appCreds);
 const AWS_CREDS = JSON.parse(process.env.awsCreds);
 const CWRX_STREAM = process.env.cwrxStream;
 const PREFIX = process.env.appPrefix;
-const targeting = require('../helpers/targeting.json');
 
 function createId(prefix) {
     return `${prefix}-${uuid.createUuid()}`;
@@ -45,140 +44,18 @@ function api(endpoint) {
 }*/
 
 describe('cwrxStream campaignStateChange', function() {
-    let producer, beeswax, request;
-
-    function createBeeswaxEntities() {
-        return beeswax.advertisers.create({
-            advertiser_name: `E2E Test Advertiser (${uuid.createUuid()})`,
-            active: true
-        }).then(response => {
-            const advertiser = response.payload;
-
-            return beeswax.uploadCreativeAsset({
-                sourceUrl: 'https://reelcontent.com/images/logo-nav.png',
-                advertiser_id: advertiser.advertiser_id
-            }).then(asset => (
-                beeswax.creatives.create({
-                    advertiser_id: advertiser.advertiser_id,
-                    creative_type: 0,
-                    creative_template_id: 13,
-                    width: 300,
-                    height: 250,
-                    sizeless: true,
-                    secure: true,
-                    creative_name: `E2E Test Creative (${uuid.createUuid()})`,
-                    creative_attributes: {
-                        mobile: { mraid_playable: [true] },
-                        technical: {
-                            banner_mime: ['text/javascript', 'application/javascript'],
-                            tag_type: [3]
-                        },
-                        advertiser: {
-                            advertiser_app_bundle: ['com.rc.test-app'],
-                            advertiser_domain: ['https://apps.reelcontent.com'],
-                            landing_page_url: ['https://apps.reelcontent.com/site/'],
-                            advertiser_category: ['IAB24']
-                        },
-                        video: { video_api: [3] }
-                    },
-                    creative_content: {
-                        TAG: `
-                            <script>
-                                document.write([
-                                    '<a href="{{CLICK_URL}}" target="_blank">',
-                                    '    <img src="https://reelcontent.com/images/logo-nav.png" width="300" height="250" />,
-                                    '</a>'
-                                ].join('\\n');
-                            </script>
-                        `
-                    },
-                    creative_thumbnail_url: asset.path_to_asset,
-                    active: true
-                }).then(response => {
-                    const creative = response.payload;
-
-                    return beeswax.campaigns.create({
-                        advertiser_id: advertiser.advertiser_id,
-                        campaign_name: `E2E Test Campaign (${uuid.createUuid()})`,
-                        campaign_budget: 1000,
-                        budget_type: 1,
-                        start_date: moment().format('YYYY-MM-DD'),
-                        pacing: 0,
-                        active: true
-                    }).then(response => {
-                        const campaign = response.payload;
-
-                        return beeswax.targetingTemplates.create(ld.assign({}, targeting, {
-                            template_name: `E2E Test Template (${uuid.createUuid()})`,
-                            strategy_id: 1,
-                            active: true
-                        })).then(response => {
-                            const targetingTemplate = response.payload;
-
-                            return beeswax.lineItems.create({
-                                campaign_id: campaign.campaign_id,
-                                advertiser_id: advertiser.advertiser_id,
-                                line_item_type_id: 0,
-                                targeting_template_id: targetingTemplate.targeting_template_id,
-                                line_item_name: `E2E Test Line Item (${uuid.createUuid()})`,
-                                line_item_budget: 1000,
-                                budget_type: 1,
-                                bidding: {
-                                    bidding_strategy: 'cpm',
-                                    values: {
-                                        cpm_bid: 1
-                                    }
-                                },
-                                start_date: moment().format('YYYY-MM-DD'),
-                                end_date: moment().add(1, 'week').format('YYYY-MM-DD'),
-                                active: false
-                            }).then(response => {
-                                const lineItem = response.payload;
-
-                                return beeswax.creativeLineItems.create({
-                                    creative_id: creative.creative_id,
-                                    line_item_id: lineItem.line_item_id,
-                                    active: true
-                                }).then(response => {
-                                    const creativeLineItem = response.payload;
-
-                                    return beeswax.lineItems.edit(lineItem.line_item_id, { active: true }).then(response => {
-                                        const lineItem = response.payload;
-
-                                        return {
-                                            advertiser,
-                                            creative,
-                                            campaign,
-                                            targetingTemplate,
-                                            lineItem,
-                                            creativeLineItem
-                                        };
-                                    });
-                                });
-                            });
-                        });
-                    });
-                })
-            ));
+    let producer, beeswax, request, user, org, advertiser, cycleStart, cycleEnd ;
+    
+    function produce(campaign) {
+        return producer.produce({
+            type: 'campaignStateChange',
+            data: {
+                campaign,
+                date: moment().format(),
+                previousState: 'active',
+                currentState: campaign.status
+            }
         });
-    }
-
-    function deleteBeeswaxEntities(entities) {
-        const creativeLineItem = entities.creativeLineItem;
-        const lineItem = entities.lineItem;
-        const targetingTemplate = entities.targetingTemplate;
-        const campaign = entities.campaign;
-        const creative = entities.creative;
-        const advertiser = entities.advertiser;
-
-        return beeswax.lineItems.edit(lineItem.line_item_id, { active: false })
-            .then(() => beeswax.creativeLineItems.delete(creativeLineItem.cli_id))
-            .then(() => beeswax.lineItems.delete(lineItem.line_item_id))
-            .then(() => beeswax.targetingTemplates.delete(targetingTemplate.targeting_template_id))
-            .then(() => beeswax.campaigns.delete(campaign.campaign_id))
-            .then(() => beeswax.creatives.edit(creative.creative_id, { active: false }))
-            .then(() => beeswax.creatives.delete(creative.creative_id))
-            .then(() => beeswax.advertisers.delete(advertiser.advertiser_id));
     }
 
     function createUser() {
@@ -256,56 +133,6 @@ describe('cwrxStream campaignStateChange', function() {
         });
     }
 
-    function deleteUser(user) {
-        return request.get({
-            url: api('/api/account/advertisers?org=' + user.org),
-            jar: true
-        }).spread(function(advertisers) {
-            return q.all(advertisers.map(function(advertiser) {
-                return beeswax.advertisers.delete(advertiser.beeswaxIds.advertiser);
-            }));
-        }).then(function() {
-            return request.delete({
-                url: api('/api/account/users/' + user.id)
-            });
-        }).then(function deleteOrg() {
-            return request.delete({
-                url: api('/api/account/orgs/' + user.org)
-            });
-        }).thenResolve(null);
-    }
-
-    function deleteCampaign(campaign) {
-        return q().then(function() {
-            return request.get({
-                url: api('/api/campaigns/' + campaign.id),
-                json: true
-            });
-        }).spread(function(campaign) {
-            if (!ld.get(campaign, 'externalIds.beeswax')) { return; }
-
-            return beeswax.campaigns.delete(campaign.externalIds.beeswax);
-        }).then(function() {
-            return request.get({
-                url: api('/api/placements?tagParams.campaign=' + campaign.id),
-                json: true
-            });
-        }).spread(function(placements) {
-            return q.all(placements.map(function(placement) {
-                var beeswaxId = placement.beeswaxIds && placement.beeswaxIds.creative;
-
-                if (!beeswaxId) { return; }
-
-                return beeswax.creatives.edit(beeswaxId, { active: false })
-                    .then(function() {
-                        return beeswax.creatives.delete(beeswaxId);
-                    });
-            }));
-        }).then(() => request.delete({
-            url: api(`/api/campaigns/${campaign.id}`)
-        }));
-    }
-
     // This beforeAll is dedicated to setting application config
     beforeAll(function(done) {
         const configurator = new Configurator();
@@ -317,6 +144,12 @@ describe('cwrxStream campaignStateChange', function() {
                     root: API_ROOT,
                     campaigns: {
                         endpoint: '/api/campaigns'
+                    },
+                    placements: {
+                        endpoint: '/api/placements'
+                    },
+                    advertisers: {
+                        endpoint: '/api/account/advertisers'
                     },
                     orgs: {
                         endpoint: '/api/account/orgs'
@@ -382,16 +215,18 @@ describe('cwrxStream campaignStateChange', function() {
         jasmine.DEFAULT_TIMEOUT_INTERVAL = 60000;
 
         producer = new JsonProducer(CWRX_STREAM, awsConfig);
-        beeswax = new BeeswaxClient({
-            creds: {
-                email: 'ops@cinema6.com',
-                password: '07743763902206f2b511bead2d2bf12292e2af82'
-            }
-        });
+        beeswax = new BeeswaxHelper();
         request = new CwrxRequest(APP_CREDS);
     });
+    
+    beforeAll(function(done) {
+        Promise.all([
+            testUtils.pgQuery('DELETE FROM fct.billing_transactions'),
+            testUtils.pgQuery('DELETE FROM fct.showcase_user_views_daily')
+        ]).then(done, done.fail);
+    });
 
-    beforeEach(function(done) {
+    beforeAll(function(done) {
         const cwrxApp = {
             id: 'app-cwrx',
             created: new Date(),
@@ -467,64 +302,123 @@ describe('cwrxStream campaignStateChange', function() {
             }
         };
 
-        Promise.all([
-            testUtils.resetCollection('applications', [watchmanApp, cwrxApp]),
-            testUtils.resetPGTable('fct.billing_transactions')
-        ]).then(done, done.fail);
+        testUtils.resetCollection('applications', [watchmanApp, cwrxApp])
+        .then(done, done.fail);
+    });
+
+    beforeAll(function(done){
+        createUser()
+        .then(ld.spread(function(){
+            user        = arguments[0];
+            org         = arguments[1];
+            advertiser  = arguments[2];
+        }))
+        .then(done, done.fail);
+    });
+    
+    beforeAll(function(done){
+        cycleStart = moment().format('YYYY-MM-DDT00:00:00') + 'Z';
+        cycleEnd = moment().add(1,'month').subtract(1,'day')
+            .format('YYYY-MM-DDT23:59:59') + 'Z';
+
+        testUtils.resetPGTable('fct.billing_transactions',[
+            `(
+                1,
+                current_timestamp,
+                't-1',
+                current_timestamp,
+                '${org.id}',
+                50,
+                1,
+                1,
+                null,
+                'braintree1',
+                null,
+                'description',
+                2000,
+                '${cycleEnd}',
+                '${cycleStart}',
+                'pp-${uuid.createUuid()}',
+                'showcase'
+            )`
+        ])
+        .then(done,done.fail);
+    });
+
+    afterAll(function(done){
+        beeswax.cleanupAdvertiser(advertiser.beeswaxIds.advertiser).then(done,done.fail);
     });
 
     describe('for a showcase (apps) campaign', function() {
-        let campaign, beeswaxEntities, user, org, advertiser;
+        let beeswaxEntities;
 
-        function produce() {
-            return producer.produce({
-                type: 'campaignStateChange',
-                data: {
-                    campaign,
-                    date: moment().format(),
-                    previousState: 'active',
-                    currentState: campaign.status
-                }
-            });
-        }
-
-        beforeEach(function(done) {
-            createBeeswaxEntities().then(entities => {
-                beeswaxEntities = entities;
-            }).then(() => createUser()).then(ld.spread(function(/*user, org, advertiser*/) {
-                user = arguments[0];
-                org = arguments[1];
-                advertiser = arguments[2];
-
-                campaign = {
-                    id: createId('cam'),
-                    status: 'canceled',
-                    application: 'showcase',
-                    org: org.id,
-                    product: {
-                        type: 'app'
-                    },
-                    targetUsers: 667,
-                    externalIds: {
-                        beeswax: beeswaxEntities.campaign.campaign_id
-                    }
-                };
-            })).then(() => (
-                produce()
-            )).then(() => waitUntil(() => Promise.all([
-                beeswax.lineItems.find(beeswaxEntities.lineItem.line_item_id).then(response => response.payload && !response.payload.active && response.payload),
-                beeswax.campaigns.find(beeswaxEntities.campaign.campaign_id).then(response => response.payload && !response.payload.active && response.payload)
-            ]).then(items => items.every(item => !!item) && items)).then(items => {
-                beeswaxEntities.lineItem = items[0];
-                beeswaxEntities.campaign = items[1];
-            })).then(done, done.fail);
+        beforeAll(function(done){
+            beeswaxEntities = {};
+            return beeswax.createAdvertiser()
+            .then(advertiser => { 
+                beeswaxEntities.advertiser = advertiser;
+                return beeswax.createMRAIDCreative(advertiser);
+            })
+            .then(creative => {
+                beeswaxEntities.creative = creative;
+                return beeswax.createCampaign({ 
+                    advertiser_id : beeswaxEntities.advertiser.advertiser_id,
+                    campaign_budget : 1000
+                });
+            })
+            .then(campaign => {
+                beeswaxEntities.campaign = campaign;
+                return beeswax.createLineItem({
+                    campaign_id      : beeswaxEntities.campaign.campaign_id,
+                    advertiser_id    : beeswaxEntities.advertiser.advertiser_id,
+                    line_item_budget : 1000
+                });
+            })
+            .then(lineItem => {
+                beeswaxEntities.lineItem = lineItem;
+                return beeswaxEntities;
+            })
+            .then(done,done.fail);
         });
 
-        afterEach(function(done) {
-            Promise.all([
-                deleteBeeswaxEntities(beeswaxEntities).then(done, done.fail),
-                deleteUser(user)
-            ]).then(done, done.fail);
+        beforeAll(function(done) {
+            produce({
+                id: createId('cam'),
+                status: 'canceled',
+                application: 'showcase',
+                org: org.id,
+                product: {
+                    type: 'app'
+                },
+                targetUsers: 667,
+                externalIds: {
+                    beeswax: beeswaxEntities.campaign.campaign_id
+                }
+            })
+            .then(() => 
+                waitUntil(() =>
+                    Promise.all([
+                        beeswax.api.lineItems.find(beeswaxEntities.lineItem.line_item_id)
+                        .then(response =>
+                            response.payload && !response.payload.active && response.payload
+                        ),
+                        beeswax.api.campaigns.find(beeswaxEntities.campaign.campaign_id)
+                        .then(response =>
+                            response.payload && !response.payload.active && response.payload
+                        )
+                    ]).then(items => items.every(item => !!item) && items)
+                )
+                .then(items => {
+                    beeswaxEntities.lineItem = items[0];
+                    beeswaxEntities.campaign = items[1];
+                })
+            )
+            .then(done, done.fail);
+        });
+        
+        afterAll(function (done) {
+            beeswax.cleanupAdvertiser(beeswaxEntities.advertiser.advertiser_id)
+            .then(done,done.fail);
         });
 
         it('should deactivate the line items', function() {
@@ -534,165 +428,183 @@ describe('cwrxStream campaignStateChange', function() {
         it('should deactivate the campaign', function() {
             expect(beeswaxEntities.campaign.active).toBe(false);
         });
+    });
 
-        describe('if the org has other campaigns', function() {
-            let today;
-            let campaigns, beeswaxCampaigns;
+    describe('if the org has other campaigns', function(){
+        let beeswaxEntities, campaigns;
 
-            function createCampaigns() {
-                const ids = [createId('cam'), createId('cam')];
-
-                return Promise.resolve().then(() => {
-                    return Promise.all([
-                        beeswax.campaigns.create({
-                            advertiser_id: advertiser.beeswaxIds.advertiser,
-                            campaign_name: `E2E Test Campaign (${uuid.createUuid()})`,
-                            campaign_budget: 4500,
-                            budget_type: 1,
-                            start_date: moment().format('YYYY-MM-DD'),
-                            pacing: 0,
-                            active: true
-                        }),
-                        beeswax.campaigns.create({
-                            advertiser_id: advertiser.beeswaxIds.advertiser,
-                            campaign_name: `E2E Test Campaign (${uuid.createUuid()})`,
-                            campaign_budget: 2500,
-                            budget_type: 1,
-                            start_date: moment().format('YYYY-MM-DD'),
-                            pacing: 0,
-                            active: true
-                        })
-                    ]);
-                }).then(responses => {
-                    const beeswaxCampaigns = responses.map(response => response.payload);
-
-                    return testUtils.resetCollection('campaigns', [
-                        {
-                            id: ids[0],
-                            status: 'active',
-                            targetUsers: 667,
-                            application: 'showcase',
-                            product: {
-                                type: 'app'
-                            },
-                            conversionMultipliers: {
-                                internal: 1.25,
-                                external: 1.5
-                            },
-                            org: org.id,
-                            user: user.id,
-                            advertiserId: advertiser.id,
-                            externalIds: {
-                                beeswax: beeswaxCampaigns[0].campaign_id
-                            },
-                            pricing: {
-                                model: 'cpv',
-                                cost: 0.02,
-                                budget: 75
-                            }
-                        },
-                        {
-                            id: ids[1],
-                            status: 'active',
-                            targetUsers: 667,
-                            application: 'showcase',
-                            product: {
-                                type: 'app'
-                            },
-                            org: org.id,
-                            user: user.id,
-                            advertiserId: advertiser.id,
-                            externalIds: {
-                                beeswax: beeswaxCampaigns[1].campaign_id
-                            },
-                            pricing: {
-                                model: 'cpv',
-                                cost: 0.011,
-                                budget: 50
-                            }
-                        },
-                        campaign
-                    ]).then(() => request.get({
-                        url: api('/api/campaigns'),
-                        qs: { ids: ids.join(',') }
-                    })).spread(campaigns => [campaigns, beeswaxCampaigns]);
-                });
-            }
-
-            function createTransactions() {
-                const ids = [createId('t')];
-
-                return testUtils.resetPGTable('fct.billing_transactions', [
-                    `(
-                        1,
-                        current_timestamp,
-                        '${ids[0]}',
-                        '${today.format()}',
-                        '${org.id}',
-                        50,
-                        1,
-                        1,
-                        null,
-                        null,
-                        null,
-                        '${JSON.stringify({
-                            source: 'braintree',
-                            target: 'showcase'
-                        })}',
-                        2000,
-                        '${moment(today).add(1, 'month').subtract(1, 'day').format()}',
-                        '${today.format()}',
-                        'pp-${uuid.createUuid()}',
-                        'showcase'
-                    )`
-                ]).then(() => (
-                    request.get({
-                        url: api('/api/transactions'),
-                        qs: { org: org.id }
-                    })).spread(transactions => (
-                        transactions.filter(transaction => ids.indexOf(transaction.id) > -1)
-                    ))
-                );
-            }
-
-            function createAnalytics(campaign, days) {
-                const dailyUserViewsTable = days.map((views, index) => `(
-                    '${moment(today).add(index, 'days').format()}',
-                    '${campaign.id}',
-                    ${views}
-                )`);
-                const showcaseUserViewsTable = ld(days).map((views, index) => Array.apply([], new Array(views)).map(() => `(
-                    '${moment(today).add(index, 'days').format()}',
+        function createAnalytics(campaign, days) {
+            const showcaseUserViewsTable = ld(days).map(
+                (views, index) => Array.apply([], new Array(views)).map( () => `(
+                    '${moment().add(index, 'days').format('YYYY-MM-DDT12:00:00') + 'Z'}',
                     '${campaign.id}',
                     '${campaign.org}',
                     '${uuid.createUuid()}'
-                )`)).flatten().value();
+                )`)
+            ).flatten().value();
 
-                return Promise.all([
-                    testUtils.pgQuery(`INSERT INTO rpt.unique_user_views_daily VALUES${dailyUserViewsTable.join(',\n')};`),
-                    testUtils.pgQuery(`INSERT INTO fct.showcase_user_views_daily VALUES${showcaseUserViewsTable.join(',\n')};`)
-                ]);
-            }
+            return Promise.all([
+                testUtils.pgQuery(
+                    'INSERT INTO fct.showcase_user_views_daily ' +
+                    `VALUES${showcaseUserViewsTable.join(',\n')};`
+                )
+            ]);
+        }
 
-            beforeEach(function(done) {
-                today = moment().utcOffset(0).startOf('day');
 
-                createTransactions().then(function(/*transactions*/) {
+        beforeAll(function(done){
+            beeswaxEntities = { };
+            let endDate   =  moment(cycleEnd).tz('America/New_York')
+                .format('YYYY-MM-DD HH:mm:ss');
+            let startDate =  moment(cycleStart).tz('America/New_York')
+                .format('YYYY-MM-DD HH:mm:ss');
 
-                }).then(() => createCampaigns()).spread(function(/*campaigns, beeswaxCampaigns*/) {
-                    campaigns = arguments[0];
-                    beeswaxCampaigns = arguments[1];
-                }).then(() => Promise.all([
-                    createAnalytics(campaigns[0], [100, 100, 100, 200]),
-                    createAnalytics(campaigns[1], [200, 200, 50, 50]),
-                    createAnalytics(campaign, [200, 50, 50, 200])
-                ])).then(() => (
-                    produce()
-                )).then(() => waitUntil(() => Promise.all([
-                    Promise.all(campaigns.map((campaign, index) => (
+            beeswax.createMRAIDCreative({ advertiser_id : advertiser.beeswaxIds.advertiser })
+            .then(() => 
+                Promise.all([
+                    beeswax.createCampaign({ 
+                        advertiser_id : advertiser.beeswaxIds.advertiser,
+                        campaign_budget: 4500,
+                        start_date : startDate
+                    })
+                    .then(campaign => 
+                        beeswax.createLineItem({
+                            campaign_id : campaign.campaign_id,
+                            advertiser_id : campaign.advertiser_id,
+                            line_item_budget: 4500,
+                            start_date : startDate,
+                            end_date : endDate
+                        })
+                        .then(lineItem => [ campaign, lineItem ])
+                    ),
+                    beeswax.createCampaign({ 
+                        advertiser_id : advertiser.beeswaxIds.advertiser,
+                        campaign_budget: 2500,
+                        start_date : startDate
+                    })
+                    .then(campaign => 
+                        beeswax.createLineItem({
+                            campaign_id : campaign.campaign_id,
+                            advertiser_id : campaign.advertiser_id,
+                            line_item_budget: 2500,
+                            start_date : startDate,
+                            end_date : endDate
+                        })
+                        .then(lineItem => [ campaign, lineItem ])
+                    ),
+                    beeswax.createCampaign({ 
+                        advertiser_id : advertiser.beeswaxIds.advertiser,
+                        campaign_budget: 1000,
+                        start_date : startDate
+                    })
+                    .then(campaign => 
+                        beeswax.createLineItem({
+                            campaign_id : campaign.campaign_id,
+                            advertiser_id : campaign.advertiser_id,
+                            line_item_budget: 1000,
+                            start_date : startDate,
+                            end_date : endDate
+                        })
+                        .then(lineItem => [ campaign, lineItem ])
+                    )
+                ])
+            )
+            .then(ld.unzip)
+            .then(ld.spread( (campaigns, lineItems) => {
+                beeswaxEntities.campaigns = campaigns;
+                beeswaxEntities.lineItems = lineItems;
+            }))
+            .then(() => {
+                const ids = [createId('cam'), createId('cam'), createId('cam')];
+                
+                return testUtils.resetCollection('campaigns', [
+                    {
+                        id: ids[0],
+                        status: 'active',
+                        targetUsers: 667,
+                        application: 'showcase',
+                        product: {
+                            type: 'app'
+                        },
+                        conversionMultipliers: {
+                            internal: 1.25,
+                            external: 1.5
+                        },
+                        org: org.id,
+                        user: user.id,
+                        advertiserId: advertiser.id,
+                        externalIds: {
+                            beeswax: beeswaxEntities.campaigns[0].campaign_id
+                        },
+                        pricing: {
+                            model: 'cpv',
+                            cost: 0.02,
+                            budget: 75
+                        }
+                    },
+                    {
+                        id: ids[1],
+                        status: 'active',
+                        targetUsers: 667,
+                        application: 'showcase',
+                        product: {
+                            type: 'app'
+                        },
+                        org: org.id,
+                        user: user.id,
+                        advertiserId: advertiser.id,
+                        externalIds: {
+                            beeswax: beeswaxEntities.campaigns[1].campaign_id
+                        },
+                        pricing: {
+                            model: 'cpv',
+                            cost: 0.011,
+                            budget: 50
+                        }
+                    },
+                    {
+                        id: ids[2],
+                        status: 'canceled',
+                        application: 'showcase',
+                        org: org.id,
+                        product: {
+                            type: 'app'
+                        },
+                        targetUsers: 667,
+                        externalIds: {
+                            beeswax: beeswaxEntities.campaigns[2].campaign_id
+                        }
+                    }
+                ])
+                .then(() => request.get({
+                    url: api('/api/campaigns'),
+                    qs: { ids: ids.join(',') }
+                }))
+                .spread(result => {
+                    campaigns = result;
+                    
+                    return Promise.all([
+                        createAnalytics(campaigns[0], [100, 100, 100, 200]),
+                        createAnalytics(campaigns[1], [200, 200, 50, 50]),
+                        createAnalytics(campaigns[2], [200, 50, 50, 200])
+                    ]);
+                });
+            })
+            .then(done,done.fail);
+        });
+
+        beforeAll(function(done){
+            produce(campaigns[2])
+            .then(() => waitUntil(() => Promise.all([
+                Promise.all(campaigns.map((campaign, index) => (
                         request.get({
                             url: api(`/api/campaigns/${campaign.id}`)
-                        }).then(ld.spread(campaign => {
+                        })
+                        .then(ld.spread(campaign => {
+                            if (index == 2) {
+                                return campaign.status === 'canceled' && campaign;
+                            }
+                            
                             const oldCampaign = campaigns[index];
 
                             return (
@@ -700,50 +612,63 @@ describe('cwrxStream campaignStateChange', function() {
                                 campaign.pricing.budget > oldCampaign.pricing.budget
                             ) && campaign;
                         }))
-                    ))).then(campaigns => campaigns.every(campaign => !!campaign) && campaigns),
-                    Promise.all(beeswaxCampaigns.map((beeswaxCampaign, index) => (
-                        beeswax.campaigns.find(beeswaxCampaign.campaign_id).then(response => {
-                            const oldBeeswaxCampaign = beeswaxCampaigns[index];
-                            const beeswaxCampaign = response.payload;
+                )))
+                .then(campaigns => campaigns.every(campaign => !!campaign) && campaigns),
 
-                            return beeswaxCampaign.campaign_budget > oldBeeswaxCampaign.campaign_budget && beeswaxCampaign;
-                        })
-                    ))).then(beeswaxCampaigns => beeswaxCampaigns.every(beeswaxCampaign => !!beeswaxCampaign) && beeswaxCampaigns),
-                    Promise.all([
-                        beeswax.lineItems.find(beeswaxEntities.lineItem.line_item_id).then(response => response.payload && !response.payload.active && response.payload),
-                        beeswax.campaigns.find(beeswaxEntities.campaign.campaign_id).then(response => response.payload && !response.payload.active && response.payload)
-                    ]).then(items => items.every(item => !!item) && items)
-                ]).then(items => (
-                    items.every(item => !!item) && items
-                )))).then(ld.spread(function(/*campaigns, beeswaxCampaigns*/) {
-                    campaigns = arguments[0];
-                    beeswaxCampaigns = arguments[1];
-                })).then(done, done.fail);
-            });
+                Promise.all(beeswaxEntities.campaigns.map((beeswaxCampaign, index) => (
+                    beeswax.api.campaigns.find(beeswaxCampaign.campaign_id)
+                    .then(response => {
+                        const old = beeswaxEntities.campaigns[index];
+                        const updated = response.payload;
+                        if (index == 2) {
+                            return updated.active === false && updated;
+                        }
+                        
+                        return updated.campaign_budget > old.campaign_budget && updated;
+                    })
+                )))
+                .then(beeswaxCampaigns => beeswaxCampaigns.every(
+                    beeswaxCampaign => !!beeswaxCampaign) && beeswaxCampaigns
+                ),
+                
+                Promise.all(beeswaxEntities.lineItems.map((beeswaxlineItem, index) => (
+                    beeswax.api.lineItems.find(beeswaxlineItem.line_item_id)
+                    .then(response => {
+                        //const old = beeswaxEntities.lineItems[index];
+                        const updated = response.payload;
+                        if (index == 2) {
+                            return updated.active === false && updated;
+                        }
+                        return updated; 
+                        //return updated.line_item_budget > old.line_item_budget && updated;
+                    })
+                )))
+                .then(beeswaxLineItems => beeswaxLineItems.every(
+                    beeswaxLineItem => !!beeswaxLineItem) && beeswaxLineItems
+                )
+            ]).then(items => ( items.every(item => !!item) && items))
+            ))
+            .then(ld.spread(function(/*campaigns, beeswaxCampaigns, beeswaxLineItems*/) {
+                campaigns = arguments[0];
+                beeswaxEntities.campaigns = arguments[1];
+                beeswaxEntities.lineItems = arguments[2];
+            }))
+            .then(done, done.fail);
+        });
 
-            afterEach(function(done) {
-                Promise.all([
-                    Promise.all(campaigns.map(campaign => deleteCampaign(campaign))),
-                    testUtils.pgQuery('DELETE FROM fct.billing_transactions'),
-                    testUtils.pgQuery('DELETE FROM rpt.unique_user_views_daily'),
-                    testUtils.pgQuery('DELETE FROM fct.showcase_user_views_daily')
-                ]).then(done, done.fail);
-            });
+        it('should increase the targetUsers of the remaining campaigns', function() {
+            expect(campaigns[0].targetUsers).toBe(750);
+            expect(campaigns[1].targetUsers).toBe(750);
+        });
 
-            it('should increase the targetUsers of the remaining campaigns', function() {
-                expect(campaigns[0].targetUsers).toBe(750);
-                expect(campaigns[1].targetUsers).toBe(750);
-            });
+        it('should increase the budget of the remaining campaigns', function() {
+            expect(campaigns[0].pricing.budget).toBe(77.08);
+            expect(campaigns[1].pricing.budget).toBe(52.08);
+        });
 
-            it('should increase the budget of the remaining campaigns', function() {
-                expect(campaigns[0].pricing.budget).toBe(77.08);
-                expect(campaigns[1].pricing.budget).toBe(52.08);
-            });
-
-            it('should icrease the budget of the beeswax campaigns', function() {
-                expect(beeswaxCampaigns[0].campaign_budget).toBe(4625);
-                expect(beeswaxCampaigns[1].campaign_budget).toBe(2604);
-            });
+        it('should icrease the budget of the beeswax campaigns', function() {
+            expect(beeswaxEntities.campaigns[0].campaign_budget).toBe(4625);
+            expect(beeswaxEntities.campaigns[1].campaign_budget).toBe(2604);
         });
     });
 });

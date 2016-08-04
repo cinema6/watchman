@@ -21,6 +21,7 @@ module.exports = {
     e2e: {
         specs: 'tests/e2e/**/*.e2e.js',
         options: {
+            stopOnFailure : true,
             reporters: {
                 console: {
                     colors: true,
