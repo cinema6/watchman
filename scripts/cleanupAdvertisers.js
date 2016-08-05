@@ -1,7 +1,4 @@
-#! /usr/bin/env node
-
-var fs      = require('fs'),
-    request = require('request'),
+var request = require('request'),
     url     = require('url'),
     q       = require('q'),
     BeeswaxHelper = require('../tests/helpers/BeeswaxHelper'),
@@ -44,23 +41,23 @@ function initTask(task) {
 function authenticate(task) {
 
     var loginOpts = {
-        url: task.authUrl,
-        rejectUnauthorized : false,
-        json: {
-            email       : task.username,
-            password    : task.password
-        },
-        jar : true
-    }, deferred = q.defer();
+            url: task.authUrl,
+            rejectUnauthorized : false,
+            json: {
+                email       : task.username,
+                password    : task.password
+            },
+            jar : true
+        }, deferred = q.defer();
    
     request.post(loginOpts, function(error, response, body) {
         if (error) {
-            console.log('Login error: ', error);
+//            console.log('Login error: ', error);
             return deferred.reject(error);
         }
         else if (response.statusCode !== 200) {
-            console.log('Login failure: ', response.statusCode);
-            console.log(body);
+//            console.log('Login failure: ', response.statusCode);
+//            console.log(body);
             return deferred.reject(body);
         }
         
@@ -72,20 +69,20 @@ function authenticate(task) {
 
 function getAdvertisers(task) {
     var opts = {
-        url: task.rqsUrl + 'api/account/advertisers?fields=name,externalIds,beeswaxIds',
-        rejectUnauthorized : false,
-        jar : true,
-        json : true
-    }, deferred = q.defer();
+            url: task.rqsUrl + 'api/account/advertisers?fields=name,externalIds,beeswaxIds',
+            rejectUnauthorized : false,
+            jar : true,
+            json : true
+        }, deferred = q.defer();
    
     request.get(opts, function(error, response, body) {
         if (error) {
-            console.log(' Error: ', error);
+//            console.log(' Error: ', error);
             return deferred.reject(error);
         }
         else if (response.statusCode !== 200) {
-            console.log(' Failed: ', response.statusCode);
-            console.log(body);
+//            console.log(' Failed: ', response.statusCode);
+//            console.log(body);
             return deferred.reject(body);
         }
         task.advertisers = body;  
@@ -98,29 +95,30 @@ function getAdvertisers(task) {
 function getBeeswaxStuff(task){
     return q.all(task.advertisers.filter(function(adv){
         return ((adv.externalIds && adv.externalIds.beeswax) || 
-            (adv.beeswaxIds && adv.beeswaxIds.advertiser))
+            (adv.beeswaxIds && adv.beeswaxIds.advertiser));
     }).map(function(adv){
         var advertiserId = ((adv.externalIds && adv.externalIds.beeswax) || 
             (adv.beeswaxIds && adv.beeswaxIds.advertiser));
-        console.log('SEARCH ADVERTISER ID:',advertiserId);
+//        console.log('SEARCH ADVERTISER ID:',advertiserId);
         return q.all([
-                task.beeswax.api.advertisers.find( advertiserId ),
-                task.beeswax.api.campaigns.queryAll({ advertiser_id : advertiserId }),
-                task.beeswax.api.creatives.queryAll({ advertiser_id : advertiserId })
-            ])
-            .spread(function(bwad,bwcamp,bwcreat){
-                adv.beeswax = {
-                    advertiser_id : advertiserId,
-                    advertiser : bwad.payload ? true : false,
-                    campaign : bwcamp.payload[0] ? true : false,
-                    creative : bwcreat.payload[0] ? true : false
-                };
-            });
+            task.beeswax.api.advertisers.find( advertiserId ),
+            task.beeswax.api.campaigns.queryAll({ advertiser_id : advertiserId }),
+            task.beeswax.api.creatives.queryAll({ advertiser_id : advertiserId })
+        ])
+        .spread(function(bwad,bwcamp,bwcreat){
+            adv.beeswax = {
+                advertiser_id : advertiserId,
+                advertiser : bwad.payload ? true : false,
+                campaign : bwcamp.payload[0] ? true : false,
+                creative : bwcreat.payload[0] ? true : false
+            };
+        });
     }))
     .then(function(ads){
-        console.log('GIT ADS:',ads);
+//        console.log('GIT ADS:',ads);
         task.advertisers = ads.filter(function(ad){
-            return ads.beeswax && ads.beeswax.advertiser && ( !ads.beeswax.campaign && !ads.beeswax.creative);
+            return ad.beeswax && ad.beeswax.advertiser &&
+                ( !ad.beeswax.campaign && !ad.beeswax.creative);
         });
         return task;
     });
@@ -129,11 +127,11 @@ function getBeeswaxStuff(task){
 q(initTask(task))
 .then(authenticate)
 .then(getAdvertisers)
-.then(getBeeswaxStuff)
-.then(function(task){
-    console.log(task.advertisers);
-})
-.catch(function(e){
-    console.log(e);
-});
+.then(getBeeswaxStuff);
+//.then(function(task){
+////    console.log(task.advertisers);
+//})
+//.catch(function(e){
+////    console.log(e);
+//});
 
