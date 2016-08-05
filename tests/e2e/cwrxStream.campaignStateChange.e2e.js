@@ -106,15 +106,21 @@ describe('cwrxStream campaignStateChange', function() {
                 jar: true
             });
         }).then(function makeAdvertiser() {
-            return request.post({
-                url: api('/api/account/advertisers'),
-                json: {
-                    name: 'e2e-advertiser--' + uuid.createUuid(),
-                    defaultLinks: {},
-                    defaultLogos: {}
-                },
-                jar: true
-            }).then(ld.property(0));
+            return beeswax.createAdvertiser()
+            .then(function(result){
+                return request.post({
+                    url: api('/api/account/advertisers'),
+                    json: {
+                        name: result.advertiser_name,
+                        externalIds : {
+                            beeswax : result.advertiser_id
+                        },
+                        defaultLinks: {},
+                        defaultLogos: {}
+                    },
+                    jar: true
+                }).then(ld.property(0));
+            });
         }).then(function fetchEntities() {
             return q.all([
                 request.get({
@@ -346,7 +352,7 @@ describe('cwrxStream campaignStateChange', function() {
     });
 
     afterAll(function(done){
-        beeswax.cleanupAdvertiser(advertiser.beeswaxIds.advertiser).then(done,done.fail);
+        beeswax.cleanupAdvertiser(advertiser.externalIds.beeswax).then(done,done.fail);
     });
 
     describe('for a showcase (apps) campaign', function() {
@@ -459,11 +465,11 @@ describe('cwrxStream campaignStateChange', function() {
             let startDate =  moment(cycleStart).tz('America/New_York')
                 .format('YYYY-MM-DD HH:mm:ss');
 
-            beeswax.createMRAIDCreative({ advertiser_id : advertiser.beeswaxIds.advertiser })
+            beeswax.createMRAIDCreative({ advertiser_id : advertiser.externalIds.beeswax })
             .then(() => 
                 Promise.all([
                     beeswax.createCampaign({ 
-                        advertiser_id : advertiser.beeswaxIds.advertiser,
+                        advertiser_id : advertiser.externalIds.beeswax,
                         campaign_budget: 4500,
                         start_date : startDate
                     })
@@ -478,7 +484,7 @@ describe('cwrxStream campaignStateChange', function() {
                         .then(lineItem => [ campaign, lineItem ])
                     ),
                     beeswax.createCampaign({ 
-                        advertiser_id : advertiser.beeswaxIds.advertiser,
+                        advertiser_id : advertiser.externalIds.beeswax,
                         campaign_budget: 2500,
                         start_date : startDate
                     })
@@ -493,7 +499,7 @@ describe('cwrxStream campaignStateChange', function() {
                         .then(lineItem => [ campaign, lineItem ])
                     ),
                     beeswax.createCampaign({ 
-                        advertiser_id : advertiser.beeswaxIds.advertiser,
+                        advertiser_id : advertiser.externalIds.beeswax,
                         campaign_budget: 1000,
                         start_date : startDate
                     })

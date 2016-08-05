@@ -3,6 +3,7 @@
 * *[v1.4.3-rc1]*
   * [FEATURE]: Added campaign budget adjustment func to beeswax middleware
   * [FEATURE]: Added upsert method to create (and eventually update) line items.
+  * [FIX]: Fix e2e tests to work with ad service that does not integrate with beeswax.
   * [DEV]: Added BeeswaxHelper for e2e tests that work with beeswax.
   * [DEV]: Added grunt beeswax:clean task to cleanup lingering test advertisers.
 
