@@ -10,6 +10,7 @@ var Mailman = testUtils.Mailman;
 var resolveURL = require('url').resolve;
 var uuid = require('rc-uuid');
 var moment = require('moment');
+var waiter = require('../helpers/waiter.js');
 
 var API_ROOT = process.env.apiRoot;
 var APP_CREDS = JSON.parse(process.env.appCreds);
@@ -19,24 +20,6 @@ var PREFIX = process.env.appPrefix;
 
 function createId(prefix) {
     return prefix + '-' + uuid.createUuid();
-}
-
-function waitUntil(predicate) {
-    function check() {
-        return q(predicate()).then(function(value) {
-            if (value) {
-                return value;
-            } else {
-                return q.delay(500).then(check);
-            }
-        });
-    }
-
-    return check();
-}
-
-function wait(time) {
-    return waitUntil(function() { return q.delay(time).thenResolve(true); });
 }
 
 describe('timeStream payment plan billing', function() {
@@ -175,7 +158,10 @@ describe('timeStream payment plan billing', function() {
             status: 'active'
         }))).then(function makeOrg() {
             return request.get({
-                url: api('/api/payment-plans')
+                url: api('/api/payment-plans'),
+                qs: {
+                    sort: 'price,1'
+                }
             }).then(ld.property(0));
         }).then(function(/*paymentPlans*/) {
             paymentPlans = arguments[0];
@@ -259,7 +245,7 @@ describe('timeStream payment plan billing', function() {
     }
 
     function getMostRecentPayment() {
-        return waitUntil(function() {
+        return waiter.waitFor(function() {
             return getPayments().then(ld.property('0'));
         });
     }
@@ -502,7 +488,7 @@ describe('timeStream payment plan billing', function() {
 
                     return dailyEvent(today);
                 }).then(function() {
-                    return wait(10000);
+                    return waiter.delay(10000);
                 }).then(function() {
                     return getPayments();
                 }).then(function(/*payments*/) {
@@ -534,7 +520,7 @@ describe('timeStream payment plan billing', function() {
                 }).then(function(/*payment*/) {
                     payment = arguments[0];
                 }).then(function() {
-                    return waitUntil(function() {
+                    return waiter.waitFor(function() {
                         return testUtils.pgQuery(
                             'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC LIMIT 1',
                             [org.id]
@@ -545,7 +531,7 @@ describe('timeStream payment plan billing', function() {
                 }).then(function(result) {
                     transaction = result.rows[0];
 
-                    return waitUntil(function() {
+                    return waiter.waitFor(function() {
                         return getOrg().then(function(updatedOrg) {
                             return updatedOrg.nextPaymentDate !== org.nextPaymentDate && updatedOrg;
                         });
@@ -584,7 +570,7 @@ describe('timeStream payment plan billing', function() {
                 }).then(function(/*payment*/) {
                     payment = arguments[0];
                 }).then(function() {
-                    return waitUntil(function() {
+                    return waiter.waitFor(function() {
                         return testUtils.pgQuery(
                             'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY rec_ts DESC LIMIT 1',
                             [org.id]
@@ -594,8 +580,7 @@ describe('timeStream payment plan billing', function() {
                     });
                 }).then(function(result) {
                     transaction = result.rows[0];
-
-                    return waitUntil(function() {
+                    return waiter.waitFor(function() {
                         return getOrg().then(function(updatedOrg) {
                             return updatedOrg.nextPaymentDate !== org.nextPaymentDate && updatedOrg;
                         });
@@ -627,7 +612,7 @@ describe('timeStream payment plan billing', function() {
                 updateNextPaymentDate(null).then(function() {
                     return dailyEvent(moment().add(3, 'hours'));
                 }).then(function() {
-                    return wait(5000);
+                    return waiter.delay(5000);
                 }).then(function() {
                     return getPayments();
                 }).then(function(/*payments*/) {
