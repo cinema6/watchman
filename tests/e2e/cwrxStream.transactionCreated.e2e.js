@@ -480,8 +480,9 @@ describe('cwrxStream transactionCreated', function() {
                         });
                     }))
                     .then(beeswaxLineItems => 
-                        beeswaxLineItems.every(item => (!!item && item.length)) &&
-                            (beeswaxLineItems.length === 2 ) && beeswaxLineItems
+                        beeswaxLineItems.every(
+                            item => (!!item && (item.length === 1) && item[0].active)
+                        ) && (beeswaxLineItems.length === 2 ) && beeswaxLineItems
                     )
                 ]).then(items => items.every(item => !!item) && items)
                 ).spread(function(/*updatedCampaigns, updatedBeeswaxCampaigns*/) {
