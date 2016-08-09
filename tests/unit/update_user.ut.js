@@ -1,10 +1,9 @@
 'use strict';
 
-var CwrxRequest = require('../../lib/CwrxRequest');
-var Hubspot = require('../../lib/Hubspot.js');
-var Q = require('q');
-var logger = require('cwrx/lib/logger.js');
-var updateUser = require('../../src/actions/hubspot/update_user.js');
+const CwrxRequest = require('../../lib/CwrxRequest');
+const Hubspot = require('../../lib/Hubspot.js');
+const logger = require('cwrx/lib/logger.js');
+const updateUser = require('../../src/actions/hubspot/update_user.js');
 
 describe('update_user', function() {
     beforeEach(function() {
@@ -15,6 +14,9 @@ describe('update_user', function() {
                     root: 'https://root',
                     users: {
                         endpoint: 'users'
+                    },
+                    paymentPlans: {
+                        endpoint: '/api/payment-plans'
                     }
                 }
             },
@@ -66,13 +68,12 @@ describe('update_user', function() {
 
         it('should be able to create an action', function() {
             expect(this.action).toEqual(jasmine.any(Function));
-            expect(this.action.name).toBe('action');
         });
     });
 
     it('should fetch the user from the campaign if not provided one', function(done) {
         delete this.event.data.user;
-        CwrxRequest.prototype.get.and.returnValue(Q.resolve([{
+        CwrxRequest.prototype.get.and.returnValue(Promise.resolve([{
             id: 'u-123',
             email: 'snail@mail.com',
             firstName: 'Sebastian',
@@ -87,16 +88,16 @@ describe('update_user', function() {
     });
 
     it('should check to see if a contact in Hubspot exists', function(done) {
-        Hubspot.prototype.getContactByEmail.and.returnValue(Q.resolve(null));
-        Hubspot.prototype.createContact.and.returnValue(Q.resolve());
+        Hubspot.prototype.getContactByEmail.and.returnValue(Promise.resolve(null));
+        Hubspot.prototype.createContact.and.returnValue(Promise.resolve());
         this.action(this.event).then(function() {
             expect(Hubspot.prototype.getContactByEmail).toHaveBeenCalledWith('snail@mail.com');
         }).then(done, done.fail);
     });
 
     it('should be able to check the existance of a contact using an old email', function(done) {
-        Hubspot.prototype.getContactByEmail.and.returnValue(Q.resolve(null));
-        Hubspot.prototype.createContact.and.returnValue(Q.resolve());
+        Hubspot.prototype.getContactByEmail.and.returnValue(Promise.resolve(null));
+        Hubspot.prototype.createContact.and.returnValue(Promise.resolve());
         this.event.data.oldEmail = 'old-snail@mail.com';
         this.action(this.event).then(function() {
             expect(Hubspot.prototype.getContactByEmail).toHaveBeenCalledWith('old-snail@mail.com');
@@ -104,8 +105,8 @@ describe('update_user', function() {
     });
 
     it('should log an error if checking the existance of the contact fails', function(done) {
-        var self = this;
-        Hubspot.prototype.getContactByEmail.and.returnValue(Q.reject());
+        const self = this;
+        Hubspot.prototype.getContactByEmail.and.returnValue(Promise.reject());
         self.action(self.event).then(function() {
             expect(self.mockLog.error).toHaveBeenCalled();
             expect(Hubspot.prototype.createContact).not.toHaveBeenCalled();
@@ -114,8 +115,8 @@ describe('update_user', function() {
     });
 
     it('should create a contact in Hubspot if one doesn\'t exist', function(done) {
-        Hubspot.prototype.getContactByEmail.and.returnValue(Q.resolve(null));
-        Hubspot.prototype.createContact.and.returnValue(Q.resolve());
+        Hubspot.prototype.getContactByEmail.and.returnValue(Promise.resolve(null));
+        Hubspot.prototype.createContact.and.returnValue(Promise.resolve());
         this.action(this.event).then(function() {
             expect(Hubspot.prototype.createContact).toHaveBeenCalledWith({
                 properties: [
@@ -142,17 +143,17 @@ describe('update_user', function() {
     });
 
     it('should log an error if creating a contact fails', function(done) {
-        var self = this;
-        Hubspot.prototype.getContactByEmail.and.returnValue(Q.resolve(null));
-        Hubspot.prototype.createContact.and.returnValue(Q.reject());
+        const self = this;
+        Hubspot.prototype.getContactByEmail.and.returnValue(Promise.resolve(null));
+        Hubspot.prototype.createContact.and.returnValue(Promise.reject());
         self.action(self.event).then(function() {
             expect(self.mockLog.error).toHaveBeenCalled();
         }).then(done, done.fail);
     });
 
     it('should be able to update a contact in Hubspot with any given or changed user properties', function(done) {
-        Hubspot.prototype.getContactByEmail.and.returnValue(Q.resolve({ vid: 123 }));
-        Hubspot.prototype.updateContact.and.returnValue(Q.resolve());
+        Hubspot.prototype.getContactByEmail.and.returnValue(Promise.resolve({ vid: 123 }));
+        Hubspot.prototype.updateContact.and.returnValue(Promise.resolve());
         this.action(this.event).then(function() {
             expect(Hubspot.prototype.updateContact).toHaveBeenCalledWith(123, {
                 properties: [
@@ -178,8 +179,8 @@ describe('update_user', function() {
     });
 
     it('should be able to update a contact in HubSpot with templated properties', function(done) {
-        Hubspot.prototype.getContactByEmail.and.returnValue(Q.resolve({ vid: 123 }));
-        Hubspot.prototype.updateContact.and.returnValue(Q.resolve());
+        Hubspot.prototype.getContactByEmail.and.returnValue(Promise.resolve({ vid: 123 }));
+        Hubspot.prototype.updateContact.and.returnValue(Promise.resolve());
         this.event.options.properties ={
             templateProp: '{{user.id}}'
         };
@@ -208,11 +209,78 @@ describe('update_user', function() {
     });
 
     it('should log an error if updating a contact fails', function(done) {
-        var self = this;
-        Hubspot.prototype.getContactByEmail.and.returnValue(Q.resolve({ vid: 123 }));
-        Hubspot.prototype.updateContact.and.returnValue(Q.reject());
+        const self = this;
+        Hubspot.prototype.getContactByEmail.and.returnValue(Promise.resolve({ vid: 123 }));
+        Hubspot.prototype.updateContact.and.returnValue(Promise.reject());
         self.action(self.event).then(function() {
             expect(self.mockLog.error).toHaveBeenCalled();
+        }).then(done, done.fail);
+    });
+
+    it('should fetch the current payment plan if one is provided', function (done) {
+        CwrxRequest.prototype.get.and.returnValue(Promise.resolve([{
+            label: 'Business'
+        }]));
+        this.event.data.currentPaymentPlanId = 'pp-123';
+        this.action(this.event).then(() => {
+            expect(CwrxRequest.prototype.get).toHaveBeenCalledWith({
+                url: 'https://root/api/payment-plans/pp-123'
+            });
+        }).then(done, done.fail);
+    });
+
+    it('should be able to update the payment plan property of a HubSpot contact', function (done) {
+        CwrxRequest.prototype.get.and.returnValue(Promise.resolve([{
+            label: 'Business'
+        }]));
+        Hubspot.prototype.getContactByEmail.and.returnValue(Promise.resolve({ vid: 123 }));
+        this.event.data.currentPaymentPlanId = 'pp-123';
+        this.action(this.event).then(() => {
+            expect(Hubspot.prototype.updateContact).toHaveBeenCalledWith(123, {
+                properties: [
+                    {
+                        property: 'email',
+                        value: 'snail@mail.com'
+                    },
+                    {
+                        property: 'firstname',
+                        value: 'Sebastian'
+                    },
+                    {
+                        property: 'lastname',
+                        value: 'Snail'
+                    },
+                    {
+                        property: 'foo',
+                        value: 'bar'
+                    },
+                    {
+                        property: 'payment_plan',
+                        value: 'Business'
+                    }
+                ]
+            });
+        }).then(done, done.fail);
+    });
+
+    it('should be able to fetch the user from an org if not provided one', function (done) {
+        CwrxRequest.prototype.get.and.returnValue(Promise.resolve([[{
+            email: 'snail@mail.com'
+        }]]));
+        delete this.event.data.user;
+        delete this.event.data.campaign;
+        this.event.data.org = {
+            id: 'o-123'
+        };
+        this.action(this.event).then(() => {
+            expect(CwrxRequest.prototype.get).toHaveBeenCalledWith({
+                url: 'https://root/users',
+                qs: {
+                    org: 'o-123',
+                    sort: 'created,1'
+                }
+            });
+            expect(Hubspot.prototype.getContactByEmail).toHaveBeenCalledWith('snail@mail.com');
         }).then(done, done.fail);
     });
 });
