@@ -15,6 +15,7 @@ var PREFIX = process.env.appPrefix;
 var TIME_STREAM = process.env.timeStream;
 var WAIT_TIME = 1000;
 var WATCHMAN_STREAM = process.env.watchmanStream;
+var EMAIL_TIMEOUT = 60000;
 
 describe('timeStream', function() {
     var producer, mockman;
@@ -618,7 +619,7 @@ describe('timeStream', function() {
                     expect(msg.text).toMatch(regex);
                     expect(msg.html).toMatch(regex);
                 });
-                expect((new Date() - msg.date)).toBeLessThan(30000);
+                expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
                 done();
             });
         });

@@ -11,6 +11,7 @@ var AWS_CREDS = JSON.parse(process.env.awsCreds);
 var CWRX_STREAM = process.env.cwrxStream;
 var PREFIX = process.env.appPrefix;
 var WAIT_TIME = 1000;
+var EMAIL_TIMEOUT = 60000;
 
 describe('cwrxStream', function() {
     var producer;
@@ -426,7 +427,7 @@ describe('cwrxStream', function() {
                     var regex = new RegExp('Your\\s*campaign.*Cooltastic Campaign.*\\s*reached\\s*its\\s*end\\s*date');
                     expect(msg.text).toMatch(regex);
                     expect(msg.html).toMatch(regex);
-                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
                     done();
                 });
             });
@@ -453,7 +454,7 @@ describe('cwrxStream', function() {
                     var regex = new RegExp('Your\\s*campaign.*Cooltastic Campaign.*\\s*reached\\s*its\\s*end\\s*date');
                     expect(msg.text).toMatch(regex);
                     expect(msg.html).toMatch(regex);
-                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
                     done();
                 });
             });
@@ -506,7 +507,7 @@ describe('cwrxStream', function() {
                         '.*is\\s*out\\s*of\\s*budget');
                     expect(msg.text).toMatch(regex);
                     expect(msg.html).toMatch(regex);
-                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
                     done();
                 });
             });
@@ -533,7 +534,7 @@ describe('cwrxStream', function() {
                     var regex = new RegExp('.*Cooltastic Campaign.* is live! Sit back and relax\..*');
                     expect(msg.text).toMatch(regex);
                     expect(msg.html).toMatch(regex);
-                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
                     done();
                 });
             });
@@ -555,7 +556,7 @@ describe('cwrxStream', function() {
                     'Cooltastic Campaign.*has\\s*been\\s*approved');
                 expect(msg.text).toMatch(regex);
                 expect(msg.html).toMatch(regex);
-                expect((new Date() - msg.date)).toBeLessThan(30000);
+                expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
                 done();
             });
         }).catch(done.fail);
@@ -580,7 +581,7 @@ describe('cwrxStream', function() {
                     expect(msg.text).toMatch(regex);
                     expect(msg.html).toMatch(regex);
                 });
-                expect((new Date() - msg.date)).toBeLessThan(30000);
+                expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
                 done();
             });
         }).catch(done.fail);
@@ -606,7 +607,7 @@ describe('cwrxStream', function() {
                     expect(msg.text).toMatch(regex);
                     expect(msg.html).toMatch(regex);
                 });
-                expect((new Date() - msg.date)).toBeLessThan(30000);
+                expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
                 done();
             });
         }).catch(done.fail);
@@ -642,7 +643,7 @@ describe('cwrxStream', function() {
                     expect(msg.text).toMatch(regex);
                     expect(msg.html).toMatch(regex);
                 });
-                expect((new Date() - msg.date)).toBeLessThan(30000);
+                expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
             }).then(done, done.fail);
         });
 
@@ -657,7 +658,7 @@ describe('cwrxStream', function() {
                 var regex = new RegExp('.*Terry[\\s\\S]*You.*ve submitted Cooltastic Campaign - high five!.*');
                 expect(msg.text).toMatch(regex);
                 expect(msg.html).toMatch(regex);
-                expect((new Date() - msg.date)).toBeLessThan(30000);
+                expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
             }).then(done, done.fail);
         });
     });
@@ -708,7 +709,7 @@ describe('cwrxStream', function() {
                             expect(regex.test(msg.text)).toBeTruthy('Expected text to match ' + regex);
                             expect(regex.test(msg.html)).toBeTruthy('Expected html to match ' + regex);
                         });
-                        expect((new Date() - msg.date)).toBeLessThan(30000);
+                        expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
                         done();
                     });
                 }).catch(done.fail);
@@ -735,7 +736,7 @@ describe('cwrxStream', function() {
                             expect(regex.test(msg.text)).toBeTruthy('Expected text to match ' + regex);
                             expect(regex.test(msg.html)).toBeTruthy('Expected html to match ' + regex);
                         });
-                        expect((new Date() - msg.date)).toBeLessThan(30000);
+                        expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
                         done();
                     });
                 }).catch(done.fail);
@@ -773,7 +774,7 @@ describe('cwrxStream', function() {
                             expect(regex.test(msg.text)).toBeTruthy('Expected text to match ' + regex);
                             expect(regex.test(msg.html)).toBeTruthy('Expected html to match ' + regex);
                         });
-                        expect((new Date() - msg.date)).toBeLessThan(30000);
+                        expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
                         done();
                     });
                 }).catch(done.fail);
@@ -801,7 +802,7 @@ describe('cwrxStream', function() {
                             expect(regex.test(msg.text)).toBeTruthy('Expected text to match ' + regex);
                             expect(regex.test(msg.html)).toBeTruthy('Expected html to match ' + regex);
                         });
-                        expect((new Date() - msg.date)).toBeLessThan(30000);
+                        expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
                         done();
                     });
                 }).catch(done.fail);
@@ -827,7 +828,7 @@ describe('cwrxStream', function() {
                 var regex = /https?:\/\/.+id.+u-123.+token.+secret-token/;
                 expect(msg.text).toMatch(regex);
                 expect(msg.html).toMatch(regex);
-                expect((new Date() - msg.date)).toBeLessThan(30000);
+                expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
             }).then(done, done.fail);
         });
 
@@ -849,7 +850,7 @@ describe('cwrxStream', function() {
                 expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                 expect(msg.text).toMatch(regex);
                 expect(msg.html).toMatch(regex);
-                expect((new Date() - msg.date)).toBeLessThan(30000);
+                expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
                 expect(msg.text.toLowerCase()).toContain('welcome to reelcontent apps');
             }).then(done, done.fail);
         });
@@ -872,7 +873,7 @@ describe('cwrxStream', function() {
                 expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                 expect(msg.text).toMatch(regex);
                 expect(msg.html).toMatch(regex);
-                expect((new Date() - msg.date)).toBeLessThan(30000);
+                expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
             }).then(done, done.fail);
         });
 
@@ -893,7 +894,7 @@ describe('cwrxStream', function() {
                 expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                 expect(msg.text).toMatch(regex);
                 expect(msg.html).toMatch(regex);
-                expect((new Date() - msg.date)).toBeLessThan(30000);
+                expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
             }).then(done, done.fail);
         });
 
@@ -1042,7 +1043,7 @@ describe('cwrxStream', function() {
                     var regex = /password\s*was\s*changed\s*on.*at.*/;
                     expect(msg.text).toMatch(regex);
                     expect(msg.html).toMatch(regex);
-                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
                     done();
                 });
             }).catch(done.fail);
@@ -1063,7 +1064,7 @@ describe('cwrxStream', function() {
                     var regex = /Terry, Just a quick note/;
                     expect(msg.text).toMatch(regex);
                     expect(msg.html).toMatch(regex);
-                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
                     done();
                 });
             }).catch(done.fail);
@@ -1106,7 +1107,7 @@ describe('cwrxStream', function() {
                     expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                     expect(msg.text).toMatch(regex);
                     expect(msg.html).toMatch(regex);
-                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
                 }).then(done, done.fail);
             });
 
@@ -1135,7 +1136,7 @@ describe('cwrxStream', function() {
                         expect(msg.text).toMatch(regex);
                         expect(msg.html).toMatch(regex);
                     });
-                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
                 }).then(done, done.fail);
             });
         });
@@ -1179,7 +1180,7 @@ describe('cwrxStream', function() {
                         expect(msg.text).toMatch(regex);
                         expect(msg.html).toMatch(regex);
                     });
-                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
                 }).then(done, done.fail);
             });
 
@@ -1208,7 +1209,7 @@ describe('cwrxStream', function() {
                         expect(msg.text).toMatch(regex);
                         expect(msg.html).toMatch(regex);
                     });
-                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
                 }).then(done, done.fail);
             });
         });
@@ -1228,7 +1229,7 @@ describe('cwrxStream', function() {
                     var regex = /consecutive\s*failed\s*login\s*attempts/;
                     expect(msg.text).toMatch(regex);
                     expect(msg.html).toMatch(regex);
-                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
                     done();
                 });
             }).catch(done.fail);
@@ -1248,7 +1249,7 @@ describe('cwrxStream', function() {
                     var regex = /Terry,\s+Looks\s+like\s+someone\s+has\s+tried\s+to\s+log\s+into\s+your\s+account/;
                     expect(msg.text).toMatch(regex);
                     expect(msg.html).toMatch(regex);
-                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
                     done();
                 });
             }).catch(done.fail);
@@ -1271,7 +1272,7 @@ describe('cwrxStream', function() {
                     var regex = /https?:\/\/.+id.+u-123.+token.+secret-token/;
                     expect(msg.text).toMatch(regex);
                     expect(msg.html).toMatch(regex);
-                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
                     done();
                 });
             }).catch(done.fail);
@@ -1292,7 +1293,7 @@ describe('cwrxStream', function() {
                     var regex = /https?:\/\/.+id.+u-123.+token.+secret-token/;
                     expect(msg.text).toMatch(regex);
                     expect(msg.html).toMatch(regex);
-                    expect((new Date() - msg.date)).toBeLessThan(30000);
+                    expect((new Date() - msg.date)).toBeLessThan(EMAIL_TIMEOUT);
                     done();
                 });
             }).catch(done.fail);
@@ -1314,7 +1315,7 @@ describe('cwrxStream', function() {
                 var regex = /https?:\/\/.+id.+u-123.+token.+secret-token/;
                 expect(msg.text).toMatch(regex);
                 expect(msg.html).toMatch(regex);
-                expect(new Date() - msg.date).toBeLessThan(30000);
+                expect(new Date() - msg.date).toBeLessThan(EMAIL_TIMEOUT);
                 done();
             });
         }).catch(done.fail);
