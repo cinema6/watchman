@@ -12,6 +12,7 @@ const API_ROOT = process.env.apiRoot;
 const AWS_CREDS = JSON.parse(process.env.awsCreds);
 const PREFIX = process.env.appPrefix;
 const TIME_STREAM = process.env.timeStream;
+const WATCHMAN_STREAM = process.env.watchmanStream;
 
 describe('timeStream weeklyStats', function() {
     // This beforeAll is dedicated to setting application config
@@ -34,6 +35,9 @@ describe('timeStream weeklyStats', function() {
                     },
                     analytics: {
                         endpoint: '/api/analytics'
+                    },
+                    transactions: {
+                        endpoint: '/api/transactions'
                     }
                 }
             },
@@ -111,12 +115,24 @@ describe('timeStream weeklyStats', function() {
                 campaigns: { read: 'all' },
                 cards: { read: 'all' },
                 orgs: { read: 'all' },
-                users: { read: 'all' }
+                users: { read: 'all' },
+                transactions: { read: 'all' }
             },
             entitlements: { },
             fieldValidation: { }
         };
         testUtils.resetCollection('applications', [watchmanApp]).then(done, done.fail);
+    });
+
+    beforeAll(function (done) {
+        this.mockman = new testUtils.Mockman({
+            streamName: WATCHMAN_STREAM
+        });
+        this.mockman.start().then(done, done.fail);
+    });
+
+    afterAll(function () {
+        this.mockman.stop();
     });
 
     beforeEach(function(done) {
@@ -125,6 +141,7 @@ describe('timeStream weeklyStats', function() {
         const campaignId = `cam-${uuid.createUuid()}`;
         const orgId = `o-${uuid.createUuid()}`;
         const userId = `u-${uuid.createUuid()}`;
+        const paymentPlanId = `pp-${uuid.createUuid()}`;
 
         const today = offset => {
             const dt = new Date(((new Date()).toISOString()).substr(0,10) + 'T00:00:00.000Z');
@@ -210,8 +227,9 @@ describe('timeStream weeklyStats', function() {
         this.updateCampaign = campaign => {
             return testUtils.resetCollection('campaigns', [campaign]);
         };
-        const mockOrg = {
-            id: orgId
+        this.mockOrg = {
+            id: orgId,
+            paymentPlanId: paymentPlanId
         };
         const mockUser = {
             id: userId,
@@ -225,15 +243,72 @@ describe('timeStream weeklyStats', function() {
             throw new Error(error);
         });
         this.statsSubject = 'Patrick, Wondering How Your Ad is Doing?';
+        this.weekiversaryEvent = 'campaign_weekiversary';
         Promise.all([
-            testUtils.resetCollection('orgs', [mockOrg]),
+            testUtils.resetCollection('orgs', [this.mockOrg]),
             testUtils.resetCollection('users', [mockUser]),
             supplyMockPostgresData(),
             this.mailman.start()
         ]).then(done, done.fail);
     });
 
+    // Mock relevent Postgres data
+    beforeEach(function(done) {
+        var transCounter = 9999,
+            transFields = ['rec_ts','transaction_id','transaction_ts','org_id','amount','sign',
+                           'units','campaign_id','braintree_id','promotion_id','description',
+                           'view_target','paymentplan_id','application',
+                           'cycle_start','cycle_end'];
+
+        function creditRecordShowcase(org, amount, braintreeId, promotion, desc,
+                viewTarget,paymentPlan, app, transTs, cycleStart, cycleEnd ) {
+            var recKey = transCounter++,
+                id = 't-e2e-' + String(recKey);
+
+            var s =  testUtils.stringifyRecord({
+                rec_ts: transTs,
+                transaction_id: id,
+                transaction_ts: transTs,
+                org_id: org,
+                amount: amount,
+                sign: 1,
+                units: 1,
+                campaign_id: null,
+                braintree_id: braintreeId,
+                promotion_id: promotion,
+                description: desc,
+                view_target : viewTarget,
+                paymentplan_id : paymentPlan,
+                application: app,
+                cycle_start: cycleStart,
+                cycle_end: cycleEnd
+            }, transFields);
+            return s;
+        }
+
+        var testTransactions = [
+            creditRecordShowcase(this.mockOrg.id, 49.99, 'pay13',null,null,2000,'plan9','showcase',
+                    'current_timestamp - \'30 days\'::interval',
+                    'current_timestamp - \'30 days\'::interval',
+                    'current_timestamp'),
+            creditRecordShowcase(this.mockOrg.id, 59.99, 'pay14',null,null,3000,'plan9','showcase',
+                    'current_timestamp','current_timestamp',
+                    'current_timestamp + \'30 days\'::interval'),
+            creditRecordShowcase(this.mockOrg.id, 59.99, 'pay14','promo1',null,400,null,'showcase',
+                    'current_timestamp - \'10 days\'::interval'),
+            creditRecordShowcase(this.mockOrg.id, 59.99, 'pay14','promo1',null,500,null,'showcase',
+                    'current_timestamp + \'10 days\'::interval'),
+            creditRecordShowcase(this.mockOrg.id, 59.99, 'pay14','promo1',null,600,null,'showcase',
+                    'current_timestamp + \'15 days\'::interval'),
+            creditRecordShowcase(this.mockOrg.id, 59.99, 'pay14','promo1',null,500,null,'showcase',
+                    'current_timestamp + \'10 days\'::interval')
+        ];
+
+        testUtils.resetPGTable('fct.billing_transactions', testTransactions, null, transFields).then(done, done.fail);
+    });
+
     afterEach(function(done) {
+        this.mockman.removeAllListeners();
         this.mailman.removeAllListeners();
         this.mailman.stop();
         testUtils.closeDbs().then(() => {
@@ -248,9 +323,9 @@ describe('timeStream weeklyStats', function() {
         }).then(() => {
             return new Promise((resolve, reject) => {
                 const timeout = setTimeout(() => resolve(), 5000);
-                this.mailman.once(this.statsSubject, () => {
+                this.mockman.once(this.weekiversaryEvent, () => {
                     clearTimeout(timeout);
-                    reject(new Error('Should not have sent an email'));
+                    reject(new Error(`Should not have produced ${this.weekiversaryEvent}`));
                 });
             });
         }).then(done, done.fail);
@@ -298,6 +373,26 @@ describe('timeStream weeklyStats', function() {
 
             const contents = [email.html, email.text];
             contents.forEach(content => expect(content).toMatch(regex));
+        }).then(done, done.fail);
+    });
+
+    it('should not send a weekly stats emails if the org does not have a payment plan', function (done) {
+        this.mockOrg.paymentPlanId = null;
+        this.mockCampaign.created = moment().subtract(1, 'week').toDate();
+        Promise.all([
+            testUtils.resetCollection('orgs', [this.mockOrg]),
+            this.updateCampaign(this.mockCampaign),
+            testUtils.resetPGTable('fct.billing_transactions')
+        ]).then(() => {
+            return this.produceRecord();
+        }).then(() => {
+            return new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => resolve(), 5000);
+                this.mockman.once(this.weekiversaryEvent, () => {
+                    clearTimeout(timeout);
+                    reject(new Error(`Should not have produced ${this.weekiversaryEvent}`));
+                });
+            });
         }).then(done, done.fail);
     });
 });

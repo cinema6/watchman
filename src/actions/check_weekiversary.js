@@ -14,29 +14,53 @@ module.exports = function factory(config) {
     const producerConfig = config.kinesis.producer;
     const producer = new JsonProducer(producerConfig.stream, producerConfig);
     const request = new CwrxRequest(config.appCreds);
+    const campaignsEndpoint = url.resolve(config.cwrx.api.root,
+        config.cwrx.api.campaigns.endpoint);
+    const usersEndpoint = url.resolve(config.cwrx.api.root, config.cwrx.api.users.endpoint);
+    const transactionsEndpoint = url.resolve(config.cwrx.api.root,
+        config.cwrx.api.transactions.endpoint);
+    const releventStatuses = ld.values(enums.Status)
+        .filter(value => value !== enums.Status.Canceled && value !== enums.Status.Deleted);
+
+    const getCampaigns = org => {
+        return request.get({
+            url: campaignsEndpoint,
+            qs: {
+                application: 'showcase',
+                org: org.id,
+                statuses: releventStatuses.join(','),
+                sort: 'created,1',
+                limit: '1'
+            }
+        }).then(results => results[0]);
+    };
+
+    const hasCurrentPayment = org => {
+        return request.get({
+            url: `${transactionsEndpoint}/showcase/current-payment`,
+            qs: {
+                org: org.id
+            }
+        }).then(() => true).catch(error => {
+            if (error.statusCode === 404) {
+                return false;
+            }
+            throw error;
+        });
+    };
 
     return event => {
         const data = event.data;
-        const campaignsEndpoint = url.resolve(config.cwrx.api.root,
-            config.cwrx.api.campaigns.endpoint);
-        const usersEndpoint = url.resolve(config.cwrx.api.root, config.cwrx.api.users.endpoint);
-        const releventStatuses = ld.values(enums.Status)
-            .filter(value => value !== enums.Status.Canceled && value !== enums.Status.Deleted);
 
         if(data.org && data.date) {
-            return request.get({
-                url: campaignsEndpoint,
-                qs: {
-                    application: 'showcase',
-                    org: data.org.id,
-                    statuses: releventStatuses.join(','),
-                    sort: 'created,1',
-                    limit: '1'
-                }
-            }).then(results => {
+            return Promise.all([
+                getCampaigns(data.org),
+                hasCurrentPayment(data.org)
+            ]).then(results => {
                 const campaigns = results[0];
+                const hasPayment = results[1];
 
-                if(campaigns.length > 0) {
+                if(campaigns.length > 0 && hasPayment) {
                     const firstCampaign = campaigns[0];
                     const now = moment(new Date(data.date));
                     const campaignCreated = moment(new Date(firstCampaign.created));
