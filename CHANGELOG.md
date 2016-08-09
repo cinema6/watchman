@@ -2,6 +2,7 @@
 
 ## v1.5.0 (August 8, 2016)
 * *[v1.5.0-rc2]*
+  * [FEATURE]: Only send weekly stats emails to orgs with a current payment
   * [FIX]: Line items will use today as start_date when created to avoid a mismatch on the campaign start date..
 * *[/v1.5.0-rc2]*
 
