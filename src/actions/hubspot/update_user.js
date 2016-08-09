@@ -47,7 +47,10 @@ module.exports = function factory(config) {
             if (paymentPlan) {
                 return request.get({
                     url: `${paymentPlansEndpoint}/${paymentPlan}`
-                }).then(result => result[0]);
+                }).then(result => result[0]).catch(error => {
+                    log.error(`Error getting payment plan ${paymentPlan}`);
+                    throw error;
+                });
             }
 
             return Promise.resolve();
