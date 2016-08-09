@@ -12,6 +12,7 @@ const API_ROOT = process.env.apiRoot;
 const AWS_CREDS = JSON.parse(process.env.awsCreds);
 const PREFIX = process.env.appPrefix;
 const TIME_STREAM = process.env.timeStream;
+const WATCHMAN_STREAM = process.env.watchmanStream;
 
 describe('timeStream weeklyStats', function() {
     // This beforeAll is dedicated to setting application config
@@ -74,7 +75,10 @@ describe('timeStream weeklyStats', function() {
                 noon_orgPulse: {
                     actions: [
                         {
-                            name: 'check_weekiversary'
+                            name: 'check_weekiversary',
+                            ifData: {
+                                'org.paymentPlanId': '^pp-.+$'
+                            }
                         }
                     ]
                 },
@@ -119,12 +123,24 @@ describe('timeStream weeklyStats', function() {
         testUtils.resetCollection('applications', [watchmanApp]).then(done, done.fail);
     });
 
+    beforeAll(function (done) {
+        this.mockman = new testUtils.Mockman({
+            streamName: WATCHMAN_STREAM
+        });
+        this.mockman.start().then(done, done.fail);
+    });
+
+    afterAll(function () {
+        this.mockman.stop();
+    });
+
     beforeEach(function(done) {
         jasmine.DEFAULT_TIMEOUT_INTERVAL = 60000;
 
         const campaignId = `cam-${uuid.createUuid()}`;
         const orgId = `o-${uuid.createUuid()}`;
         const userId = `u-${uuid.createUuid()}`;
+        const paymentPlanId = `pp-${uuid.createUuid()}`;
 
         const today = offset => {
             const dt = new Date(((new Date()).toISOString()).substr(0,10) + 'T00:00:00.000Z');
@@ -210,8 +226,9 @@ describe('timeStream weeklyStats', function() {
         this.updateCampaign = campaign => {
             return testUtils.resetCollection('campaigns', [campaign]);
         };
-        const mockOrg = {
-            id: orgId
+        this.mockOrg = {
+            id: orgId,
+            paymentPlanId: paymentPlanId
         };
         const mockUser = {
             id: userId,
@@ -225,8 +242,9 @@ describe('timeStream weeklyStats', function() {
             throw new Error(error);
         });
         this.statsSubject = 'Patrick, Wondering How Your Ad is Doing?';
+        this.weekiversaryEvent = 'campaign_weekiversary';
         Promise.all([
-            testUtils.resetCollection('orgs', [mockOrg]),
+            testUtils.resetCollection('orgs', [this.mockOrg]),
             testUtils.resetCollection('users', [mockUser]),
             supplyMockPostgresData(),
             this.mailman.start()
@@ -234,6 +252,7 @@ describe('timeStream weeklyStats', function() {
     });
 
     afterEach(function(done) {
+        this.mockman.removeAllListeners();
         this.mailman.removeAllListeners();
         this.mailman.stop();
         testUtils.closeDbs().then(() => {
@@ -248,9 +267,9 @@ describe('timeStream weeklyStats', function() {
         }).then(() => {
             return new Promise((resolve, reject) => {
                 const timeout = setTimeout(() => resolve(), 5000);
-                this.mailman.once(this.statsSubject, () => {
+                this.mockman.once(this.weekiversaryEvent, () => {
                     clearTimeout(timeout);
-                    reject(new Error('Should not have sent an email'));
+                    reject(new Error(`Should not have produced ${this.weekiversaryEvent}`));
                 });
             });
         }).then(done, done.fail);
@@ -298,6 +317,25 @@ describe('timeStream weeklyStats', function() {
 
             const contents = [email.html, email.text];
             contents.forEach(content => expect(content).toMatch(regex));
+        }).then(done, done.fail);
+    });
+
+    it('should not send a weekly stats emails if the org does not have a payment plan', function (done) {
+        this.mockOrg.paymentPlanId = null;
+        this.mockCampaign.created = moment().subtract(1, 'week').toDate();
+        Promise.all([
+            testUtils.resetCollection('orgs', [this.mockOrg]),
+            this.updateCampaign(this.mockCampaign)
+        ]).then(() => {
+            return this.produceRecord();
+        }).then(() => {
+            return new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => resolve(), 5000);
+                this.mockman.once(this.weekiversaryEvent, () => {
+                    clearTimeout(timeout);
+                    reject(new Error(`Should not have produced ${this.weekiversaryEvent}`));
+                });
+            });
         }).then(done, done.fail);
     });
 });
