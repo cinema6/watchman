@@ -35,6 +35,9 @@ describe('timeStream weeklyStats', function() {
                     },
                     analytics: {
                         endpoint: '/api/analytics'
+                    },
+                    transactions: {
+                        endpoint: '/api/transactions'
                     }
                 }
             },
@@ -75,10 +78,7 @@ describe('timeStream weeklyStats', function() {
                 noon_orgPulse: {
                     actions: [
                         {
-                            name: 'check_weekiversary',
-                            ifData: {
-                                'org.paymentPlanId': '^pp-.+$'
-                            }
+                            name: 'check_weekiversary'
                         }
                     ]
                 },
@@ -115,7 +115,8 @@ describe('timeStream weeklyStats', function() {
                 campaigns: { read: 'all' },
                 cards: { read: 'all' },
                 orgs: { read: 'all' },
-                users: { read: 'all' }
+                users: { read: 'all' },
+                transactions: { read: 'all' }
             },
             entitlements: { },
             fieldValidation: { }
@@ -251,6 +252,61 @@ describe('timeStream weeklyStats', function() {
         ]).then(done, done.fail);
     });
 
+    // Mock relevent Postgres data
+    beforeEach(function(done) {
+        var transCounter = 9999,
+            transFields = ['rec_ts','transaction_id','transaction_ts','org_id','amount','sign',
+                           'units','campaign_id','braintree_id','promotion_id','description',
+                           'view_target','paymentplan_id','application',
+                           'cycle_start','cycle_end'];
+
+        function creditRecordShowcase(org, amount, braintreeId, promotion, desc,
+                viewTarget,paymentPlan, app, transTs, cycleStart, cycleEnd ) {
+            var recKey = transCounter++,
+                id = 't-e2e-' + String(recKey);
+
+            var s =  testUtils.stringifyRecord({
+                rec_ts: transTs,
+                transaction_id: id,
+                transaction_ts: transTs,
+                org_id: org,
+                amount: amount,
+                sign: 1,
+                units: 1,
+                campaign_id: null,
+                braintree_id: braintreeId,
+                promotion_id: promotion,
+                description: desc,
+                view_target : viewTarget,
+                paymentplan_id : paymentPlan,
+                application: app,
+                cycle_start: cycleStart,
+                cycle_end: cycleEnd
+            }, transFields);
+            return s;
+        }
+
+        var testTransactions = [
+            creditRecordShowcase(this.mockOrg.id, 49.99, 'pay13',null,null,2000,'plan9','showcase',
+                    'current_timestamp - \'30 days\'::interval',
+                    'current_timestamp - \'30 days\'::interval',
+                    'current_timestamp'),
+            creditRecordShowcase(this.mockOrg.id, 59.99, 'pay14',null,null,3000,'plan9','showcase',
+                    'current_timestamp','current_timestamp',
+                    'current_timestamp + \'30 days\'::interval'),
+            creditRecordShowcase(this.mockOrg.id, 59.99, 'pay14','promo1',null,400,null,'showcase',
+                    'current_timestamp - \'10 days\'::interval'),
+            creditRecordShowcase(this.mockOrg.id, 59.99, 'pay14','promo1',null,500,null,'showcase',
+                    'current_timestamp + \'10 days\'::interval'),
+            creditRecordShowcase(this.mockOrg.id, 59.99, 'pay14','promo1',null,600,null,'showcase',
+                    'current_timestamp + \'15 days\'::interval'),
+            creditRecordShowcase(this.mockOrg.id, 59.99, 'pay14','promo1',null,500,null,'showcase',
+                    'current_timestamp + \'10 days\'::interval')
+        ];
+
+        testUtils.resetPGTable('fct.billing_transactions', testTransactions, null, transFields).then(done, done.fail);
+    });
+
     afterEach(function(done) {
         this.mockman.removeAllListeners();
         this.mailman.removeAllListeners();
@@ -325,7 +381,8 @@ describe('timeStream weeklyStats', function() {
         this.mockCampaign.created = moment().subtract(1, 'week').toDate();
         Promise.all([
             testUtils.resetCollection('orgs', [this.mockOrg]),
-            this.updateCampaign(this.mockCampaign)
+            this.updateCampaign(this.mockCampaign),
+            testUtils.resetPGTable('fct.billing_transactions')
         ]).then(() => {
             return this.produceRecord();
         }).then(() => {
