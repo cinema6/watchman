@@ -845,7 +845,6 @@ describe('cwrxStream campaignCreated', function() {
             const ids = [createId('cam'), createId('cam')];
             const start_date = moment(today)
                 .tz('America/New_York').format('YYYY-MM-DD HH:mm:ss');
-
             return Promise.resolve().then(() => {
                 return Promise.all([
                     beeswax.createCampaign({
@@ -973,7 +972,6 @@ describe('cwrxStream campaignCreated', function() {
 
         beforeEach(function(done) {
             today = moment().utcOffset(0).startOf('day');
-
             createTransactions().then(function(/*transactions*/) {
 
             }).then(() => createCampaigns()).spread(function(/*campaigns, beeswaxCampaigns*/) {
