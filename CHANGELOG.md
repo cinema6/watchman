@@ -1,6 +1,10 @@
 # Watchman
 
 ## v1.5.0 (August 8, 2016)
+* *[v1.5.0-rc2]*
+  * [FIX]: Line items will use today as start_date when created to avoid a mismatch on the campaign start date..
+* *[/v1.5.0-rc2]*
+
 * *[v1.5.0-rc1]*
   * [FEATURE]: Added campaign budget adjustment func to beeswax middleware
   * [FEATURE]: Added upsert method to create (and eventually update) line items.

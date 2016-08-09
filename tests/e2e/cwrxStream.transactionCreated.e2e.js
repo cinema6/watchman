@@ -8,7 +8,7 @@ var ld = require('lodash');
 var CwrxRequest = require('../../lib/CwrxRequest');
 var resolveURL = require('url').resolve;
 var uuid = require('rc-uuid');
-var moment = require('moment');
+var moment = require('moment-timezone');
 var Status = require('cwrx/lib/enums').Status;
 var BeeswaxHelper = require('../helpers/BeeswaxHelper');
 
@@ -17,6 +17,10 @@ var APP_CREDS = JSON.parse(process.env.appCreds);
 var AWS_CREDS = JSON.parse(process.env.awsCreds);
 var CWRX_STREAM = process.env.cwrxStream;
 var PREFIX = process.env.appPrefix;
+
+function toBeeswaxDate(dt){
+    return moment(dt).tz('America/New_York').format('YYYY-MM-DD HH:mm:ss');
+}
 
 function createId(prefix) {
     return prefix + '-' + uuid.createUuid();
@@ -69,7 +73,8 @@ describe('cwrxStream transactionCreated', function() {
             campaign_name: `E2E Test Campaign (${uuid.createUuid()})`,
             campaign_budget: 750,
             budget_type: 1,
-            start_date: moment().format('YYYY-MM-DD'),
+            start_date : toBeeswaxDate(
+                (new Date()).toISOString().substr(0,10) + 'T00:00:00Z'),
             pacing: 0,
             active: true
         }).then(response => {

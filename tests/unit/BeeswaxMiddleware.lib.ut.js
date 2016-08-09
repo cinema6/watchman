@@ -961,7 +961,7 @@ describe('BeeswaxMiddleware(config)', function() {
                         advertiser_id : 55, active : true    
                     });
                     expect(beeswax.lineItems.query).toHaveBeenCalledWith({
-                        campaign_id : 11, active : true, start_date : '2016-06-30 20:00:00',
+                        campaign_id : 11, active : true,
                         end_date : '2016-07-31 19:59:59'
                     });
                 })
@@ -1052,7 +1052,6 @@ describe('BeeswaxMiddleware(config)', function() {
                         expect(beeswax.lineItems.query).toHaveBeenCalledWith({
                             campaign_id : 11,
                             active : true, 
-                            start_date : '2016-06-30 20:00:00',
                             end_date : '2016-07-31 19:59:59'
                         });
                         expect(beeswax.targetingTemplates.create).toHaveBeenCalledWith({
@@ -1087,7 +1086,7 @@ describe('BeeswaxMiddleware(config)', function() {
                                 bidding_strategy: 'CPM_PACED', 
                                 values : { cpm_bid : 11 }
                             },
-                            start_date: '2016-06-30 20:00:00',
+                            start_date : '2016-01-26 19:00:00',
                             end_date : '2016-07-31 19:59:59',
                             active : false
                         });
@@ -1147,7 +1146,6 @@ describe('BeeswaxMiddleware(config)', function() {
                         expect(beeswax.lineItems.query).toHaveBeenCalledWith({
                             campaign_id : 11,
                             active : true, 
-                            start_date : '2016-06-30 20:00:00',
                             end_date : '2016-07-31 19:59:59'
                         });
                         expect(log.error).toHaveBeenCalledWith('Manual Beeswax Update required for Campaign %1 (%2) line items. New impressions target is %3', 'c-1234567', 11, 4000);
