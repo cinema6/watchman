@@ -1,5 +1,8 @@
 # Watchman
 
+* *[v1.6.0-rc1]*
+  * [FEATURE]: Added the ability to add payment plan information to HubSpot
+
 ## v1.5.0 (August 8, 2016)
 * *[v1.5.0-rc2]*
   * [FEATURE]: Only send weekly stats emails to orgs with a current payment
