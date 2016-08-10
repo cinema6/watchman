@@ -1,6 +1,9 @@
 # Watchman
 
 ## v1.5.0 (August 8, 2016)
+* *[v1.5.0-rc5]*
+  * [FIX]: Pass beeswax.templates config into beeswaxhelper midware.
+* *[/v1.5.0-rc5]*
 * *[v1.5.0-rc4]*
   * [FIX]: Fixed bug in cwrx.campaignStateChange e2e.
 * *[/v1.5.0-rc4]*

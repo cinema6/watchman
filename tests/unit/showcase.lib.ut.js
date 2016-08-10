@@ -98,7 +98,8 @@ describe('showcase lib', function() {
             {
                 apiRoot: config.beeswax.apiRoot,
                 creds  : config.state.secrets.beeswax,
-                bid : undefined
+                bid : undefined,
+                templates: undefined
             },
             {
                 creds: config.appCreds,

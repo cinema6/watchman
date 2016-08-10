@@ -138,7 +138,8 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                 {
                     apiRoot: config.beeswax.apiRoot,
                     creds  : config.state.secrets.beeswax,
-                    bid : undefined
+                    bid : undefined,
+                    templates: undefined
                 },
                 {
                     creds: config.appCreds,

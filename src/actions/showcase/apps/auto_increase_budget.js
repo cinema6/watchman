@@ -18,7 +18,7 @@ module.exports = function factory(config) {
     const request = new CwrxRequest(config.appCreds);
     const beeswax = new BeeswaxMiddleware(
         { apiRoot: config.beeswax.apiRoot, creds: config.state.secrets.beeswax,
-            bid : config.beeswax.bid },
+            bid : config.beeswax.bid, templates : config.beeswax.templates },
         { creds: config.appCreds, api: config.cwrx.api },
         { conversionMultipliers : get(config,'campaign.conversionMultipliers')  }
     );
