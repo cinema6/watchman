@@ -1,6 +1,9 @@
 # Watchman
 
 ## v1.5.0 (August 8, 2016)
+* *[v1.5.0-rc4]*
+  * [FIX]: Fixed bug in cwrx.campaignStateChange e2e.
+* *[/v1.5.0-rc4]*
 * *[v1.5.0-rc3]*
   * [FIX]: Line items will use creatives associated with a campaign (placement) not all
     creatives associated with an advertiser.  Fixes bug if changing apps in SSB.
