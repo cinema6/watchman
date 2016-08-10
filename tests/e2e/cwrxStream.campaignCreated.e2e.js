@@ -847,19 +847,31 @@ describe('cwrxStream campaignCreated', function() {
                 .tz('America/New_York').format('YYYY-MM-DD HH:mm:ss');
             return Promise.resolve().then(() => {
                 return Promise.all([
-                    beeswax.createCampaign({
-                        advertiser_id: advertiser.externalIds.beeswax,
-                        campaign_budget: 4500,
-                        start_date : start_date
-                    }),
-                    beeswax.createCampaign({
-                        advertiser_id: advertiser.externalIds.beeswax,
-                        campaign_budget: 2500,
-                        start_date : start_date
-                    })
+                    Promise.all([
+                        beeswax.createCampaign({
+                            advertiser_id: advertiser.externalIds.beeswax,
+                            campaign_budget: 4500,
+                            start_date : start_date
+                        }),
+                        beeswax.createCampaign({
+                            advertiser_id: advertiser.externalIds.beeswax,
+                            campaign_budget: 2500,
+                            start_date : start_date
+                        })
+                    ]),
+                    Promise.all([
+                        beeswax.createMRAIDCreative({
+                            advertiser_id: advertiser.externalIds.beeswax
+                        }),
+                        beeswax.createMRAIDCreative({
+                            advertiser_id: advertiser.externalIds.beeswax
+                        })
+                    ])
                 ]);
             }).then(responses => {
-                const beeswaxCampaigns = responses;
+                const beeswaxCampaigns = responses[0];
+                const beeswaxCreatives = responses[1];
+
                 return testUtils.resetCollection('campaigns', [
                     {
                         id: ids[0],
@@ -906,7 +918,52 @@ describe('cwrxStream campaignCreated', function() {
                         }
                     },
                     campaign
-                ]).then(() => request.get({
+                ]).then(() => 
+                    testUtils.resetCollection('placements', [
+                        {
+                            id : createId('pl'),
+                            label : 'Placement1',
+                            tagType : 'display',
+                            tagParams : {
+                                container : 'beeswax',
+                                type : 'mobile-card',
+                                campaign : ids[0]
+                            },
+                            status : 'active',
+                            externalIds : {
+                                beeswax : 666
+                            }
+                        },
+                        {
+                            id : createId('pl'),
+                            label : 'Placement1',
+                            tagType : 'mraid',
+                            tagParams : {
+                                container : 'beeswax',
+                                type : 'mobile-card',
+                                campaign : ids[0]
+                            },
+                            status : 'active',
+                            externalIds : {
+                                beeswax : beeswaxCreatives[0].creative_id
+                            }
+                        },
+                        {
+                            id : createId('pl'),
+                            label : 'Placement1',
+                            tagType : 'mraid',
+                            tagParams : {
+                                container : 'beeswax',
+                                type : 'mobile-card',
+                                campaign : ids[1]
+                            },
+                            status : 'active',
+                            externalIds : {
+                                beeswax : beeswaxCreatives[1].creative_id
+                            }
+                        }
+                    ])
+                ).then(() => request.get({
                     url: api('/api/campaigns'),
                     qs: { ids: ids.join(',') }
                 })).spread(campaigns => (
@@ -1023,6 +1080,15 @@ describe('cwrxStream campaignCreated', function() {
                         })
                         .then(response => (response.payload[0] &&
                             response.payload[0].active && response.payload[0]))
+                        .then(lineItem => !!lineItem && 
+                            beeswax.api.creativeLineItems.query({
+                                line_item_id : lineItem.line_item_id 
+                            })
+                            .then(result => {
+                                lineItem.mappings = result.payload;
+                                return lineItem;
+                            })
+                        )
                     ])
                 ))),
                 Promise.all(beeswaxCampaigns.map(beeswaxCampaign => (
@@ -1039,7 +1105,16 @@ describe('cwrxStream campaignCreated', function() {
                         campaign_id : beeswaxCampaign.campaign_id
                     })
                     .then(response => response.payload[0] &&
-                        response.payload[0].active && response.payload[0]);
+                        response.payload[0].active && response.payload[0])
+                    .then(lineItem => !!lineItem && 
+                        beeswax.api.creativeLineItems.query({
+                            line_item_id : lineItem.line_item_id 
+                        })
+                        .then(result => {
+                            lineItem.mappings = result.payload;
+                            return lineItem;
+                        })
+                    );
                 }))
                 .then(beeswaxLineItems => 
                     beeswaxLineItems.every(item => (!!item)) && beeswaxLineItems
@@ -1088,8 +1163,11 @@ describe('cwrxStream campaignCreated', function() {
             expect(beeswaxCampaigns[1].campaign_budget).toBe(2291);
             expect(beeswaxCampaign.campaign_budget).toBe(417);
             expect(beeswaxLineItem.line_item_budget).toBe(416);
+            expect(beeswaxLineItem.mappings.length).toEqual(1);
             expect(beeswaxLineItems[0].line_item_budget).toBe(1250);
+            expect(beeswaxLineItems[0].mappings.length).toEqual(1);
             expect(beeswaxLineItems[1].line_item_budget).toBe(1041);
+            expect(beeswaxLineItems[1].mappings.length).toEqual(1);
         });
     });
 

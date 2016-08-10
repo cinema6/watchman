@@ -88,6 +88,27 @@ describe('cwrxStream transactionCreated', function() {
                     }
                 }
             }).spread(campaign => [campaign, beeswaxCampaign]);
+        })
+        .spread((campaign,beeswaxCampaign) => {
+            return beeswax.createMRAIDCreative({
+                advertiser_id : advertiser.externalIds.beeswax
+            })
+            .then(creative => request.post({
+                url : api('/api/placements'),
+                json : {
+                    label : 'Showcase Interstitial: ' + creative.creative_id,
+                    tagType : 'mraid',
+                    tagParams : {
+                        type: 'mobile-card',
+                        container : 'beeswax',
+                        campaign : campaign.id
+                    },
+                    externalIds : {
+                        beeswax : creative.creative_id
+                    }
+                }
+            }))
+            .then(() => [ campaign, beeswaxCampaign ] );
         });
     }
 
@@ -215,6 +236,7 @@ describe('cwrxStream transactionCreated', function() {
                 users: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
                 orgs: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
                 advertisers: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
+                placements: { read: 'all', create: 'all' },
                 promotions: { read: 'all' },
                 transactions: { create: 'all' }
             },
@@ -296,7 +318,7 @@ describe('cwrxStream transactionCreated', function() {
                 // Our org's showcase campaign
                 {
                     id: targetCampaignIds[0],
-                    status: Status.OutOfBudget,
+                    status: Status.Active,
                     application: 'showcase',
                     created: moment().subtract(1, 'year').toDate(),
                     lastUpdated: moment().subtract(1, 'month').toDate(),
@@ -335,7 +357,7 @@ describe('cwrxStream transactionCreated', function() {
                 // Our org's showcase campaign
                 {
                     id: targetCampaignIds[1],
-                    status: Status.OutOfBudget,
+                    status: Status.Active,
                     application: 'showcase',
                     created: moment().subtract(1, 'year').toDate(),
                     lastUpdated: moment().subtract(1, 'month').toDate(),
@@ -403,10 +425,6 @@ describe('cwrxStream transactionCreated', function() {
             });
 
             return testUtils.resetCollection('campaigns', campaigns);
-        }).then(function(){
-            return beeswax.createMRAIDCreative({
-                advertiser_id : advertiser.externalIds.beeswax
-            });
         }).then(done, done.fail);
     });
 

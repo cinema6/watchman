@@ -82,6 +82,8 @@ module.exports = function factory(config) {
                     })
                 })
                 .spread(newCampaign => {
+                    log.trace('Adjust campaign(%1) in beeswax by %2 impressions',
+                        campaign.id, externalImpressions);
                     return beeswax.adjustCampaignBudget(newCampaign,externalImpressions)
                         .spread((beeswaxCampaign, updatedBeeswaxCampaign) => {
                             log.info(
