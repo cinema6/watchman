@@ -143,6 +143,15 @@ describe('cwrxStream transactionCreated', function() {
                     }
                 }
             },
+            //beeswax : {
+            //    templates : {
+            //        targeting : {
+            //            mobile_app: [ {
+            //                exclude: { app_bundle_list: [ 7031 ] }
+            //            }]
+            //        }
+            //    }
+            //},
             campaign: {
                 conversionMultipliers: {
                     internal: 1.1,
