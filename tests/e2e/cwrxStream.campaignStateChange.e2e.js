@@ -521,7 +521,7 @@ describe('cwrxStream campaignStateChange', function() {
                 beeswaxEntities.lineItems = lineItems;
             }))
             .then(() => {
-                const ids = [createId('cam'), createId('cam'), createId('cam')];
+                const ids = [createId('c0'), createId('c1'), createId('c2')];
                 
                 return testUtils.resetCollection('campaigns', [
                     {
@@ -587,7 +587,7 @@ describe('cwrxStream campaignStateChange', function() {
                     qs: { ids: ids.join(',') }
                 }))
                 .spread(result => {
-                    campaigns = result;
+                    campaigns = result.sort((a,b) => (a.id > b.id ? 1 : -1 ));
                     
                     return Promise.all([
                         createAnalytics(campaigns[0], [100, 100, 100, 200]),
@@ -637,8 +637,8 @@ describe('cwrxStream campaignStateChange', function() {
                     beeswaxCampaign => !!beeswaxCampaign) && beeswaxCampaigns
                 ),
                 
-                Promise.all(beeswaxEntities.lineItems.map((beeswaxlineItem, index) => (
-                    beeswax.api.lineItems.find(beeswaxlineItem.line_item_id)
+                Promise.all(beeswaxEntities.lineItems.map((beeswaxlineItem, index) => {
+                    return beeswax.api.lineItems.find(beeswaxlineItem.line_item_id)
                     .then(response => {
                         //const old = beeswaxEntities.lineItems[index];
                         const updated = response.payload;
@@ -647,8 +647,8 @@ describe('cwrxStream campaignStateChange', function() {
                         }
                         return updated; 
                         //return updated.line_item_budget > old.line_item_budget && updated;
-                    })
-                )))
+                    });
+                }))
                 .then(beeswaxLineItems => beeswaxLineItems.every(
                     beeswaxLineItem => !!beeswaxLineItem) && beeswaxLineItems
                 )
