@@ -1,7 +1,9 @@
 # Watchman
 
+## v1.6.0 (August 11, 2016)
 * *[v1.6.0-rc1]*
   * [FEATURE]: Added the ability to add payment plan information to HubSpot
+* *[v1.6.0-rc1]*
 
 ## v1.5.0 (August 8, 2016)
 * *[v1.5.0-rc5]*
