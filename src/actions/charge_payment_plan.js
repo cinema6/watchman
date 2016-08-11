@@ -25,13 +25,14 @@ module.exports = function factory(config) {
         const org = data.org;
         const paymentMethod = data.paymentMethod;
         const paymentPlan = data.paymentPlan;
+        const discount = data.discount || 0;
 
         return request.post({
             url: paymentsEndpoint,
             qs: { org: org.id, target: options.target },
             json: {
                 paymentMethod: paymentMethod.token,
-                amount: paymentPlan.price,
+                amount: paymentPlan.price - discount,
                 transaction: {
                     application: options.target,
                     paymentPlanId: paymentPlan.id,

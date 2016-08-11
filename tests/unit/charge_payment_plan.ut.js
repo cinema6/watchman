@@ -358,6 +358,39 @@ describe('(action factory) charge_payment_plan', function() {
                     });
                 });
             });
+
+            describe('if there is a discount', () => {
+                beforeEach(done => {
+                    success.calls.reset();
+                    failure.calls.reset();
+                    request.post.calls.reset();
+                    data.discount = 15;
+
+                    chargePaymentPlan(event).then(success, failure);
+                    setTimeout(done);
+                });
+
+                it('should subtract the discount', () => {
+                    expect(request.post).toHaveBeenCalledWith({
+                        url: resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint),
+                        qs: {
+                            org: data.org.id,
+                            target: options.target
+                        },
+                        json: {
+                            paymentMethod: data.paymentMethod.token,
+                            amount: data.paymentPlan.price -  data.discount,
+                            transaction: {
+                                targetUsers: data.paymentPlan.viewsPerMonth,
+                                cycleStart: moment(data.date).utcOffset(0).startOf('day').format(),
+                                cycleEnd: moment(data.date).utcOffset(0).add(1, 'month').subtract(1, 'day').endOf('day').format(),
+                                paymentPlanId: data.paymentPlan.id,
+                                application: options.target
+                            }
+                        }
+                    });
+                });
+            });
         });
     });
 });
