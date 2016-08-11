@@ -1,5 +1,8 @@
 # Watchman
 
+* *[v1.6.0-rc1]*
+  * [FEATURE]: Added the ability to add payment plan information to HubSpot
+
 ## v1.5.0 (August 8, 2016)
 * *[v1.5.0-rc5]*
   * [FIX]: Pass beeswax.templates config into beeswaxhelper midware.

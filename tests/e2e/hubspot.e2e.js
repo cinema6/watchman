@@ -36,6 +36,9 @@ describe('HubSpot integration', function() {
                     },
                     analytics: {
                         endpoint: '/api/analytics'
+                    },
+                    paymentPlans: {
+                        endpoint: '/api/payment-plans'
                     }
                 }
             },
@@ -111,6 +114,19 @@ describe('HubSpot integration', function() {
                             },
                             ifData: {
                                 target: '^showcase$'
+                            }
+                        }
+                    ]
+                },
+                paymentPlanChanged: {
+                    actions: [
+                        {
+                            name: 'hubspot/update_user',
+                            options: {
+                                properties: {
+                                    applications: 'apps',
+                                    e2e: 'true'
+                                }
                             }
                         }
                     ]
@@ -484,5 +500,48 @@ describe('HubSpot integration', function() {
                     Promise.reject(new Error('should not have created HubSpot contact'));
             }).then(done, done.fail);
         });
+    });
+
+    it('should be able to update the payment plan property', function (done) {
+        const orgId = `o-${rcUuid.createUuid()}`;
+        const paymentPlanId = `pp-${rcUuid.createUuid()}`;
+
+        const org = {
+            id: orgId,
+            status: 'active',
+            name: 'orgAnic',
+            paymentPlanId: paymentPlanId
+        };
+        const paymentPlan = {
+            id: paymentPlanId,
+            status: 'active',
+            label: 'Business'
+        };
+        this.user.org = orgId;
+
+        Promise.all([
+            testUtils.resetCollection('paymentPlans', [paymentPlan]),
+            testUtils.resetCollection('users', [this.user])
+        ]).then(() => {
+            return this.producers.cwrx.produce({
+                type: 'paymentPlanChanged',
+                data: {
+                    org: org,
+                    currentPaymentPlanId: paymentPlanId
+                }
+            });
+        }).then(() => {
+            return this.waitForHubspotContact(this.user.email, {
+                email: this.user.email,
+                payment_plan: 'Business'
+            });
+        }).then(contact => {
+            expect(contact.properties.email.value).toBe(this.user.email);
+            expect(contact.properties.firstname.value).toBe(this.user.firstName);
+            expect(contact.properties.lastname.value).toBe(this.user.lastName);
+            expect(contact.properties.applications.value).toBe('apps');
+            expect(contact.properties.lifecyclestage.value).toBe('subscriber');
+            expect(contact.properties.payment_plan.value).toBe('Business');
+        }).then(done, done.fail);
     });
 });
