@@ -5,6 +5,7 @@ const CwrxRequest = require('../../lib/CwrxRequest');
 const resolveURL = require('url').resolve;
 const ld = require('lodash');
 const moment = require('moment');
+const logger = require('cwrx/lib/logger');
 
 module.exports = function factory(config) {
     const watchmanStream = new JsonProducer(
@@ -18,12 +19,19 @@ module.exports = function factory(config) {
         config.cwrx.api.root,
         config.cwrx.api.paymentPlans.endpoint
     );
+    const log = logger.getLog();
 
     return event => Promise.resolve().then(() => {
         const data = event.data;
         const org = data.org;
         const now = moment(data.date);
         const nextPaymentDate = org.nextPaymentDate && moment(org.nextPaymentDate);
+
+        if (org.nextPaymentPlanId) {
+            log.warn(`Org ${org.id} has pending next payment plan ${org.nextPaymentPlanId}` +
+                ' which should have been transitioned');
+            return undefined;
+        }
 
         if (!nextPaymentDate || nextPaymentDate.isAfter(now)) {
             return undefined;
