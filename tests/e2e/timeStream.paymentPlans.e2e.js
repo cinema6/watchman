@@ -24,7 +24,7 @@ function createId(prefix) {
 
 describe('timeStream payment plan billing', function() {
     var producer, request, mailman, cookies;
-    var user, org, paymentMethod, paymentPlans, paymentPlan;
+    var user, org, paymentMethod, paymentPlans, paymentPlan, downgradingOrg;
 
     var getValidPaymentNonce = (function() {
         var validNonces = [
@@ -113,6 +113,7 @@ describe('timeStream payment plan billing', function() {
         var orgId = createId('o');
         var userId = createId('u');
         var policyId = createId('p');
+        var downgradingOrgId = createId('o');
 
         return testUtils.resetCollection('paymentPlans', [
             {
@@ -172,6 +173,12 @@ describe('timeStream payment plan billing', function() {
                 name: 'The Best Org',
                 paymentPlanId: getPaymentPlanId(),
                 paymentPlanStart: moment().format()
+            }, {
+                id: downgradingOrgId,
+                status: 'active',
+                name: 'The Worst Org',
+                paymentPlanId: ld.last(paymentPlans).id,
+                nextPaymentPlanId: ld.first(paymentPlans).id
             }].concat(Array.apply([], new Array(25)).map(function() {
                 var id = uuid.createUuid();
 
@@ -229,7 +236,10 @@ describe('timeStream payment plan billing', function() {
                 request.get({
                     url: api('/api/account/orgs/' + orgId)
                 }).then(ld.property(0)),
-                paymentMethod
+                paymentMethod,
+                request.get({
+                    url: api('/api/account/orgs/' + downgradingOrgId)
+                }).then(ld.property(0))
             ]);
         });
     }
@@ -309,6 +319,15 @@ describe('timeStream payment plan billing', function() {
                         {
                             name: 'fetch_orgs',
                             options: {
+                                prefix: 'morning'
+                            },
+                            ifData: {
+                                hour: '^4$'
+                            }
+                        },
+                        {
+                            name: 'fetch_orgs',
+                            options: {
                                 prefix: 'noon'
                             },
                             ifData: {
@@ -321,6 +340,13 @@ describe('timeStream payment plan billing', function() {
         };
         const watchmanConfig = {
             eventHandlers: {
+                morning_orgPulse: {
+                    actions: [
+                        {
+                            name: 'transition_payment_plans'
+                        }
+                    ]
+                },
                 noon_orgPulse: {
                     actions: [
                         {
@@ -419,7 +445,8 @@ describe('timeStream payment plan billing', function() {
                 campaigns: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
                 cards: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
                 users: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
-                orgs: { read: 'all', create: 'all', edit: 'all', delete: 'all' }
+                orgs: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
+                transactions: { read: 'all', create: 'all', edit: 'all', delete: 'all' }
             },
             entitlements: {
                 directEditCampaigns: true,
@@ -449,15 +476,71 @@ describe('timeStream payment plan billing', function() {
             testUtils.resetPGTable('fct.billing_transactions')
         ]).then(function() {
             return createUser();
-        }).spread(function(/*user, org, paymentMethod*/) {
+        }).spread(function(/*user, org, paymentMethod, downgradingOrg*/) {
             user = arguments[0];
             org = arguments[1];
             paymentMethod = arguments[2];
+            downgradingOrg = arguments[3];
 
             paymentPlan = ld.find(paymentPlans, { id: org.paymentPlanId });
         }).then(done, done.fail);
 
         getInvalidPaymentNonce();
+    });
+
+    // Mock relevent Postgres data
+    beforeEach(function(done) {
+        var transCounter = 9999,
+            transFields = ['rec_ts','transaction_id','transaction_ts','org_id','amount','sign',
+                           'units','campaign_id','braintree_id','promotion_id','description',
+                           'view_target','paymentplan_id','application',
+                           'cycle_start','cycle_end'];
+
+        function creditRecordShowcase(org, amount, braintreeId, promotion, desc,
+                viewTarget,paymentPlan, app, transTs, cycleStart, cycleEnd ) {
+            var recKey = transCounter++,
+                id = 't-e2e-' + String(recKey);
+
+            var s =  testUtils.stringifyRecord({
+                rec_ts: transTs,
+                transaction_id: id,
+                transaction_ts: transTs,
+                org_id: org,
+                amount: amount,
+                sign: 1,
+                units: 1,
+                campaign_id: null,
+                braintree_id: braintreeId,
+                promotion_id: promotion,
+                description: desc,
+                view_target : viewTarget,
+                paymentplan_id : paymentPlan,
+                application: app,
+                cycle_start: cycleStart,
+                cycle_end: cycleEnd
+            }, transFields);
+            return s;
+        }
+
+        var testTransactions = [
+            creditRecordShowcase(downgradingOrg.id, 49.99, 'pay13',null,null,2000,'plan9','showcase',
+                    'current_timestamp - \'30 days\'::interval',
+                    'current_timestamp - \'30 days\'::interval',
+                    'current_timestamp'),
+            creditRecordShowcase(downgradingOrg.id, 59.99, 'pay14',null,null,3000,'plan9','showcase',
+                    'current_timestamp','current_timestamp',
+                    'current_timestamp + \'30 days\'::interval'),
+            creditRecordShowcase(downgradingOrg.id, 59.99, 'pay14','promo1',null,400,null,'showcase',
+                    'current_timestamp - \'10 days\'::interval'),
+            creditRecordShowcase(downgradingOrg.id, 59.99, 'pay14','promo1',null,500,null,'showcase',
+                    'current_timestamp + \'10 days\'::interval'),
+            creditRecordShowcase(downgradingOrg.id, 59.99, 'pay14','promo1',null,600,null,'showcase',
+                    'current_timestamp + \'15 days\'::interval'),
+            creditRecordShowcase(downgradingOrg.id, 59.99, 'pay14','promo1',null,500,null,'showcase',
+                    'current_timestamp + \'10 days\'::interval')
+        ];
+
+        testUtils.resetPGTable('fct.billing_transactions', testTransactions, null, transFields).then(done, done.fail);
     });
 
     afterEach(function(done) {
@@ -660,5 +743,26 @@ describe('timeStream payment plan billing', function() {
                 expect(moment(email.date).isAfter(moment().subtract(1, 'minute'))).toBe(true, 'Email is too old.');
             });
         });
+    });
+
+    it('should be able to transition to a pending next payment plan', function (done) {
+        producer.produce({
+            type: 'hourly',
+            data: {
+                date: moment().add(1, 'month').toDate(),
+                hour: '4'
+            }
+        }).then(() => {
+            return waiter.waitFor(() => {
+                return request.get({
+                    url: api(`/api/account/orgs/${downgradingOrg.id}`)
+                }).then(ld.spread(org => {
+                    return !org.nextPaymentPlanId && org;
+                }));
+            });
+        }).then(org => {
+            expect(org.paymentPlanId).toEqual(ld.first(paymentPlans).id);
+            expect(org.nextPaymentPlanId).toBeNull();
+        }).then(done, done.fail);
     });
 });

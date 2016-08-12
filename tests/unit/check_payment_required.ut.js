@@ -1,6 +1,7 @@
 'use strict';
 
 const proxyquire = require('proxyquire').noCallThru();
+const logger = require('cwrx/lib/logger');
 
 describe('(action factory) check_payment_required', function() {
     let JsonProducer, CwrxRequest;
@@ -71,6 +72,14 @@ describe('(action factory) check_payment_required', function() {
                 }
             };
 
+            this.mockLog = {
+                trace: jasmine.createSpy('trace'),
+                info: jasmine.createSpy('info'),
+                warn: jasmine.createSpy('warn'),
+                error: jasmine.createSpy('error')
+            };
+            spyOn(logger, 'getLog').and.returnValue(this.mockLog);
+
             checkPaymentRequired = factory(config);
 
             watchmanStream = JsonProducer.calls.mostRecent().returnValue;
@@ -112,6 +121,19 @@ describe('(action factory) check_payment_required', function() {
                 failure = jasmine.createSpy('failure()');
 
                 spyOn(request, 'get').and.returnValue(q.defer().promise);
+            });
+
+            it('should handle if the the org unexpectedly has a next payment plan', function (done) {
+                data.org.nextPaymentPlanId = 'pp-123';
+                checkPaymentRequired(event).then(success, failure);
+                setTimeout(() => {
+                    expect(success).toHaveBeenCalled();
+                    expect(failure).not.toHaveBeenCalled();
+                    expect(this.mockLog.warn).toHaveBeenCalled();
+                    expect(request.get).not.toHaveBeenCalled();
+                    expect(watchmanStream.produce).not.toHaveBeenCalled();
+                    done();
+                });
             });
 
             describe('if the org has no nextPaymentDate', function() {
