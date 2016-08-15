@@ -1,8 +1,11 @@
 # Watchman
 
 * *[v1.7.0-rc1]*
+  * [FEATURE]: Added the ability for weekly stats emails to include stats for multiple apps
   * [FEATURE]: Added the ability to transition payment plans for an org
   * **Extra Deployment Steps**:
+    * Update postmark template config with new weekly stats templates
+    * Deploy new postmark weekly stats templates
     * Update environment with `transition_payment_plans` action
   * [FEATURE]: Added updating of lineItems to upsertCampaignActiveLineItems
 

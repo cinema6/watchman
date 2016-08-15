@@ -83,6 +83,9 @@ describe('campaign_email.js', function() {
                     },
                     analytics: {
                         endpoint: '/analytics'
+                    },
+                    campaigns: {
+                        endpoint: '/campaigns'
                     }
                 }
             },
@@ -116,7 +119,8 @@ describe('campaign_email.js', function() {
                     initializedShowcaseCampaign: 'initializedShowcaseCampaign-template-id',
                     'campaignActive--app': 'campaignActive--app-template-id',
                     'promotionEnded--app': 'promotionEnded--app-template-id',
-                    'weekOneStats--app': 'weekOneStats--app-template-id'
+                    'weeklyStats1': 'weekOneStats--app-template-id',
+                    'weeklyStatsDefault': 'weekTwoStats--app-template-id'
                 }
             },
             state: {
@@ -2319,7 +2323,7 @@ describe('campaign_email.js', function() {
         });
     });
 
-    describe('sending stats emails', function() {
+    describe('sending stats emails', function () {
         beforeEach(function() {
             this.event.options.type = 'stats';
             this.event.options.provider = 'postmark';
@@ -2332,10 +2336,27 @@ describe('campaign_email.js', function() {
                 id: 'cam-123',
                 created: 'Sun Jun 12 2016 00:00:00 GMT-0500 (EST)'
             };
-        });
-
-        it('should be able to send', function(done) {
-            this.CwrxRequest.prototype.get.and.returnValue(Promise.resolve([{
+            this.event.data.org = {
+                id: 'o-123'
+            };
+            this.mockCampaigns = [
+                {
+                    id: 'cam-123',
+                    status: 'active',
+                    name: 'Pokemon Go'
+                },
+                {
+                    id: 'cam-456',
+                    status: 'active',
+                    name: 'Google Maps'
+                },
+                {
+                    id: 'cam-789',
+                    status: 'active',
+                    name: 'Soda Can Party'
+                }
+            ];
+            this.mockAnalytics = [{
                 daily_7: [
                     {'date':'2016-06-26','views':270,'users':210,'clicks':15,'installs':0,'launches':0},
                     {'date':'2016-06-27','views':283,'users':221,'clicks':16,'installs':0,'launches':0},
@@ -2345,7 +2366,78 @@ describe('campaign_email.js', function() {
                     {'date':'2016-07-01','views':125,'users':175,'clicks':3,'installs':0,'launches':0},
                     {'date':'2016-07-02','views':193,'users':125,'clicks':15,'installs':0,'launches':0}
                 ]
-            }]));
+            }, {
+                daily_7: [
+                    {'date':'2016-06-26','views':231,'users':211,'clicks':16,'installs':0,'launches':0},
+                    {'date':'2016-06-27','views':154,'users':104,'clicks':17,'installs':0,'launches':0},
+                    {'date':'2016-06-28','views':300,'users':294,'clicks':2,'installs':0,'launches':0},
+                    {'date':'2016-06-29','views':169,'users':150,'clicks':50,'installs':0,'launches':0},
+                    {'date':'2016-06-30','views':230,'users':200,'clicks':17,'installs':0,'launches':0},
+                    {'date':'2016-07-01','views':103,'users':99,'clicks':4,'installs':0,'launches':0},
+                    {'date':'2016-07-02','views':207,'users':125,'clicks':15,'installs':0,'launches':0}
+                ]
+            }];
+        });
+
+        it('should fetch all campaigns for the org', function (done) {
+            this.CwrxRequest.prototype.get.and.callFake(options => {
+                const url = options.url || options;
+                return /analytics/.test(url) ? Promise.resolve([this.mockAnalytics[0]]) : Promise.resolve([this.mockCampaigns]);
+            });
+            this.email(this.event).then(() => {
+                expect(this.CwrxRequest.prototype.get).toHaveBeenCalledWith({
+                    url: 'https://root/campaigns',
+                    qs: {
+                        application: 'showcase',
+                        org: 'o-123',
+                        statuses: 'draft,new,pending,approved,rejected,active,paused,inactive,expired,outOfBudget,error',
+                        sort: 'created,1'
+                    }
+                });
+            }).then(done, done.fail);
+        });
+
+        it('should fetch analytics for all of the fetched campaigns', function (done) {
+            this.CwrxRequest.prototype.get.and.callFake(options => {
+                const url = options.url || options;
+                return /analytics/.test(url) ? Promise.resolve([this.mockAnalytics[0]]) : Promise.resolve([this.mockCampaigns]);
+            });
+            this.email(this.event).then(() => {
+                expect(this.CwrxRequest.prototype.get).toHaveBeenCalledWith('https://root/analytics/campaigns/showcase/apps/cam-123');
+                expect(this.CwrxRequest.prototype.get).toHaveBeenCalledWith('https://root/analytics/campaigns/showcase/apps/cam-456');
+                expect(this.CwrxRequest.prototype.get).toHaveBeenCalledWith('https://root/analytics/campaigns/showcase/apps/cam-789');
+            }).then(done, done.fail);
+        });
+
+        it('should reject if fetching campaigns fails', function (done) {
+            this.CwrxRequest.prototype.get.and.callFake(options => {
+                const url = options.url || options;
+                return /analytics/.test(url) ? Promise.resolve([this.mockAnalytics[0]]) : Promise.reject(new Error('epic fail'));
+            });
+            this.email(this.event).then(done.fail, error => {
+                expect(error).toEqual(jasmine.any(Error));
+                expect(error.message).toBe('epic fail');
+            }).then(done, done.fail);
+        });
+
+        it('should reject if fetching analytics fails', function (done) {
+            this.CwrxRequest.prototype.get.and.callFake(options => {
+                const url = options.url || options;
+                return /analytics/.test(url) ? Promise.reject(new Error('epic fail')) : Promise.resolve([this.mockCampaigns]);
+            });
+            this.email(this.event).then(() => done.fail('promise should not have resolved'), error => {
+                expect(error).toEqual(jasmine.any(Error));
+                expect(error.message).toBe('epic fail');
+            }).then(done, done.fail);
+        });
+
+        it('should be able to send on week one', function(done) {
+            this.CwrxRequest.prototype.get.and.callFake(options => {
+                const url = options.url || options;
+                const analytics = /cam-123/.test(url) ? this.mockAnalytics[0] : this.mockAnalytics[1];
+                return /analytics/.test(url) ? Promise.resolve([analytics]) : Promise.resolve([this.mockCampaigns]);
+            });
+            this.event.data.week = 1;
 
             this.email(this.event).then(() => {
                 expect(this.CwrxRequest.prototype.get).toHaveBeenCalledWith('https://root/analytics/campaigns/showcase/apps/cam-123');
@@ -2353,25 +2445,59 @@ describe('campaign_email.js', function() {
                     TemplateId: 'weekOneStats--app-template-id',
                     TemplateModel: {
                         firstName: 'Charlie',
+                        dashboardLink: 'showcase dashboard link',
                         startDate: 'Jun 26, 2016',
                         endDate: 'Jul 2, 2016',
-                        views: 1521,
-                        clicks: 115,
-                        ctr: 7.56,
-                        dashboardLink: 'showcase dashboard link'
+                        apps: [
+                            {
+                                name: 'Pokemon Go',
+                                views: 1521,
+                                clicks: 115,
+                                ctr: 7.56
+                            },
+                            {
+                                name: 'Google Maps',
+                                views: 1183,
+                                clicks: 121,
+                                ctr: 10.23
+                            },
+                            {
+                                name: 'Soda Can Party',
+                                views: 1183,
+                                clicks: 121,
+                                ctr: 10.23
+                            }
+                        ],
+                        totalViews: 3887,
+                        totalClicks: 357,
+                        totalCtr: 9.18
                     },
                     InlineCss: true,
                     From: 'e2eSender@fake.com',
                     To: 'somedude@fake.com',
-                    Tag: 'weekOneStats--app',
+                    Tag: 'weeklyStats1',
                     TrackOpens: true,
                     Attachments: this.showcasePostmarkAttachments.concat({
-                        Name: 'stats_week_2.png',
+                        Name: 'stats_week_1.png',
                         Content: jasmine.any(String),
                         ContentType: 'image/png',
                         ContentID: 'cid:stats'
                     })
                 }, jasmine.any(Function));
+            }).then(done, done.fail);
+        });
+
+        it('should be able to send on a future week using a different template', function (done) {
+            this.CwrxRequest.prototype.get.and.callFake(options => {
+                const url = options.url || options;
+                const analytics = /cam-123/.test(url) ? this.mockAnalytics[0] : this.mockAnalytics[1];
+                return /analytics/.test(url) ? Promise.resolve([analytics]) : Promise.resolve([this.mockCampaigns]);
+            });
+            this.event.data.week = 2;
+
+            this.email(this.event).then(() => {
+                expect(this.CwrxRequest.prototype.get).toHaveBeenCalledWith('https://root/analytics/campaigns/showcase/apps/cam-123');
+                expect(postmark.Client.prototype.sendEmailWithTemplate.calls.mostRecent().args[0].TemplateId).toBe('weekTwoStats--app-template-id');
             }).then(done, done.fail);
         });
     });
