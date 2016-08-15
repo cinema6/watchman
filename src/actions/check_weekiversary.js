@@ -86,7 +86,8 @@ module.exports = function factory(config) {
                                     data: {
                                         campaign: firstCampaign,
                                         user: user,
-                                        week: daysSinceFirstCampaign / 7
+                                        week: daysSinceFirstCampaign / 7,
+                                        org: data.org
                                     }
                                 });
                             }));

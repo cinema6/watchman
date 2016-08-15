@@ -14,9 +14,9 @@ const PREFIX = process.env.appPrefix;
 const TIME_STREAM = process.env.timeStream;
 const WATCHMAN_STREAM = process.env.watchmanStream;
 
-describe('timeStream weeklyStats', function() {
+describe('timeStream weeklyStats', function () {
     // This beforeAll is dedicated to setting application config
-    beforeAll(function(done) {
+    beforeAll(function (done) {
         const configurator = new Configurator();
         const sharedConfig = {
             secrets: '/opt/sixxy/.watchman.secrets.json',
@@ -49,7 +49,8 @@ describe('timeStream weeklyStats', function() {
             },
             postmark: {
                 templates: {
-                    'weekOneStats--app': '736301'
+                    'weeklyStats1': '822221',
+                    'weeklyStatsDefault': '844202'
                 }
             }
         };
@@ -105,7 +106,7 @@ describe('timeStream weeklyStats', function() {
     });
 
     // Create a mock watchman app
-    beforeAll(function(done) {
+    beforeAll(function (done) {
         const watchmanApp = {
             id: 'watchman-app',
             key: APP_CREDS.key,
@@ -135,10 +136,10 @@ describe('timeStream weeklyStats', function() {
         this.mockman.stop();
     });
 
-    beforeEach(function(done) {
+    beforeEach(function (done) {
         jasmine.DEFAULT_TIMEOUT_INTERVAL = 60000;
 
-        const campaignId = `cam-${uuid.createUuid()}`;
+        const campaignIds = [`cam-${uuid.createUuid()}`, `cam-${uuid.createUuid()}`];
         const orgId = `o-${uuid.createUuid()}`;
         const userId = `u-${uuid.createUuid()}`;
         const paymentPlanId = `pp-${uuid.createUuid()}`;
@@ -148,60 +149,69 @@ describe('timeStream weeklyStats', function() {
             return (new Date(dt.valueOf() + (86400000 * (offset || 0)))).toISOString().substr(0,10);
         };
 
-        const supplyMockPostgresData = () => {
-            const testSummaries = [
-                // Day 1 Stats
-                `(\'${today(-7)} 00:00:00+00\',\'${campaignId}\',\'cardView\',0,0.0000)`,
-                `(\'${today(-7)} 00:00:00+00\',\'${campaignId}\',\'completedView\',270,0.0000)`,
-                `(\'${today(-7)} 00:00:00+00\',\'${campaignId}\',\'unique_user_view\',0,0.0000)`,
-                `(\'${today(-7)} 00:00:00+00\',\'${campaignId}\',\'link.Action\',15,0.0000)`,
-                `(\'${today(-7)} 00:00:00+00\',\'${campaignId}\',\'appLaunch\',0,0.0000)`,
-                // Day 2 Stats
-                `(\'${today(-6)} 00:00:00+00\',\'${campaignId}\',\'cardView\',0,0.0000)`,
-                `(\'${today(-6)} 00:00:00+00\',\'${campaignId}\',\'completedView\',283,0.0000)`,
-                `(\'${today(-6)} 00:00:00+00\',\'${campaignId}\',\'unique_user_view\',0,0.0000)`,
-                `(\'${today(-6)} 00:00:00+00\',\'${campaignId}\',\'link.Action\',16,0.0000)`,
-                `(\'${today(-6)} 00:00:00+00\',\'${campaignId}\',\'appLaunch\',0,0.0000)`,
-                // Day 3 Stats
-                `(\'${today(-5)} 00:00:00+00\',\'${campaignId}\',\'cardView\',0,0.0000)`,
-                `(\'${today(-5)} 00:00:00+00\',\'${campaignId}\',\'completedView\',245,0.0000)`,
-                `(\'${today(-5)} 00:00:00+00\',\'${campaignId}\',\'unique_user_view\',0,0.0000)`,
-                `(\'${today(-5)} 00:00:00+00\',\'${campaignId}\',\'link.Action\',3,0.0000)`,
-                `(\'${today(-5)} 00:00:00+00\',\'${campaignId}\',\'appLaunch\',0,0.0000)`,
-                // Day 4 Stats
-                `(\'${today(-4)} 00:00:00+00\',\'${campaignId}\',\'cardView\',0,0.0000)`,
-                `(\'${today(-4)} 00:00:00+00\',\'${campaignId}\',\'completedView\',433,0.0000)`,
-                `(\'${today(-4)} 00:00:00+00\',\'${campaignId}\',\'unique_user_view\',0,0.0000)`,
-                `(\'${today(-4)} 00:00:00+00\',\'${campaignId}\',\'link.Action\',50,0.0000)`,
-                `(\'${today(-4)} 00:00:00+00\',\'${campaignId}\',\'appLaunch\',0,0.0000)`,
-                // Day 5 Stats
-                `(\'${today(-3)} 00:00:00+00\',\'${campaignId}\',\'cardView\',0,0.0000)`,
-                `(\'${today(-3)} 00:00:00+00\',\'${campaignId}\',\'completedView\',250,0.0000)`,
-                `(\'${today(-3)} 00:00:00+00\',\'${campaignId}\',\'unique_user_view\',0,0.0000)`,
-                `(\'${today(-3)} 00:00:00+00\',\'${campaignId}\',\'link.Action\',13,0.0000)`,
-                `(\'${today(-3)} 00:00:00+00\',\'${campaignId}\',\'appLaunch\',0,0.0000)`,
-                // Day 6 Stats
-                `(\'${today(-2)} 00:00:00+00\',\'${campaignId}\',\'cardView\',0,0.0000)`,
-                `(\'${today(-2)} 00:00:00+00\',\'${campaignId}\',\'completedView\',125,0.0000)`,
-                `(\'${today(-2)} 00:00:00+00\',\'${campaignId}\',\'unique_user_view\',0,0.0000)`,
-                `(\'${today(-2)} 00:00:00+00\',\'${campaignId}\',\'link.Action\',3,0.0000)`,
-                `(\'${today(-2)} 00:00:00+00\',\'${campaignId}\',\'appLaunch\',0,0.0000)`,
-                // Day 7 Stats
-                `(\'${today(-1)} 00:00:00+00\',\'${campaignId}\',\'cardView\',0,0.0000)`,
-                `(\'${today(-1)} 00:00:00+00\',\'${campaignId}\',\'completedView\',193,0.0000)`,
-                `(\'${today(-1)} 00:00:00+00\',\'${campaignId}\',\'unique_user_view\',0,0.0000)`,
-                `(\'${today(-1)} 00:00:00+00\',\'${campaignId}\',\'link.Action\',15,0.0000)`,
-                `(\'${today(-1)} 00:00:00+00\',\'${campaignId}\',\'appLaunch\',0,0.0000)`
-            ];
-            const testViews = [
-                `(\'${today(-7)}\',\'${campaignId}\',210)`,
-                `(\'${today(-6)}\',\'${campaignId}\',221)`,
-                `(\'${today(-5)}\',\'${campaignId}\',195)`,
-                `(\'${today(-4)}\',\'${campaignId}\',395)`,
-                `(\'${today(-3)}\',\'${campaignId}\',200)`,
-                `(\'${today(-2)}\',\'${campaignId}\',175)`,
-                `(\'${today(-1)}\',\'${campaignId}\',125)`
-            ];
+        const supplyMockPostgresData = campaigns => {
+            let testSummaries = [ ];
+            let testViews = [ ];
+
+            campaigns.forEach(campaign => {
+                const testSummary = [
+                    // Day 1 Stats
+                    `(\'${today(-7)} 00:00:00+00\',\'${campaign.id}\',\'cardView\',0,0.0000)`,
+                    `(\'${today(-7)} 00:00:00+00\',\'${campaign.id}\',\'completedView\',270,0.0000)`,
+                    `(\'${today(-7)} 00:00:00+00\',\'${campaign.id}\',\'unique_user_view\',0,0.0000)`,
+                    `(\'${today(-7)} 00:00:00+00\',\'${campaign.id}\',\'link.Action\',15,0.0000)`,
+                    `(\'${today(-7)} 00:00:00+00\',\'${campaign.id}\',\'appLaunch\',0,0.0000)`,
+                    // Day 2 Stats
+                    `(\'${today(-6)} 00:00:00+00\',\'${campaign.id}\',\'cardView\',0,0.0000)`,
+                    `(\'${today(-6)} 00:00:00+00\',\'${campaign.id}\',\'completedView\',283,0.0000)`,
+                    `(\'${today(-6)} 00:00:00+00\',\'${campaign.id}\',\'unique_user_view\',0,0.0000)`,
+                    `(\'${today(-6)} 00:00:00+00\',\'${campaign.id}\',\'link.Action\',16,0.0000)`,
+                    `(\'${today(-6)} 00:00:00+00\',\'${campaign.id}\',\'appLaunch\',0,0.0000)`,
+                    // Day 3 Stats
+                    `(\'${today(-5)} 00:00:00+00\',\'${campaign.id}\',\'cardView\',0,0.0000)`,
+                    `(\'${today(-5)} 00:00:00+00\',\'${campaign.id}\',\'completedView\',245,0.0000)`,
+                    `(\'${today(-5)} 00:00:00+00\',\'${campaign.id}\',\'unique_user_view\',0,0.0000)`,
+                    `(\'${today(-5)} 00:00:00+00\',\'${campaign.id}\',\'link.Action\',3,0.0000)`,
+                    `(\'${today(-5)} 00:00:00+00\',\'${campaign.id}\',\'appLaunch\',0,0.0000)`,
+                    // Day 4 Stats
+                    `(\'${today(-4)} 00:00:00+00\',\'${campaign.id}\',\'cardView\',0,0.0000)`,
+                    `(\'${today(-4)} 00:00:00+00\',\'${campaign.id}\',\'completedView\',433,0.0000)`,
+                    `(\'${today(-4)} 00:00:00+00\',\'${campaign.id}\',\'unique_user_view\',0,0.0000)`,
+                    `(\'${today(-4)} 00:00:00+00\',\'${campaign.id}\',\'link.Action\',50,0.0000)`,
+                    `(\'${today(-4)} 00:00:00+00\',\'${campaign.id}\',\'appLaunch\',0,0.0000)`,
+                    // Day 5 Stats
+                    `(\'${today(-3)} 00:00:00+00\',\'${campaign.id}\',\'cardView\',0,0.0000)`,
+                    `(\'${today(-3)} 00:00:00+00\',\'${campaign.id}\',\'completedView\',250,0.0000)`,
+                    `(\'${today(-3)} 00:00:00+00\',\'${campaign.id}\',\'unique_user_view\',0,0.0000)`,
+                    `(\'${today(-3)} 00:00:00+00\',\'${campaign.id}\',\'link.Action\',13,0.0000)`,
+                    `(\'${today(-3)} 00:00:00+00\',\'${campaign.id}\',\'appLaunch\',0,0.0000)`,
+                    // Day 6 Stats
+                    `(\'${today(-2)} 00:00:00+00\',\'${campaign.id}\',\'cardView\',0,0.0000)`,
+                    `(\'${today(-2)} 00:00:00+00\',\'${campaign.id}\',\'completedView\',125,0.0000)`,
+                    `(\'${today(-2)} 00:00:00+00\',\'${campaign.id}\',\'unique_user_view\',0,0.0000)`,
+                    `(\'${today(-2)} 00:00:00+00\',\'${campaign.id}\',\'link.Action\',3,0.0000)`,
+                    `(\'${today(-2)} 00:00:00+00\',\'${campaign.id}\',\'appLaunch\',0,0.0000)`,
+                    // Day 7 Stats
+                    `(\'${today(-1)} 00:00:00+00\',\'${campaign.id}\',\'cardView\',0,0.0000)`,
+                    `(\'${today(-1)} 00:00:00+00\',\'${campaign.id}\',\'completedView\',193,0.0000)`,
+                    `(\'${today(-1)} 00:00:00+00\',\'${campaign.id}\',\'unique_user_view\',0,0.0000)`,
+                    `(\'${today(-1)} 00:00:00+00\',\'${campaign.id}\',\'link.Action\',15,0.0000)`,
+                    `(\'${today(-1)} 00:00:00+00\',\'${campaign.id}\',\'appLaunch\',0,0.0000)`
+                ];
+                const testView = [
+                    `(\'${today(-7)}\',\'${campaign.id}\',210)`,
+                    `(\'${today(-6)}\',\'${campaign.id}\',221)`,
+                    `(\'${today(-5)}\',\'${campaign.id}\',195)`,
+                    `(\'${today(-4)}\',\'${campaign.id}\',395)`,
+                    `(\'${today(-3)}\',\'${campaign.id}\',200)`,
+                    `(\'${today(-2)}\',\'${campaign.id}\',175)`,
+                    `(\'${today(-1)}\',\'${campaign.id}\',125)`
+                ];
+
+                testSummaries = testSummaries.concat(testSummary);
+                testViews = testViews.concat(testView);
+            });
+
             return Promise.all([
                 testUtils.resetPGTable('rpt.campaign_summary_hourly', testSummaries),
                 testUtils.resetPGTable('rpt.unique_user_views_daily', testViews)
@@ -218,14 +228,24 @@ describe('timeStream weeklyStats', function() {
                 }
             });
         };
-        this.mockCampaign = {
-            id: campaignId,
+        this.mockCampaigns = [{
+            id: campaignIds[0],
             org: orgId,
             status: 'active',
-            application: 'showcase'
-        };
-        this.updateCampaign = campaign => {
-            return testUtils.resetCollection('campaigns', [campaign]);
+            application: 'showcase',
+            name: 'The Best App',
+            created: moment().toDate()
+        }, {
+            id: campaignIds[1],
+            org: orgId,
+            status: 'active',
+            application: 'showcase',
+            name: 'The Worst App',
+            created: moment().toDate()
+        }];
+        this.updateCampaigns = campaigns => {
+            return supplyMockPostgresData(campaigns).then(() =>
+                testUtils.resetCollection('campaigns', campaigns));
         };
         this.mockOrg = {
             id: orgId,
@@ -247,13 +267,12 @@ describe('timeStream weeklyStats', function() {
         Promise.all([
             testUtils.resetCollection('orgs', [this.mockOrg]),
             testUtils.resetCollection('users', [mockUser]),
-            supplyMockPostgresData(),
             this.mailman.start()
         ]).then(done, done.fail);
     });
 
     // Mock relevent Postgres data
-    beforeEach(function(done) {
+    beforeEach(function (done) {
         var transCounter = 9999,
             transFields = ['rec_ts','transaction_id','transaction_ts','org_id','amount','sign',
                            'units','campaign_id','braintree_id','promotion_id','description',
@@ -307,7 +326,7 @@ describe('timeStream weeklyStats', function() {
         testUtils.resetPGTable('fct.billing_transactions', testTransactions, null, transFields).then(done, done.fail);
     });
 
-    afterEach(function(done) {
+    afterEach(function (done) {
         this.mockman.removeAllListeners();
         this.mailman.removeAllListeners();
         this.mailman.stop();
@@ -316,9 +335,9 @@ describe('timeStream weeklyStats', function() {
         }).then(done, done.fail);
     });
 
-    it('should not send a weekly stats email if the campaign is not a week old', function(done) {
-        this.mockCampaign.created = moment().subtract(6, 'days').toDate();
-        this.updateCampaign(this.mockCampaign).then(() => {
+    it('should not send a weekly stats email if the campaign is not a week old', function (done) {
+        this.mockCampaigns[0].created = moment().subtract(6, 'days').toDate();
+        this.updateCampaigns(this.mockCampaigns).then(() => {
             return this.produceRecord();
         }).then(() => {
             return new Promise((resolve, reject) => {
@@ -331,9 +350,9 @@ describe('timeStream weeklyStats', function() {
         }).then(done, done.fail);
     });
 
-    it('should send a weekly stats email when the campaign is a week old', function(done) {
-        this.mockCampaign.created = moment().subtract(1, 'week').toDate();
-        this.updateCampaign(this.mockCampaign).then(() => {
+    it('should send a weekly stats email when the campaign is a week old', function (done) {
+        this.mockCampaigns[0].created = moment().subtract(1, 'week').toDate();
+        this.updateCampaigns(this.mockCampaigns).then(() => {
             return Promise.all([
                 new Promise(resolve => this.mailman.once(this.statsSubject, email => resolve(email))),
                 this.produceRecord()
@@ -357,16 +376,16 @@ describe('timeStream weeklyStats', function() {
         }).then(done, done.fail);
     });
 
-    it('should send a weekly stats email when the campaign is two weeks old', function(done) {
-        this.mockCampaign.created = moment().subtract(2, 'weeks').toDate();
-        this.updateCampaign(this.mockCampaign).then(() => {
+    it('should send a weekly stats email when the campaign is two weeks old', function (done) {
+        this.mockCampaigns[0].created = moment().subtract(2, 'weeks').toDate();
+        this.updateCampaigns(this.mockCampaigns).then(() => {
             return Promise.all([
                 new Promise(resolve => this.mailman.once(this.statsSubject, email => resolve(email))),
                 this.produceRecord()
             ]);
         }).then(results => {
             const email = results[0];
-            const regex = /Patrick, it's only been a few days/;
+            const regex = /Patrick, your ads have been hard at work./;
 
             expect(email.from[0].address.toLowerCase()).toBe('support@cinema6.com');
             expect(email.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
@@ -378,10 +397,10 @@ describe('timeStream weeklyStats', function() {
 
     it('should not send a weekly stats emails if the org does not have a payment plan', function (done) {
         this.mockOrg.paymentPlanId = null;
-        this.mockCampaign.created = moment().subtract(1, 'week').toDate();
+        this.mockCampaigns[0].created = moment().subtract(1, 'week').toDate();
         Promise.all([
             testUtils.resetCollection('orgs', [this.mockOrg]),
-            this.updateCampaign(this.mockCampaign),
+            this.updateCampaigns(this.mockCampaigns),
             testUtils.resetPGTable('fct.billing_transactions')
         ]).then(() => {
             return this.produceRecord();
@@ -392,6 +411,36 @@ describe('timeStream weeklyStats', function() {
                     clearTimeout(timeout);
                     reject(new Error(`Should not have produced ${this.weekiversaryEvent}`));
                 });
+            });
+        }).then(done, done.fail);
+    });
+
+    it('should be able to send a weekly stats email containing stats for multiple apps', function (done) {
+        this.mockCampaigns[0].created = moment().subtract(2, 'weeks').toDate();
+        this.updateCampaigns(this.mockCampaigns).then(() => {
+            return Promise.all([
+                new Promise(resolve => this.mailman.once(this.statsSubject, email => resolve(email))),
+                this.produceRecord()
+            ]);
+        }).then(results => {
+            const email = results[0];
+            const regex = /Patrick, your ads have been hard at work./;
+
+            expect(email.from[0].address.toLowerCase()).toBe('support@cinema6.com');
+            expect(email.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
+
+            const contents = [email.html, email.text];
+            contents.forEach(content => {
+                expect(content).toMatch(regex);
+                expect(content).toContain(moment().subtract(1, 'day').format('MMM D, YYYY'));
+                expect(content).toContain(moment().subtract(1, 'week').format('MMM D, YYYY'));
+                expect(content).toContain('The Best App');
+                expect(content).toContain('The Worst App');
+                expect(content.match(/\D1521/g).length).toBe(2); // individual views
+                expect(content.match(/\D115/g).length).toBe(2); // individual clicks
+                expect(content.match(/\D3042/g).length).toBe(1); // total views
+                expect(content.match(/\D230/g).length).toBe(1); // total clicks
+                expect(content.match(/\D7\.56%/g).length).toBe(3); // cpv
             });
         }).then(done, done.fail);
     });
