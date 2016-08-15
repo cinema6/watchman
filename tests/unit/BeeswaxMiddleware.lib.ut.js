@@ -916,6 +916,10 @@ describe('BeeswaxMiddleware(config)', function() {
                         } 
                     ]
                 });
+                
+                bwEditLineItemDeferred.fulfill({
+                    payload : { line_item_id : 111, active : true }
+                });
 
                 getPlacementDeferred.fulfill([[
                     {
@@ -987,7 +991,7 @@ describe('BeeswaxMiddleware(config)', function() {
                 .then(done,done.fail);
             });
             
-            it('lookups up the beeswax campaign line items',function(done){
+            it('looks up the beeswax campaign line items',function(done){
                 middleWare.upsertCampaignActiveLineItems(args)
                 .then(function (){
                     expect(beeswax.campaigns.find).toHaveBeenCalledWith(11);
@@ -1012,7 +1016,7 @@ describe('BeeswaxMiddleware(config)', function() {
                 .then(done,done.fail);
             });
 
-            it('lookups up the beeswax campaign advertiser creatives',function(done){
+            it('looks up the beeswax campaign advertiser creatives',function(done){
                 middleWare.upsertCampaignActiveLineItems(args)
                 .then(function (){
                     expect(beeswax.campaigns.find).toHaveBeenCalledWith(11);
@@ -1179,6 +1183,7 @@ describe('BeeswaxMiddleware(config)', function() {
                     args.campaign.targetUsers = 2000;
                     
                     bwQueryLineItemDeferred = q.defer();
+                    bwEditLineItemDeferred = q.defer();
                     
                     bwQueryLineItemDeferred.fulfill({
                         payload : [
@@ -1190,10 +1195,19 @@ describe('BeeswaxMiddleware(config)', function() {
                         ]
                     });
 
+                    bwEditLineItemDeferred.fulfill({
+                        success: true,
+                        payload : {
+                            line_item_id : 100,
+                            line_item_budget: 2000
+                        }
+                    });
+
                 });
-                it('logs an error if an update is required.',function(done){
+
+                it('updates an existing lineItem as required',function(done){
                     middleWare.upsertCampaignActiveLineItems(args)
-                    .then(function (){
+                    .then(function (res){
                         expect(beeswax.campaigns.find).toHaveBeenCalledWith(11);
                         expect(beeswax.creatives.find).toHaveBeenCalledWith(1000);
                         expect(beeswax.lineItems.query).toHaveBeenCalledWith({
@@ -1201,7 +1215,10 @@ describe('BeeswaxMiddleware(config)', function() {
                             active : true, 
                             end_date : '2016-07-31 19:59:59'
                         });
-                        expect(log.error).toHaveBeenCalledWith('Manual Beeswax Update required for Campaign %1 (%2) line items. New impressions target is %3', 'c-1234567', 11, 4000);
+                        expect(beeswax.lineItems.edit).toHaveBeenCalledWith(100, { 
+                            line_item_budget: 4000
+                        });
+                        expect(res.updatedLineItems.length).toEqual(1);
                     })
                     .then(done,done.fail);
                 });

@@ -36,7 +36,7 @@ function waitUntil(predicate) {
 }
 
 describe('cwrxStream campaignCreated', function() {
-    var producer, request, beeswax ;
+    var producer, request, beeswax, today ;
     var user, org, paymentPlans, advertiser, promotions, containers, campaign;
 
     function api(endpoint) {
@@ -256,6 +256,7 @@ describe('cwrxStream campaignCreated', function() {
 
     // This beforeAll is dedicated to setting application config
     beforeAll(function(done) {
+        today = moment().utcOffset(0).startOf('day');
         const configurator = new Configurator();
         const sharedConfig = {
             secrets: '/opt/sixxy/.watchman.secrets.json',
@@ -838,7 +839,6 @@ describe('cwrxStream campaignCreated', function() {
     });
 
     describe('if the org has other campaigns', function() {
-        let today;
         let campaigns, beeswaxCampaigns, beeswaxCampaign, beeswaxLineItem, beeswaxLineItems;
 
         function createCampaigns() {
@@ -868,6 +868,24 @@ describe('cwrxStream campaignCreated', function() {
                         })
                     ])
                 ]);
+            }).then(responses => {
+                const beeswaxCampaigns = responses[0];
+                const beeswaxCreatives = responses[1];
+                const endDate = moment(today)
+                    .add(1,'month').subtract(1,'second')
+                    .tz('America/New_York').format('YYYY-MM-DD HH:mm:ss');
+
+                return Promise.all(beeswaxCampaigns.map(function(bwCamp){
+                    return beeswax.createLineItem({
+                        advertiser_id : bwCamp.advertiser_id,
+                        campaign_id : bwCamp.campaign_id,
+                        line_item_budget : 100,
+                        end_date : endDate
+                    });
+                })).then(lineItems => {
+                    return [ beeswaxCampaigns, beeswaxCreatives, lineItems ]; 
+                });
+
             }).then(responses => {
                 const beeswaxCampaigns = responses[0];
                 const beeswaxCreatives = responses[1];
@@ -1028,7 +1046,6 @@ describe('cwrxStream campaignCreated', function() {
         }
 
         beforeEach(function(done) {
-            today = moment().utcOffset(0).startOf('day');
             createTransactions().then(function(/*transactions*/) {
 
             }).then(() => createCampaigns()).spread(function(/*campaigns, beeswaxCampaigns*/) {
@@ -1078,18 +1095,23 @@ describe('cwrxStream campaignCreated', function() {
                         beeswax.api.lineItems.query({
                             campaign_id : campaign.externalIds.beeswax
                         })
-                        .then(response => (response.payload[0] &&
-                            response.payload[0].active && response.payload[0]))
-                        .then(lineItem => !!lineItem && 
-                            beeswax.api.creativeLineItems.query({
-                                line_item_id : lineItem.line_item_id 
-                            })
-                            .then(result => {
-                                lineItem.mappings = result.payload;
-                                return lineItem;
-                            })
-                        )
+                        .then(response => {
+                            return (response.payload[0] &&
+                                response.payload[0].active && response.payload[0]);
+                        })
+                        .then(lineItem => {
+                            return (!!lineItem && 
+                                beeswax.api.creativeLineItems.query({
+                                    line_item_id : lineItem.line_item_id 
+                                })
+                                .then(result => {
+                                    lineItem.mappings = result.payload;
+                                    return !!lineItem.mappings && lineItem;
+                                })
+                            );
+                        })
                     ])
+                    .then((items) =>  items.every(item => (!!item)) && items)
                 ))),
                 Promise.all(beeswaxCampaigns.map(beeswaxCampaign => (
                     beeswax.api.campaigns.find(beeswaxCampaign.campaign_id).then(response => {
@@ -1104,7 +1126,8 @@ describe('cwrxStream campaignCreated', function() {
                     return beeswax.api.lineItems.query({
                         campaign_id : beeswaxCampaign.campaign_id
                     })
-                    .then(response => response.payload[0] &&
+                    .then(response => response.payload[0] && 
+                        (response.payload[0].line_item_budget !== 100) && 
                         response.payload[0].active && response.payload[0])
                     .then(lineItem => !!lineItem && 
                         beeswax.api.creativeLineItems.query({
