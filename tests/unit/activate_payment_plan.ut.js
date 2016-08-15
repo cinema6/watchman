@@ -223,10 +223,10 @@ describe('(action factory) activate_payment_plan', function() {
                             let putOrgDeferred;
 
                             beforeEach(function(done) {
-                                testConfig.before();
-
                                 request.get.calls.reset();
                                 request.put.and.returnValue((putOrgDeferred = q.defer()).promise);
+
+                                testConfig.before();
 
                                 getOrgDeferred.fulfill([org, response]);
                                 setTimeout(done);
@@ -263,11 +263,96 @@ describe('(action factory) activate_payment_plan', function() {
                         });
                     });
 
-                    describe('and has promotions', function() {
+                    describe('and has only bonus view promotions', function() {
                         let promotions;
 
                         beforeEach(function(done) {
                             org.promotions = Array.apply([], new Array(3)).map(function() {
+                                return {
+                                    id: 'pro-' + uuid.createUuid(),
+                                    created: new Date().toISOString(),
+                                    lastUpdated: new Date().toISOString(),
+                                    status: 'active'
+                                };
+                            });
+
+                            promotions = {};
+                            promotions[org.promotions[0].id] = {
+                                id: org.promotions[0].id,
+                                type: 'freeTrial',
+                                data: {
+                                    [org.paymentPlanId]: {
+                                        targetUsers: 100
+                                    }
+                                }
+                            };
+                            promotions[org.promotions[1].id] = {
+                                id: org.promotions[1].id,
+                                type: 'freeTrial',
+                                data: {
+                                    [org.paymentPlanId]: {
+                                        targetUsers: 500
+                                    }
+                                }
+                            };
+                            promotions[org.promotions[2].id] = {
+                                id: org.promotions[1].id,
+                                type: 'freeTrial',
+                                data: {
+                                    [`pp-${uuid.createUuid()}`]: {
+                                        targetUsers: 500
+                                    }
+                                }
+                            };
+
+                            getOrgDeferred.fulfill([org, response]);
+                            setTimeout(done);
+                        });
+
+                        describe('when the promotions are fetched', function() {
+                            let putOrgDeferred;
+
+                            beforeEach(function(done) {
+                                request.put.and.returnValue((putOrgDeferred = q.defer()).promise);
+
+                                getPromotionsDeferred.fulfill([
+                                    Object.keys(promotions).map(function(id) {
+                                        return promotions[id];
+                                    }),
+                                    { statusCode: 200 }
+                                ]);
+                                setTimeout(done);
+                            });
+
+                            describe('when the org is updated', function() {
+                                beforeEach(function(done) {
+                                    request.get.and.returnValue(q.defer().promise);
+
+                                    putOrgDeferred.fulfill([request.put.calls.mostRecent().args[0].json, { statusCode: 200 }]);
+                                    setTimeout(done);
+                                    request.get.calls.reset();
+                                });
+
+                                it('should not get the payment plan', function() {
+                                    expect(request.get).not.toHaveBeenCalled();
+                                });
+
+                                it('should not produce an event', function() {
+                                    expect(watchmanStream.produce).not.toHaveBeenCalled();
+                                });
+
+                                it('should fulfill with undefined', function() {
+                                    expect(success).toHaveBeenCalledWith(undefined);
+                                });
+                            });
+                        });
+                    });
+
+                    describe('and has promotions', function() {
+                        let promotions;
+
+                        beforeEach(function(done) {
+                            org.promotions = Array.apply([], new Array(4)).map(function() {
                                 return {
                                     id: 'pro-' + uuid.createUuid(),
                                     created: new Date().toISOString(),
@@ -302,6 +387,15 @@ describe('(action factory) activate_payment_plan', function() {
                                 data: {
                                     [org.paymentPlanId]: {
                                         trialLength: 5
+                                    }
+                                }
+                            };
+                            promotions[org.promotions[3].id] = {
+                                id: org.promotions[3].id,
+                                type: 'freeTrial',
+                                data: {
+                                    [org.paymentPlanId]: {
+                                        targetUsers: 500
                                     }
                                 }
                             };

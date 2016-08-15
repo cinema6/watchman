@@ -36,9 +36,15 @@ module.exports = function factory(config) {
 
         return request.get({ url: orgEndpoint }).spread(org => {
             const promotionIds = ld.map(org.promotions, 'id');
+            const paymentPlanId = org.paymentPlanId;
 
-            if (org.paymentPlanStart || !org.paymentPlanId) {
-                return;
+            const getTrialLength = promotion => ld.get(
+                promotion, `data[${paymentPlanId}].trialLength`
+            );
+
+
+            if (org.paymentPlanStart || !paymentPlanId) {
+                return undefined;
             }
 
             return (
@@ -46,10 +52,10 @@ module.exports = function factory(config) {
                     request.get({ url: promotionsEndpoint, qs: { ids: promotionIds.join(',') } }) :
                     q([])
             ).spread(promotions => {
-                const freeTrials = ld.filter(promotions, { type: 'freeTrial' });
-                const trialLength = ld.sum(freeTrials.map(ld.property(
-                    `data[${org.paymentPlanId}].trialLength`
-                )));
+                const freeTrials = ld.filter(promotions, promotion => (
+                    promotion.type === 'freeTrial' && !!getTrialLength(promotion)
+                ));
+                const trialLength = ld.sum(freeTrials.map(getTrialLength));
                 const startDate = moment(today).add(trialLength, 'days').format();
 
                 return request.put({
@@ -64,7 +70,7 @@ module.exports = function factory(config) {
                     }
 
                     return request.get({
-                        url: `${paymentPlansEndpoint}/${org.paymentPlanId}`
+                        url: `${paymentPlansEndpoint}/${paymentPlanId}`
                     }).spread(paymentPlan => Promise.all(freeTrials.map(promotion => (
                         watchmanStream.produce({
                             type: 'promotionFulfilled',
