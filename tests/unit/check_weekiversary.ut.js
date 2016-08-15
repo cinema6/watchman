@@ -103,6 +103,7 @@ describe('check_weekiversary', function() {
         const campaigns = [{ id: 'cam-123', created: '2015-11-12T19:52:40.601Z' }];
         const users = [{ id: 'u-123' }];
         const ten = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        const org = { id: 'o-123'};
 
         CwrxRequest.prototype.get.and.callFake(options => {
             const match = options.url.match(/campaigns|users|payment/)[0];
@@ -120,7 +121,7 @@ describe('check_weekiversary', function() {
         return Promise.all(ten.map(week => {
             return self.action({
                 data: {
-                    org: 'o-123',
+                    org: org,
                     date: moment(campaigns[0].created).add(week, 'weeks').toISOString()
                 }
             });
@@ -132,7 +133,8 @@ describe('check_weekiversary', function() {
                     data: {
                         campaign: campaigns[0],
                         user: users[0],
-                        week: week
+                        week: week,
+                        org: org
                     }
                 });
             });
@@ -167,7 +169,8 @@ describe('check_weekiversary', function() {
                     data: {
                         campaign: campaigns[0],
                         user: user,
-                        week: 1
+                        week: 1,
+                        org: this.event.data.org
                     }
                 });
             });
