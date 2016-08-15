@@ -4,6 +4,7 @@
   * [FEATURE]: Added the ability to transition payment plans for an org
   * **Extra Deployment Steps**:
     * Update environment with `transition_payment_plans` action
+  * [FEATURE]: Added updating of lineItems to upsertCampaignActiveLineItems
 
 ## v1.6.0 (August 11, 2016)
 * *[v1.6.0-rc1]*
