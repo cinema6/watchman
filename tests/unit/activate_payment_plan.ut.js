@@ -57,6 +57,9 @@ describe('(action factory) activate_payment_plan', function() {
                         },
                         paymentPlans: {
                             endpoint: '/api/payment-plans'
+                        },
+                        payments: {
+                            endpoint: '/api/payments/'
                         }
                     }
                 },
@@ -241,23 +244,167 @@ describe('(action factory) activate_payment_plan', function() {
                                     url: resolveURL(config.cwrx.api.root, config.cwrx.api.orgs.endpoint) + '/' + org.id,
                                     json: ld.merge({}, org, {
                                         paymentPlanStart: moment(data.date).utcOffset(0).startOf('day').format(),
-                                        nextPaymentDate: moment(data.date).utcOffset(0).startOf('day').format()
+                                        nextPaymentDate: null
                                     })
                                 });
                             });
 
                             describe('when the org is updated', function() {
+                                let getPaymentMethodsDeferred;
+                                let getPaymentPlanDeferred;
+
                                 beforeEach(function(done) {
+                                    getPaymentMethodsDeferred = q.defer();
+                                    getPaymentPlanDeferred = q.defer();
+
+                                    request.get.and.callFake(options => {
+                                        if (options.url === `${resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint)}methods`) {
+                                            return getPaymentMethodsDeferred.promise;
+                                        }
+
+                                        if (options.url === `${resolveURL(config.cwrx.api.root, config.cwrx.api.paymentPlans.endpoint)}/${org.paymentPlanId}`) {
+                                            return getPaymentPlanDeferred.promise;
+                                        }
+
+                                        return q.reject(new Error('Unknown URL!'));
+                                    });
+
                                     putOrgDeferred.fulfill([request.put.calls.mostRecent().args[0].json, { statusCode: 200 }]);
                                     setTimeout(done);
+                                    request.get.calls.reset();
                                 });
 
-                                it('should not produce an event', function() {
-                                    expect(watchmanStream.produce).not.toHaveBeenCalled();
+                                it('should get the org\'s payment plan', function() {
+                                    expect(request.get).toHaveBeenCalledWith({
+                                        url: `${resolveURL(config.cwrx.api.root, config.cwrx.api.paymentPlans.endpoint)}/${org.paymentPlanId}`
+                                    });
                                 });
 
-                                it('should fulfill with undefined', function() {
-                                    expect(success).toHaveBeenCalledWith(undefined);
+                                describe('when the paymentPlan is fetched', function() {
+                                    let paymentPlan;
+
+                                    beforeEach(function(done) {
+                                        paymentPlan = {
+                                            label: 'Starter',
+                                            price: 49.99,
+                                            maxCampaigns: 1,
+                                            viewsPerMonth: 2000,
+                                            id: org.paymentPlanId,
+                                            created: '2016-07-05T14:18:29.642Z',
+                                            lastUpdated: '2016-07-05T14:28:57.336Z',
+                                            status: 'active'
+                                        };
+
+                                        getPaymentPlanDeferred.resolve([paymentPlan, { statusCode: 200 }]);
+                                        setTimeout(done);
+                                        request.get.calls.reset();
+                                    });
+
+                                    it('should get the org\'s payment methods', function() {
+                                        expect(request.get).toHaveBeenCalledWith({
+                                            url: `${resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint)}methods`,
+                                            qs: { org: org.id }
+                                        });
+                                    });
+
+                                    describe('if the org has no payment method', function() {
+                                        beforeEach(function(done) {
+                                            getPaymentMethodsDeferred.resolve([[], { statusCode: 200 }]);
+                                            setTimeout(done);
+                                        });
+
+                                        it('should not produce a record', function() {
+                                            expect(watchmanStream.produce).not.toHaveBeenCalled();
+                                        });
+
+                                        it('should log an error', function() {
+                                            expect(log.error).toHaveBeenCalled();
+                                        });
+
+                                        it('should fulfill with undefined', function() {
+                                            expect(success).toHaveBeenCalledWith(undefined);
+                                        });
+                                    });
+
+                                    describe('when the payment methods are fetched', function() {
+                                        let paymentMethod;
+                                        let paymentMethods;
+                                        let produceDeferred;
+
+                                        beforeEach(function(done) {
+                                            paymentMethod = {
+                                                token: uuid.createUuid(),
+                                                default: true
+                                            };
+
+                                            paymentMethods = [
+                                                {
+                                                    token: uuid.createUuid(),
+                                                    default: false
+                                                },
+                                                {
+                                                    token: uuid.createUuid(),
+                                                    default: false
+                                                },
+                                                paymentMethod,
+                                                {
+                                                    token: uuid.createUuid(),
+                                                    default: false
+                                                }
+                                            ];
+
+                                            produceDeferred = q.defer();
+                                            watchmanStream.produce.and.returnValue(produceDeferred.promise);
+
+                                            getPaymentMethodsDeferred.resolve([paymentMethods, { statusCode: 200 }]);
+                                            setTimeout(done);
+                                        });
+
+
+                                        it('should produce a "paymentRequired" record', function() {
+                                            expect(watchmanStream.produce.calls.count()).toBe(1);
+
+                                            expect(watchmanStream.produce).toHaveBeenCalledWith({
+                                                type: 'paymentRequired',
+                                                data: {
+                                                    org,
+                                                    paymentPlan,
+                                                    paymentMethod,
+                                                    date: moment(data.date).format()
+                                                }
+                                            });
+                                        });
+
+                                        describe('if producing the record succeeds', function() {
+                                            beforeEach(function(done) {
+                                                produceDeferred.fulfill(watchmanStream.produce.calls.mostRecent().args[0]);
+                                                setTimeout(done);
+                                            });
+
+                                            it('should fulfill with undefined', function() {
+                                                expect(success).toHaveBeenCalledWith(undefined);
+                                            });
+                                        });
+
+                                        describe('if producing the record fails', function() {
+                                            let reason;
+
+                                            beforeEach(function(done) {
+                                                reason = new Error('Something went wrong!');
+
+                                                produceDeferred.reject(reason);
+                                                setTimeout(done);
+                                            });
+
+                                            it('should fulfill with undefined', function() {
+                                                expect(success).toHaveBeenCalledWith(undefined);
+                                            });
+
+                                            it('should log an error', function() {
+                                                expect(log.error).toHaveBeenCalled();
+                                            });
+                                        });
+                                    });
                                 });
                             });
                         });
@@ -324,25 +471,172 @@ describe('(action factory) activate_payment_plan', function() {
                                 setTimeout(done);
                             });
 
+                            it('should give the org a paymentPlanStart of today', function() {
+                                expect(request.put).toHaveBeenCalledWith({
+                                    url: resolveURL(config.cwrx.api.root, config.cwrx.api.orgs.endpoint) + '/' + org.id,
+                                    json: ld.merge({}, org, {
+                                        paymentPlanStart: moment(data.date).utcOffset(0).startOf('day').format(),
+                                        nextPaymentDate: null
+                                    })
+                                });
+                            });
+
                             describe('when the org is updated', function() {
+                                let getPaymentMethodsDeferred;
+                                let getPaymentPlanDeferred;
+
                                 beforeEach(function(done) {
-                                    request.get.and.returnValue(q.defer().promise);
+                                    getPaymentMethodsDeferred = q.defer();
+                                    getPaymentPlanDeferred = q.defer();
+
+                                    request.get.and.callFake(options => {
+                                        if (options.url === `${resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint)}methods`) {
+                                            return getPaymentMethodsDeferred.promise;
+                                        }
+
+                                        if (options.url === `${resolveURL(config.cwrx.api.root, config.cwrx.api.paymentPlans.endpoint)}/${org.paymentPlanId}`) {
+                                            return getPaymentPlanDeferred.promise;
+                                        }
+
+                                        return q.reject(new Error('Unknown URL!'));
+                                    });
 
                                     putOrgDeferred.fulfill([request.put.calls.mostRecent().args[0].json, { statusCode: 200 }]);
                                     setTimeout(done);
                                     request.get.calls.reset();
                                 });
 
-                                it('should not get the payment plan', function() {
-                                    expect(request.get).not.toHaveBeenCalled();
+                                it('should get the org\'s payment plan', function() {
+                                    expect(request.get).toHaveBeenCalledWith({
+                                        url: `${resolveURL(config.cwrx.api.root, config.cwrx.api.paymentPlans.endpoint)}/${org.paymentPlanId}`
+                                    });
                                 });
 
-                                it('should not produce an event', function() {
-                                    expect(watchmanStream.produce).not.toHaveBeenCalled();
-                                });
+                                describe('when the paymentPlan is fetched', function() {
+                                    let paymentPlan;
 
-                                it('should fulfill with undefined', function() {
-                                    expect(success).toHaveBeenCalledWith(undefined);
+                                    beforeEach(function(done) {
+                                        paymentPlan = {
+                                            label: 'Starter',
+                                            price: 49.99,
+                                            maxCampaigns: 1,
+                                            viewsPerMonth: 2000,
+                                            id: org.paymentPlanId,
+                                            created: '2016-07-05T14:18:29.642Z',
+                                            lastUpdated: '2016-07-05T14:28:57.336Z',
+                                            status: 'active'
+                                        };
+
+                                        getPaymentPlanDeferred.resolve([paymentPlan, { statusCode: 200 }]);
+                                        setTimeout(done);
+                                        request.get.calls.reset();
+                                    });
+
+                                    it('should get the org\'s payment methods', function() {
+                                        expect(request.get).toHaveBeenCalledWith({
+                                            url: `${resolveURL(config.cwrx.api.root, config.cwrx.api.payments.endpoint)}methods`,
+                                            qs: { org: org.id }
+                                        });
+                                    });
+
+                                    describe('if the org has no payment method', function() {
+                                        beforeEach(function(done) {
+                                            getPaymentMethodsDeferred.resolve([[], { statusCode: 200 }]);
+                                            setTimeout(done);
+                                        });
+
+                                        it('should not produce a record', function() {
+                                            expect(watchmanStream.produce).not.toHaveBeenCalled();
+                                        });
+
+                                        it('should log an error', function() {
+                                            expect(log.error).toHaveBeenCalled();
+                                        });
+
+                                        it('should fulfill with undefined', function() {
+                                            expect(success).toHaveBeenCalledWith(undefined);
+                                        });
+                                    });
+
+                                    describe('when the payment methods are fetched', function() {
+                                        let paymentMethod;
+                                        let paymentMethods;
+                                        let produceDeferred;
+
+                                        beforeEach(function(done) {
+                                            paymentMethod = {
+                                                token: uuid.createUuid(),
+                                                default: true
+                                            };
+
+                                            paymentMethods = [
+                                                {
+                                                    token: uuid.createUuid(),
+                                                    default: false
+                                                },
+                                                {
+                                                    token: uuid.createUuid(),
+                                                    default: false
+                                                },
+                                                paymentMethod,
+                                                {
+                                                    token: uuid.createUuid(),
+                                                    default: false
+                                                }
+                                            ];
+
+                                            produceDeferred = q.defer();
+                                            watchmanStream.produce.and.returnValue(produceDeferred.promise);
+
+                                            getPaymentMethodsDeferred.resolve([paymentMethods, { statusCode: 200 }]);
+                                            setTimeout(done);
+                                        });
+
+
+                                        it('should produce a "paymentRequired" record', function() {
+                                            expect(watchmanStream.produce.calls.count()).toBe(1);
+
+                                            expect(watchmanStream.produce).toHaveBeenCalledWith({
+                                                type: 'paymentRequired',
+                                                data: {
+                                                    org,
+                                                    paymentPlan,
+                                                    paymentMethod,
+                                                    date: moment(data.date).format()
+                                                }
+                                            });
+                                        });
+
+                                        describe('if producing the record succeeds', function() {
+                                            beforeEach(function(done) {
+                                                produceDeferred.fulfill(watchmanStream.produce.calls.mostRecent().args[0]);
+                                                setTimeout(done);
+                                            });
+
+                                            it('should fulfill with undefined', function() {
+                                                expect(success).toHaveBeenCalledWith(undefined);
+                                            });
+                                        });
+
+                                        describe('if producing the record fails', function() {
+                                            let reason;
+
+                                            beforeEach(function(done) {
+                                                reason = new Error('Something went wrong!');
+
+                                                produceDeferred.reject(reason);
+                                                setTimeout(done);
+                                            });
+
+                                            it('should fulfill with undefined', function() {
+                                                expect(success).toHaveBeenCalledWith(undefined);
+                                            });
+
+                                            it('should log an error', function() {
+                                                expect(log.error).toHaveBeenCalled();
+                                            });
+                                        });
+                                    });
                                 });
                             });
                         });
