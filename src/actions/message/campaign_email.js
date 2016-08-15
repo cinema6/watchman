@@ -16,6 +16,7 @@ const requestUtils = require('cwrx/lib/requestUtils.js');
 const sesTransport = require('nodemailer-ses-transport');
 const resolveURL = require('url').resolve;
 const url = require('url');
+const enums = require('cwrx/lib/enums.js');
 
 module.exports = function factory(config) {
     const emailConfig = config.emails;
@@ -24,6 +25,11 @@ module.exports = function factory(config) {
     const showcaseAnalyticsEndpoint = url.resolve(config.cwrx.api.root,
         `${config.cwrx.api.analytics.endpoint}/campaigns/showcase/apps`);
     const chartComposer = new ChartComposer();
+    const campaignsEndpoint = url.resolve(config.cwrx.api.root,
+        config.cwrx.api.campaigns.endpoint);
+    const releventStatuses = ld.values(enums.Status)
+        .filter(value => value !== enums.Status.Canceled && value !== enums.Status.Deleted);
+    const log = logger.getLog();
 
     function friendlyName(data) {
         return (data && data.user && data.user.firstName) ? `${data.user.firstName}, ` : '';
@@ -426,73 +432,111 @@ module.exports = function factory(config) {
             })
         }),
         stats: data => {
-            const uri = `${showcaseAnalyticsEndpoint}/${data.campaign.id}`;
-            return cwrxRequest.get(uri).then(results => {
-                const chartWidth = 640;
-                const chartHeight = 480;
-                const dateFormat = 'MMM D, YYYY';
-                const items = results[0].daily_7;
-                const log = logger.getLog();
-
-                function toPercent(number) {
-                    return Math.round(number * 100);
+            return cwrxRequest.get({
+                url: campaignsEndpoint,
+                qs: {
+                    application: 'showcase',
+                    org: data.org.id,
+                    statuses: releventStatuses.join(','),
+                    sort: 'created,1'
                 }
+            }).then(ld.spread(campaigns => {
+                return Promise.all(campaigns.map(campaign => {
+                    return cwrxRequest.get(`${showcaseAnalyticsEndpoint}/${campaign.id}`);
+                })).then(results => {
+                    const stats = results.map(result => result[0].daily_7);
 
-                function sum(numbers) {
-                    return numbers.reduce((lhs, rhs) => lhs + rhs);
-                }
+                    // Helper function to sum an array of Numbers
+                    function sum(numbers) {
+                        return numbers.reduce((lhs, rhs) => lhs + rhs, 0);
+                    }
 
-                // Organize and calculate data for the chart
-                const users = items.map(item => item.users);
-                const clicks = items.map(item => item.clicks);
-                const ctrs = items.map(item => toPercent(Math.min(
-                    item.clicks, item.users) / item.users) || null);
-                const labels = items.map(item => moment(item.date));
-                const firstLabel = labels[0];
-                const lastLabel = labels[items.length - 1];
-                const totalUsers = sum(users);
-                const totalClicks = sum(clicks);
-                const totalCtr = Math.round(Math.min(
-                    totalClicks, totalUsers) / totalUsers * 10000) / 100;
+                    // Helper function to compute a percent
+                    function toPercent(number) {
+                        return Math.round(number * 100);
+                    }
 
-                // Compile chart.js options
-                const chart = appsChart({
-                    items: items,
-                    industryCTR: 1,
-                    users: users,
-                    ctrs: ctrs,
-                    labels: labels
+                    // Aggregate stats by day
+                    const zippedStats = ld.spread(ld.zip)(stats);
+                    const aggregateUsers = zippedStats.map(appStats => sum(appStats.map(appStat =>
+                            appStat.users)));
+                    const aggregateClicks = zippedStats.map(appStats => sum(appStats.map(appStat =>
+                            appStat.clicks)));
+                    const aggregateCtrs = aggregateUsers.map((users, index) => toPercent(Math.min(
+                        aggregateClicks[index], users) / users) || null);
+                    const labels = stats[0].map(stat => moment(stat.date));
+
+                    // Compile chart.js options
+                    const chart = appsChart({
+                        items: zippedStats,
+                        industryCTR: 1,
+                        users: aggregateUsers,
+                        ctrs: aggregateCtrs,
+                        labels: labels
+                    });
+
+                    log.info(`Generating stats chart for org ${data.org.id}`);
+
+                    // Compose the chart
+                    return chartComposer.compose(chart, {
+                        width: 640,
+                        height: 480
+                    }).then(chartImage => {
+                        const chartData = chartImage.replace('data:image/png;base64,', '');
+
+                        // Calculate start and end dates
+                        const dateFormat = 'MMM D, YYYY';
+                        const firstLabel = labels[0];
+                        const lastLabel = labels[labels.length - 1];
+                        const startDate = firstLabel.format(dateFormat);
+                        const endDate = lastLabel.format(dateFormat);
+
+                        // Calculate stats for each app
+                        const apps = campaigns.map((campaign, index) => {
+                            const users = stats[index].map(item => item.users);
+                            const clicks = stats[index].map(item => item.clicks);
+                            const totalUsers = sum(users);
+                            const totalClicks = sum(clicks);
+                            const totalCtr = Math.round(Math.min(
+                                totalClicks, totalUsers) / totalUsers * 10000) / 100;
+
+                            return {
+                                name: campaign.name,
+                                views: totalUsers,
+                                clicks: totalClicks,
+                                ctr: totalCtr
+                            };
+                        });
+
+                        // Calculate total stats accross all apps
+                        const totalUsers = sum(aggregateUsers);
+                        const totalClicks = sum(aggregateClicks);
+                        const totalCtr = Math.round(Math.min(
+                            totalClicks, totalUsers) / totalUsers * 10000) / 100;
+
+                        return {
+                            template: 'weekOneStats--app',
+                            data: {
+                                firstName: data.user.firstName,
+                                dashboardLink: emailConfig.dashboardLinks.showcase,
+                                startDate: startDate,
+                                endDate: endDate,
+                                apps: apps,
+                                totalViews: totalUsers,
+                                totalClicks: totalClicks,
+                                totalCtr: totalCtr
+                            },
+                            attachments: getAttachments({
+                                target: 'showcase'
+                            }).concat([{
+                                filename: `stats_week_${data.week}.png`,
+                                cid: 'stats',
+                                content: chartData
+                            }])
+                        };
+                    });
                 });
-
-                log.info(`Generating stats chart for campaign ${data.campaign.id}`);
-
-                // Compose the chart
-                return chartComposer.compose(chart, {
-                    width: chartWidth,
-                    height: chartHeight
-                }).then(chartImage => {
-                    const chartData = chartImage.replace('data:image/png;base64,', '');
-                    return {
-                        template: 'weekOneStats--app',
-                        data: {
-                            firstName: data.user.firstName,
-                            startDate: firstLabel.format(dateFormat),
-                            endDate: lastLabel.format(dateFormat),
-                            views: totalUsers,
-                            clicks: totalClicks,
-                            ctr: totalCtr,
-                            dashboardLink: emailConfig.dashboardLinks.showcase
-                        },
-                        attachments: getAttachments({
-                            target: 'showcase'
-                        }).concat([{
-                            filename: `stats_week_${data.week}.png`,
-                            cid: 'stats',
-                            content: chartData
-                        }])
-                    };
-                });
-            });
+            }));
         }
     };
 
