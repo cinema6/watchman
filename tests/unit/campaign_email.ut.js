@@ -119,7 +119,8 @@ describe('campaign_email.js', function() {
                     initializedShowcaseCampaign: 'initializedShowcaseCampaign-template-id',
                     'campaignActive--app': 'campaignActive--app-template-id',
                     'promotionEnded--app': 'promotionEnded--app-template-id',
-                    'weekOneStats--app': 'weekOneStats--app-template-id'
+                    'weeklyStats1': 'weekOneStats--app-template-id',
+                    'weeklyStatsDefault': 'weekTwoStats--app-template-id'
                 }
             },
             state: {
@@ -2430,12 +2431,13 @@ describe('campaign_email.js', function() {
             }).then(done, done.fail);
         });
 
-        it('should be able to send', function(done) {
+        it('should be able to send on week one', function(done) {
             this.CwrxRequest.prototype.get.and.callFake(options => {
                 const url = options.url || options;
                 const analytics = /cam-123/.test(url) ? this.mockAnalytics[0] : this.mockAnalytics[1];
                 return /analytics/.test(url) ? Promise.resolve([analytics]) : Promise.resolve([this.mockCampaigns]);
             });
+            this.event.data.week = 1;
 
             this.email(this.event).then(() => {
                 expect(this.CwrxRequest.prototype.get).toHaveBeenCalledWith('https://root/analytics/campaigns/showcase/apps/cam-123');
@@ -2473,15 +2475,29 @@ describe('campaign_email.js', function() {
                     InlineCss: true,
                     From: 'e2eSender@fake.com',
                     To: 'somedude@fake.com',
-                    Tag: 'weekOneStats--app',
+                    Tag: 'weeklyStats1',
                     TrackOpens: true,
                     Attachments: this.showcasePostmarkAttachments.concat({
-                        Name: 'stats_week_2.png',
+                        Name: 'stats_week_1.png',
                         Content: jasmine.any(String),
                         ContentType: 'image/png',
                         ContentID: 'cid:stats'
                     })
                 }, jasmine.any(Function));
+            }).then(done, done.fail);
+        });
+
+        it('should be able to send on a future week using a different template', function (done) {
+            this.CwrxRequest.prototype.get.and.callFake(options => {
+                const url = options.url || options;
+                const analytics = /cam-123/.test(url) ? this.mockAnalytics[0] : this.mockAnalytics[1];
+                return /analytics/.test(url) ? Promise.resolve([analytics]) : Promise.resolve([this.mockCampaigns]);
+            });
+            this.event.data.week = 2;
+
+            this.email(this.event).then(() => {
+                expect(this.CwrxRequest.prototype.get).toHaveBeenCalledWith('https://root/analytics/campaigns/showcase/apps/cam-123');
+                expect(postmark.Client.prototype.sendEmailWithTemplate.calls.mostRecent().args[0].TemplateId).toBe('weekTwoStats--app-template-id');
             }).then(done, done.fail);
         });
     });

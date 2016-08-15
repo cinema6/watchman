@@ -514,8 +514,13 @@ module.exports = function factory(config) {
                         const totalCtr = Math.round(Math.min(
                             totalClicks, totalUsers) / totalUsers * 10000) / 100;
 
+                        // Get the appropriate weekly stats template
+                        const statsTemplates = config.postmark.templates;
+                        const weekId = `weeklyStats${data.week}`;
+                        const template = (weekId in statsTemplates) ? weekId : 'weeklyStatsDefault';
+
                         return {
-                            template: 'weekOneStats--app',
+                            template: template,
                             data: {
                                 firstName: data.user.firstName,
                                 dashboardLink: emailConfig.dashboardLinks.showcase,
