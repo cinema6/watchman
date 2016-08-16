@@ -6,11 +6,16 @@
   * [FEATURE]: Start a user's new payment plan immediately upon
     upgrading
   * [FEATURE]: Added updating of lineItems to upsertCampaignActiveLineItems
+  * [FEATURE]: Add support for bonus view promotions
   * **Extra Deployment Steps**:
     * Update postmark template config with new weekly stats templates
     * Deploy new postmark weekly stats templates
     * Update environment with `transition_payment_plans` action
     * Update environment with `check_plan_upgrade` action
+    * Configure `showcase/apps/auto_increase_budget` to only run for
+      transactions with a `paymentPlanId` property
+    * Update environment with `showcase/apps/rebalance` action
+    * Update environment with `fulfill_bonus_views` action
 
 ## v1.6.0 (August 11, 2016)
 * *[v1.6.0-rc1]*
