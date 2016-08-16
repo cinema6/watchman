@@ -1279,29 +1279,9 @@ describe('BeeswaxMiddleware(config)', function() {
                         bwEditLineItemDeferred.fulfill({ payload: { } });
                     });
 
-                    it('should query for all inactive line items', function (done) {
-                        middleWare.reactivateCampaign(campaign).then(function () {
-                            expect(beeswax.lineItems.queryAll).toHaveBeenCalledWith({
-                                campaign_id: 11,
-                                active: false
-                            });
-                        }).then(done, done.fail);
-                    });
-
                     it('should activate the campaign in beeswax', function (done) {
                         middleWare.reactivateCampaign(campaign).then(function () {
                             expect(beeswax.campaigns.edit).toHaveBeenCalledWith(11, {
-                                active: true
-                            });
-                        }).then(done, done.fail);
-                    });
-
-                    it('should activate all the inactive line items in beeswax', function (done) {
-                        middleWare.reactivateCampaign(campaign).then(function () {
-                            expect(beeswax.lineItems.edit).toHaveBeenCalledWith(22, {
-                                active: true
-                            });
-                            expect(beeswax.lineItems.edit).toHaveBeenCalledWith(33, {
                                 active: true
                             });
                         }).then(done, done.fail);
