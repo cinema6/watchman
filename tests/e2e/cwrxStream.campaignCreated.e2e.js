@@ -36,7 +36,7 @@ function waitUntil(predicate) {
 }
 
 describe('cwrxStream campaignCreated', function() {
-    var producer, request, beeswax, today ;
+    var producer, request, beeswax, today, cookies;
     var user, org, paymentPlans, advertiser, promotions, containers, campaign;
 
     function api(endpoint) {
@@ -141,6 +141,19 @@ describe('cwrxStream campaignCreated', function() {
                 paymentPlanId: null,
                 paymentPlanStart: moment().format()
             }]);
+        }).then(function makePolicy() {
+            return testUtils.resetCollection('policies', [{
+                id: 'pol-e2e',
+                name: 'manageAllOrgs',
+                status: 'active',
+                priority: 1,
+                permissions: {
+                    orgs: { read: 'all', create: 'all', edit: 'own', delete: 'own' }
+                },
+                entitlements: {
+                    makePayment: true
+                }
+            }]);
         }).then(function makeUser() {
             return testUtils.resetCollection('users', [{
                 id: userId,
@@ -200,6 +213,40 @@ describe('cwrxStream campaignCreated', function() {
                     }
                 }).then(ld.property('0'))
             ]);
+        });
+    }
+
+    const nonces = [
+        'fake-valid-visa-nonce',
+        'fake-valid-amex-nonce',
+        'fake-valid-mastercard-nonce',
+        'fake-valid-discover-nonce',
+        'fake-paypal-future-nonce'
+    ];
+    let nonceIndex = -1;
+    function createPaymentMethod(data) {
+        const user = data.user;
+        const nonce = nonces[++nonceIndex] || nonces[nonceIndex = 0];
+
+        return Promise.resolve().then(() => {
+            return request.post({
+                url: api('/api/auth/login'),
+                json: {
+                    email: user.email,
+                    password: 'password'
+                },
+                jar: cookies
+            });
+        }).then(function() {
+            return request.post({
+                url: api('/api/payments/methods'),
+                json: {
+                    paymentMethodNonce: nonce,
+                    makeDefault: true,
+                    cardholderName: 'Johnny Testmonkey'
+                },
+                jar: cookies
+            });
         });
     }
 
@@ -279,6 +326,9 @@ describe('cwrxStream campaignCreated', function() {
                     },
                     paymentPlans: {
                         endpoint: '/api/payment-plans'
+                    },
+                    payments: {
+                        endpoint: '/api/payments/'
                     },
                     analytics: {
                         endpoint: '/api/analytics'
@@ -401,6 +451,16 @@ describe('cwrxStream campaignCreated', function() {
                             name: 'create_promotion_credit'
                         }
                     ]
+                },
+                paymentRequired: {
+                    actions: [
+                        {
+                            name: 'charge_payment_plan',
+                            options: {
+                                target: 'showcase'
+                            }
+                        }
+                    ]
                 }
             }
         };
@@ -496,6 +556,8 @@ describe('cwrxStream campaignCreated', function() {
                 }
             }
         };
+
+        cookies = require('request').jar();
 
         containers = [
             {
@@ -1283,16 +1345,18 @@ describe('cwrxStream campaignCreated', function() {
             describe('but no promotions', function() {
                 beforeEach(function(done) {
                     updatePromotions([])
+                    .then(() => createPaymentMethod({ user }))
                     .then(() => campaignCreatedEvent(now))
                     .then(() => waitUntil(() => 
                         findBeeswaxCampaign(campaign)
                         .then(beeswaxCampaign => !!beeswaxCampaign)
                     ))
-                    //}).then(function() { return wait(8000);
                     .then(function() {
                         return waitUntil(function() {
                             return getOrg().then(function(org) {
-                                return org.paymentPlanStart && org;
+                                // The org's nextPaymentDate will be the last thing to be updated after
+                                // they are charged.
+                                return org.nextPaymentDate && org;
                             });
                         });
                     }).then(function(/*org*/) {
@@ -1302,15 +1366,41 @@ describe('cwrxStream campaignCreated', function() {
 
                 it('should give the org a paymentPlanStart of now', function() {
                     expect(moment(org.paymentPlanStart).utcOffset(0).format()).toBe(moment(now).utcOffset(0).startOf('day').format());
-                    expect(moment(org.nextPaymentDate).utcOffset(0).format()).toBe(moment(now).utcOffset(0).startOf('day').format());
                 });
 
-                it('should not give the org any credits', function(done) {
+                it('should give the org a nextPaymentDate of one month from now', function() {
+                    expect(moment(org.nextPaymentDate).utcOffset(0).format()).toBe(moment(now).utcOffset(0).add(1, 'month').startOf('day').format());
+                });
+
+                it('should charge the user', function(done) {
                     testUtils.pgQuery(
                         'SELECT * FROM fct.billing_transactions WHERE org_id = $1',
                         [org.id]
                     ).then(function(result) {
-                        expect(result.rows.length).toBe(0, 'A transaction was created.');
+                        const transaction = result.rows[0];
+
+                        expect(transaction).toEqual(jasmine.objectContaining({
+                            rec_key: jasmine.any(String),
+                            rec_ts: jasmine.any(Date),
+                            transaction_id: jasmine.any(String),
+                            transaction_ts: jasmine.any(Date),
+                            org_id: org.id,
+                            amount: '39.9900',
+                            sign: 1,
+                            units: 1,
+                            campaign_id: null,
+                            braintree_id: jasmine.any(String),
+                            promotion_id: null,
+                            description: '{"eventType":"credit","source":"braintree"}',
+                            view_target: paymentPlan.viewsPerMonth,
+                            cycle_end: jasmine.any(Date),
+                            cycle_start: jasmine.any(Date),
+                            paymentplan_id: paymentPlan.id,
+                            application: 'showcase'
+                        }));
+
+                        expect(moment(transaction.cycle_start).utcOffset(0).format()).toBe(moment(now).utcOffset(0).startOf('day').format(), 'cycle_start is incorrect');
+                        expect(moment(transaction.cycle_end).utcOffset(0).format()).toBe(moment(now).utcOffset(0).add(1, 'month').subtract(1, 'day').endOf('day').format(), 'cycle_end is incorrect');
                     }).then(done, done.fail);
                 });
             });
@@ -1412,7 +1502,8 @@ describe('cwrxStream campaignCreated', function() {
                         Promise.all([
                             updatePaymentPlan(paymentPlan.id).then(() => updatePaymentPlanStart(null)),
                             testUtils.mongoUpsert('campaigns', { id: campaign2.id }, campaign2),
-                            testUtils.pgQuery('DELETE FROM fct.billing_transactions')
+                            testUtils.pgQuery('DELETE FROM fct.billing_transactions'),
+                            createPaymentMethod({ user })
                         ]).then(ld.spread(function(/*org*/) {
                             org = arguments[0];
 
@@ -1421,12 +1512,12 @@ describe('cwrxStream campaignCreated', function() {
                             return waitUntil(function() {
                                 return q.all([
                                     testUtils.pgQuery(
-                                        'SELECT * FROM fct.billing_transactions WHERE org_id = $1 ORDER BY amount',
+                                        'SELECT * FROM fct.billing_transactions WHERE org_id = $1',
                                         [org.id]
                                     ),
                                     getOrg()
                                 ]).spread(function(queryResult, org) {
-                                    return org.paymentPlanStart && queryResult.rows.length > 0 && [org, queryResult.rows];
+                                    return org.nextPaymentDate && queryResult.rows.length === 1 && [org, queryResult.rows];
                                 });
                             });
                         }).then(ld.spread(function(/*org, transaction*/) {
@@ -1443,29 +1534,37 @@ describe('cwrxStream campaignCreated', function() {
 
                     it('should give the org a paymentPlanStart of now', function() {
                         expect(moment(org.paymentPlanStart).utcOffset(0).format()).toBe(moment(now).utcOffset(0).startOf('day').format());
-                        expect(moment(org.nextPaymentDate).utcOffset(0).format()).toBe(moment(now).utcOffset(0).startOf('day').format());
                     });
 
-                    it('should create a transaction', function() {
-                        expect(transactions.length).toBe(1);
-                        expect(transactions[0]).toEqual(jasmine.objectContaining({
+                    it('should set the org\'s nextPaymentDate to one month in the future', function() {
+                        expect(moment(org.nextPaymentDate).utcOffset(0).format()).toBe(moment(now).utcOffset(0).add(1, 'month').startOf('day').format());
+                    });
+
+                    it('should charge the user for their payment plan', function() {
+                        const transaction = ld.find(transactions, { paymentplan_id: paymentPlan.id });
+
+                        expect(transaction).toEqual(jasmine.objectContaining({
                             rec_key: jasmine.any(String),
                             rec_ts: jasmine.any(Date),
                             transaction_id: jasmine.any(String),
                             transaction_ts: jasmine.any(Date),
                             org_id: org.id,
-                            amount: '20.0000',
+                            amount: '149.9900',
                             sign: 1,
                             units: 1,
                             campaign_id: null,
-                            braintree_id: null,
-                            promotion_id: promotions[0].id,
-                            application: 'showcase',
-                            paymentplan_id: null,
-                            view_target: 1000,
-                            cycle_start: null,
-                            cycle_end: null
+                            braintree_id: jasmine.any(String),
+                            promotion_id: null,
+                            description: '{"eventType":"credit","source":"braintree"}',
+                            view_target: paymentPlan.viewsPerMonth,
+                            cycle_end: jasmine.any(Date),
+                            cycle_start: jasmine.any(Date),
+                            paymentplan_id: paymentPlan.id,
+                            application: 'showcase'
                         }));
+
+                        expect(moment(transaction.cycle_start).utcOffset(0).format()).toBe(moment(now).utcOffset(0).startOf('day').format(), 'cycle_start is incorrect');
+                        expect(moment(transaction.cycle_end).utcOffset(0).format()).toBe(moment(now).utcOffset(0).add(1, 'month').subtract(1, 'day').endOf('day').format(), 'cycle_end is incorrect');
                     });
                 });
             });

@@ -66,6 +66,9 @@ describe('cwrxStream', function() {
                     },
                     transactions: {
                         endpoint: '/api/transactions'
+                    },
+                    campaigns: {
+                        endpoint: '/api/campaigns'
                     }
                 }
             },

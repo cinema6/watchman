@@ -297,6 +297,9 @@ describe('timeStream payment plan billing', function() {
                     },
                     users: {
                         endpoint: '/api/account/users'
+                    },
+                    campaigns: {
+                        endpoint: '/api/campaigns'
                     }
                 }
             },

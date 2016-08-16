@@ -11,12 +11,30 @@ var uuid = require('rc-uuid');
 var moment = require('moment-timezone');
 var Status = require('cwrx/lib/enums').Status;
 var BeeswaxHelper = require('../helpers/BeeswaxHelper');
+const delay = require('../helpers/waiter').delay;
 
 var API_ROOT = process.env.apiRoot;
 var APP_CREDS = JSON.parse(process.env.appCreds);
 var AWS_CREDS = JSON.parse(process.env.awsCreds);
 var CWRX_STREAM = process.env.cwrxStream;
+const CWRX_STREAM_2 = process.env.cwrxStream2;
 var PREFIX = process.env.appPrefix;
+
+const mockman = new testUtils.Mockman({
+    streamName: CWRX_STREAM_2 || CWRX_STREAM
+});
+
+function waitForMockman(eventType, n) {
+    var records = [];
+    return new Promise(resolve => {
+        mockman.on(eventType, function(record) {
+            records.push(record);
+            if(records.length === n) {
+                resolve(records);
+            }
+        });
+    });
+}
 
 function toBeeswaxDate(dt){
     return moment(dt).tz('America/New_York').format('YYYY-MM-DD HH:mm:ss');
@@ -41,8 +59,9 @@ function waitUntil(predicate) {
 }
 
 describe('cwrxStream transactionCreated', function() {
-    var producer, request, beeswax;
-    var advertiser, campaigns, beeswaxCampaigns,
+    let sharedConfig, cwrxConfig, timeConfig, watchmanConfig;
+    var producer, request, beeswax, cookies;
+    var advertiser, campaigns, beeswaxCampaigns, org, paymentPlan, user, policy,
         targetCampaignIds, otherCampaignIds, ourCampaignIds;
     var targetOrg, transaction;
 
@@ -122,93 +141,71 @@ describe('cwrxStream transactionCreated', function() {
         });
     }
 
-    // This beforeAll is dedicated to setting application config
-    beforeAll(function(done) {
-        const configurator = new Configurator();
-        const sharedConfig = {
-            secrets: '/opt/sixxy/.watchman.secrets.json',
-            appCreds: '/opt/sixxy/.rcAppCreds.json',
-            cwrx: {
-                api: {
-                    root: API_ROOT,
-                    tracking : 'https://audit.cinema6.com/pixel.gif',
-                    campaigns: {
-                        endpoint: '/api/campaigns'
+    const createPaymentMethod = (() => {
+        const nonces = [
+            'fake-valid-visa-nonce',
+            'fake-valid-amex-nonce',
+            'fake-valid-mastercard-nonce',
+            'fake-valid-discover-nonce',
+            'fake-paypal-future-nonce'
+        ];
+        let nonceIndex = -1;
+
+        return function createPaymentMethod(data) {
+            const user = data.user;
+            const nonce = nonces[++nonceIndex] || nonces[nonceIndex = 0];
+
+            return Promise.resolve().then(() => {
+                return request.post({
+                    url: api('/api/auth/login'),
+                    json: {
+                        email: user.email,
+                        password: 'password'
                     },
-                    placements: {
-                        endpoint: '/api/placements'
+                    jar: cookies
+                });
+            }).then(function() {
+                return request.post({
+                    url: api('/api/payments/methods'),
+                    json: {
+                        paymentMethodNonce: nonce,
+                        makeDefault: true,
+                        cardholderName: 'Johnny Testmonkey'
                     },
-                    advertisers: {
-                        endpoint: '/api/account/advertisers'
+                    jar: cookies
+                }).spread(paymentMethod => paymentMethod);
+            });
+        };
+    })();
+
+    function createPayment(data) {
+        const user = data.user;
+        const paymentMethod = data.paymentMethod;
+        const paymentPlan = data.paymentPlan;
+
+        return Promise.resolve().then(() => {
+            return request.post({
+                url: api('/api/payments'),
+                qs: {
+                    org: user.org,
+                    target: 'showcase'
+                },
+                json: {
+                    paymentMethod: paymentMethod.token,
+                    amount: paymentPlan.price,
+                    transaction: {
+                        application: 'showcase',
+                        paymentPlanId: paymentPlan.id,
+                        targetUsers: paymentPlan.viewsPerMonth,
+                        cycleStart: moment().utcOffset(0).startOf('day').format(),
+                        cycleEnd: moment().utcOffset(0).add(1, 'month').subtract(1, 'day').endOf('day').format()
                     }
                 }
-            },
-            //beeswax : {
-            //    templates : {
-            //        targeting : {
-            //            mobile_app: [ {
-            //                exclude: { app_bundle_list: [ 7031 ] }
-            //            }]
-            //        }
-            //    }
-            //},
-            campaign: {
-                conversionMultipliers: {
-                    internal: 1.1,
-                    external: 1.25
-                }
-            },
-            emails: {
-                sender: 'support@cinema6.com'
-            },
-            postmark: {
-                templates: {
-                }
-            }
-        };
-        const cwrxConfig = {
-            eventHandlers: {
-                transactionCreated: {
-                    actions: [
-                        {
-                            name: 'showcase/apps/auto_increase_budget',
-                            options: {
-                                dailyLimit: 2,
-                                externalAllocationFactor: 0.5
-                            },
-                            ifData: {
-                                'transaction.sign': '^1$',
-                                'transaction.application': '^showcase$'
-                            }
-                        }
-                    ]
-                }
-            }
-        };
-        const timeConfig = {
-            eventHandlers: { }
-        };
-        const watchmanConfig = {
-            eventHandlers: { }
-        };
-        Promise.all([
-            configurator.updateConfig(`${PREFIX}CwrxStreamApplication`, sharedConfig, cwrxConfig),
-            configurator.updateConfig(`${PREFIX}TimeStreamApplication`, sharedConfig, timeConfig),
-            configurator.updateConfig(`${PREFIX}WatchmanStreamApplication`, sharedConfig, watchmanConfig)
-        ]).then(done, done.fail);
-    });
+            }).spread(payment => payment);
+        });
+    }
 
-    beforeAll(function() {
-        var awsConfig = ld.assign({ region: 'us-east-1' }, AWS_CREDS || {});
-
-        jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000;
-
-        producer = new JsonProducer(CWRX_STREAM, awsConfig);
-        request = new CwrxRequest(APP_CREDS);
-        beeswax = new BeeswaxHelper();
-    });
-
-    beforeAll(function(done) {
+    function initSystem() {
         var cwrxApp = {
             id: 'app-cwrx',
             created: new Date(),
@@ -247,7 +244,7 @@ describe('cwrxStream transactionCreated', function() {
                 advertisers: { read: 'all', create: 'all', edit: 'all', delete: 'all' },
                 placements: { read: 'all', create: 'all' },
                 promotions: { read: 'all' },
-                transactions: { create: 'all' }
+                transactions: { read: 'all', create: 'all', edit: 'all', delete: 'all' }
             },
             entitlements: {
                 directEditCampaigns: true,
@@ -279,13 +276,62 @@ describe('cwrxStream transactionCreated', function() {
                 }
             }
         };
-        q.all([
-            testUtils.resetCollection('applications', [watchmanApp, cwrxApp])
+
+        paymentPlan = {
+            id: 'pp-0Ek5Na02vCohpPgw',
+            label: 'Pro',
+            price: 149.99,
+            maxCampaigns: 5,
+            viewsPerMonth: 7500,
+            created: '2016-07-05T14:18:29.642Z',
+            lastUpdated: '2016-07-05T14:28:57.336Z',
+            status: 'active'
+        };
+
+        org = {
+            id: createId('o'),
+            status: 'active',
+            name: 'The Best Org',
+            paymentPlanId: paymentPlan.id,
+            paymentPlanStart: moment().format()
+        };
+
+        user = {
+            id: createId('u'),
+            status: 'active',
+            firstName: 'Johnny',
+            lastName: 'Testmonkey',
+            company: 'Bananas 4 Bananas, Inc.',
+            email: 'c6e2etester@gmail.com',
+            password: '$2a$10$XomlyDak6mGSgrC/g1L7FO.4kMRkj4UturtKSzy6mFeL8QWOBmIWq',
+            org: org.id,
+            policies: ['manageAllOrgs']
+        };
+
+        policy = {
+            id: 'pol-e2e',
+            name: 'manageAllOrgs',
+            status: 'active',
+            priority: 1,
+            permissions: {
+                orgs: { read: 'all', create: 'all', edit: 'own', delete: 'own' }
+            },
+            entitlements: {
+                makePayment: true
+            }
+        };
+
+        return q.all([
+            testUtils.resetCollection('applications', [watchmanApp, cwrxApp]),
+            testUtils.resetCollection('paymentPlans', [paymentPlan]),
+            testUtils.resetCollection('orgs', [org]),
+            testUtils.resetCollection('users', [user]),
+            testUtils.resetCollection('policies', [policy])
         ]).then(function() {
             return createAdvertiser();
         }).then(function(/*advertiser*/) {
             advertiser = arguments[0];
-            targetOrg = createId('o');
+            targetOrg = org.id;
 
             targetCampaignIds = [createId('cam'), createId('cam')];
             campaigns = [
@@ -434,95 +480,417 @@ describe('cwrxStream transactionCreated', function() {
             });
 
             return testUtils.resetCollection('campaigns', campaigns);
-        }).then(done, done.fail);
+        });
+    }
+
+    function cleanupSystem() {
+        return beeswax.cleanupAdvertiser(advertiser.externalIds.beeswax);
+    }
+
+    // This beforeAll is dedicated to setting application config
+    beforeAll(function(done) {
+        const configurator = new Configurator();
+        sharedConfig = {
+            secrets: '/opt/sixxy/.watchman.secrets.json',
+            appCreds: '/opt/sixxy/.rcAppCreds.json',
+            cwrx: {
+                api: {
+                    root: API_ROOT,
+                    tracking : 'https://audit.cinema6.com/pixel.gif',
+                    campaigns: {
+                        endpoint: '/api/campaigns'
+                    },
+                    placements: {
+                        endpoint: '/api/placements'
+                    },
+                    advertisers: {
+                        endpoint: '/api/account/advertisers'
+                    },
+                    orgs: {
+                        endpoint: '/api/account/orgs'
+                    },
+                    payments: {
+                        endpoint: '/api/payments/'
+                    },
+                    promotions: {
+                        endpoint: '/api/promotions'
+                    },
+                    paymentPlans: {
+                        endpoint: '/api/payment-plans'
+                    },
+                    analytics: {
+                        endpoint: '/api/analytics'
+                    },
+                    transactions: {
+                        endpoint: '/api/transactions'
+                    }
+                }
+            },
+            //beeswax : {
+            //    templates : {
+            //        targeting : {
+            //            mobile_app: [ {
+            //                exclude: { app_bundle_list: [ 7031 ] }
+            //            }]
+            //        }
+            //    }
+            //},
+            campaign: {
+                conversionMultipliers: {
+                    internal: 1.1,
+                    external: 1.25
+                }
+            },
+            emails: {
+                sender: 'support@cinema6.com'
+            },
+            postmark: {
+                templates: {
+                }
+            }
+        };
+        cwrxConfig = {
+            eventHandlers: {
+                transactionCreated: {
+                    actions: [
+                        {
+                            name: 'showcase/apps/auto_increase_budget',
+                            options: {
+                                dailyLimit: 2,
+                                externalAllocationFactor: 0.5
+                            },
+                            ifData: {
+                                'transaction.sign': '^1$',
+                                'transaction.application': '^showcase$',
+                                'transaction.paymentPlanId': '^pp-'
+                            }
+                        },
+                        {
+                            name: 'showcase/apps/rebalance',
+                            ifData: {
+                                'transaction.sign': '^1$',
+                                'transaction.application': '^showcase$',
+                                'transaction.paymentPlanId': '^(null|undefined)$'
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+        timeConfig = {
+            eventHandlers: { }
+        };
+        watchmanConfig = {
+            eventHandlers: {
+                increasedCampaignBudgets: {
+                    actions: [
+                        {
+                            name: 'fulfill_bonus_views',
+                            options: {
+                                target: 'showcase'
+                            }
+                        }
+                    ]
+                },
+                promotionFulfilled: {
+                    actions: [
+                        {
+                            name: 'create_promotion_credit'
+                        }
+                    ]
+                }
+            }
+        };
+        Promise.all([
+            configurator.updateConfig(`${PREFIX}CwrxStreamApplication`, sharedConfig, cwrxConfig),
+            configurator.updateConfig(`${PREFIX}TimeStreamApplication`, sharedConfig, timeConfig),
+            configurator.updateConfig(`${PREFIX}WatchmanStreamApplication`, sharedConfig, watchmanConfig)
+        ]).then(done, done.fail);
     });
 
-    afterAll(function(done) {
-        beeswax.cleanupAdvertiser(advertiser.externalIds.beeswax)
-        .then(done, done.fail);
+    beforeAll(function() {
+        var awsConfig = ld.assign({ region: 'us-east-1' }, AWS_CREDS || {});
+
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000;
+
+        producer = new JsonProducer(CWRX_STREAM, awsConfig);
+        request = new CwrxRequest(APP_CREDS);
+        beeswax = new BeeswaxHelper();
+        cookies = require('request').jar();
+    });
+
+    describe('if the org has a bonus view promotion', () => {
+        let promotion;
+
+        beforeAll(done => {
+            initSystem().then(() => {
+                const configurator = new Configurator();
+
+                promotion = {
+                    id: createId('pro'),
+                    status: 'active',
+                    created: moment().subtract(6, 'months').format(),
+                    lastUpdated: moment().subtract(6, 'months').format(),
+                    name: 'Free Trial',
+                    type: 'freeTrial',
+                    data: {
+                        [paymentPlan.id]: {
+                            paymentMethodRequired: true,
+                            targetUsers: 1000,
+                            trialLength: null
+                        }
+                    }
+                };
+                org.promotions = [
+                    {
+                        id: promotion.id,
+                        created: moment().format(),
+                        lastUpdated: moment().format(),
+                        status: 'active'
+                    }
+                ];
+
+                return Promise.resolve().then(() =>{
+                    return Promise.all([
+                        testUtils.resetCollection('promotions', [promotion]),
+                        testUtils.resetCollection('orgs', [org]),
+                        testUtils.resetPGTable('fct.billing_transactions'),
+                        mockman.start()
+                    ]);
+                }).then(() => {
+                    // First remove all cwrx event handlers before seeding braintree with a payment
+                    return configurator.updateConfig(`${PREFIX}CwrxStreamApplication`, sharedConfig, {
+                        eventHandlers: {}
+                    });
+                }).then(() => {
+                    return createPaymentMethod({ user });
+                }).then(paymentMethod => {
+                    createPayment({ user, paymentMethod, paymentPlan });
+
+                    return waitForMockman('transactionCreated', 1);
+                }).then(() => delay(2000)).then(() => {
+                    return request.get({
+                        url: api('/api/transactions'),
+                        qs: { org: org.id }
+                    }).spread(transactions => transactions[0]);
+                }).then(transaction => {
+                    // Restore cwrx config now that the payment/transaction has been created.
+                    return configurator.updateConfig(`${PREFIX}CwrxStreamApplication`, sharedConfig, cwrxConfig).then(() => {
+                        return producer.produce({
+                            type: 'transactionCreated',
+                            data: {
+                                transaction,
+                                date: moment().format()
+                            }
+                        });
+                    });
+                }).then(() => waitUntil(() => {
+                    return Promise.resolve().then(() => {
+                        return request.get({
+                            url: api('/api/campaigns'),
+                            qs: { ids: targetCampaignIds.join(',') }
+                        }).spread(campaigns => campaigns);
+                    }).then(campaigns => {
+                        // Every campaign needs to have a beeswax campaign.
+                        if (campaigns.some(campaign => !ld.get(campaign, 'externalIds.beeswax'))) {
+                            return false;
+                        }
+
+                        return Promise.all(campaigns.map(
+                            campaign => beeswax.api.lineItems.query({
+                                campaign_id : campaign.externalIds.beeswax
+                            }).then(response => {
+                                const lineItem = response.payload && response.payload[0];
+
+                                // Wait until line items' budgets have been increased a second time.
+                                return lineItem && (lineItem.line_item_budget > (3750 * ld.get(campaign, 'conversionMultipliers.external', 1.25)));
+                            })
+                        )).then(results => results.every(result => result));
+                    });
+                }));
+            }).then(done, done.fail);
+        });
+
+        afterAll(done => {
+            cleanupSystem().then(() => {
+                return Promise.all([
+                    mockman.stop()
+                ]).then(done, done.fail);
+            }).then(done, done.fail);
+        });
+
+        it('should create a transaction for the bonus views', done => {
+            testUtils.pgQuery(
+                'SELECT * FROM fct.billing_transactions WHERE org_id = $1 AND paymentplan_id IS NULL',
+                [org.id]
+            )
+            .then(result => {
+                const transaction = result.rows[0];
+
+                expect(transaction).toEqual(jasmine.objectContaining({
+                    rec_key: jasmine.any(String),
+                    rec_ts: jasmine.any(Date),
+                    transaction_id: jasmine.any(String),
+                    transaction_ts: jasmine.any(Date),
+                    org_id: org.id,
+                    amount: '20.0000',
+                    sign: 1,
+                    units: 1,
+                    campaign_id: null,
+                    braintree_id: null,
+                    promotion_id: promotion.id,
+                    description: '{"eventType":"credit","source":"promotion"}',
+                    view_target: 1000,
+                    cycle_end: null,
+                    cycle_start: null,
+                    paymentplan_id: null,
+                    application: 'showcase'
+                }));
+            })
+            .then(done, done.fail);
+        });
+
+        it('should set the pricing hash of every showcase campaign', done => {
+            Promise.all(targetCampaignIds.map(id => (
+                request.get({ url: api(`/api/campaigns/${id}`) }).spread(campaign => campaign)
+            )))
+            .then(campaigns => targetCampaignIds.map(id => ld.find(campaigns, { id })))
+            .then(campaigns => {
+                expect(campaigns[0].pricing).toEqual({
+                    model: 'cpv',
+                    cost: 0.013,
+                    budget: 87.32,
+                    dailyLimit: 2
+                });
+
+                expect(campaigns[1].pricing).toEqual({
+                    model: 'cpv',
+                    cost: 0.018,
+                    budget: 85.07,
+                    dailyLimit: 2
+                });
+            })
+            .then(done, done.fail);
+        });
+
+        it('should set the impressions of the beeswax campaigns', done => {
+            Promise.all(targetCampaignIds.map(id => (
+                request.get({ url: api(`/api/campaigns/${id}`) }).spread(campaign => campaign)
+            )))
+            .then(campaigns => targetCampaignIds.map(id => ld.find(campaigns, { id })))
+            .then(campaigns => Promise.all(campaigns.map(campaign => (
+                beeswax.api.campaigns.find(campaign.externalIds.beeswax).then(response => response.payload)
+            ))))
+            .then(beeswaxCampaigns => {
+                expect(beeswaxCampaigns[0].campaign_budget).toBe(9250);
+                expect(beeswaxCampaigns[1].campaign_budget).toBe(6062.5);
+            })
+            .then(done, done.fail);
+        });
+
+        it('should set the impressions of the beeswax line items', done => {
+            Promise.all(targetCampaignIds.map(id => (
+                request.get({ url: api(`/api/campaigns/${id}`) }).spread(campaign => campaign)
+            )))
+            .then(campaigns => targetCampaignIds.map(id => ld.find(campaigns, { id })))
+            .then(campaigns => Promise.all(campaigns.map(campaign => (
+                beeswax.api.lineItems.query({ campaign_id: campaign.externalIds.beeswax }).then(response => response.payload[0])
+            ))))
+            .then(beeswaxLineItems => {
+                expect(beeswaxLineItems[0].line_item_budget).toBe(8500);
+                expect(beeswaxLineItems[1].line_item_budget).toBe(5313);
+            })
+            .then(done, done.fail);
+        });
     });
 
     describe('when produced', function() {
         var updatedCampaigns, updatedBeeswaxCampaigns, updatedBeeswaxLineItems;
 
         beforeAll(function(done) {
-            transaction = {
-                id: createId('t'),
-                created: new Date().toISOString(),
-                transactionTS: new Date().toISOString(),
-                amount: 50,
-                sign: 1,
-                units: 1,
-                org: targetOrg,
-                campaign: null,
-                braintreeId: null,
-                promotion: createId('pro'),
-                application: 'showcase',
-                paymentPlanId: 'pp-0Ek5Na02vCohpPgw',
-                targetUsers: 2000,
-                cycleStart: moment().format(),
-                cycleEnd: moment().add(1, 'month').subtract(1, 'day').format()
-            };
+            initSystem().then(() => {
+                transaction = {
+                    id: createId('t'),
+                    created: new Date().toISOString(),
+                    transactionTS: new Date().toISOString(),
+                    amount: 50,
+                    sign: 1,
+                    units: 1,
+                    org: targetOrg,
+                    campaign: null,
+                    braintreeId: null,
+                    promotion: createId('pro'),
+                    application: 'showcase',
+                    paymentPlanId: 'pp-0Ek5Na02vCohpPgw',
+                    targetUsers: 2000,
+                    cycleStart: moment().format(),
+                    cycleEnd: moment().add(1, 'month').subtract(1, 'day').format()
+                };
 
-            transactionCreatedEvent().then(function() {
-                return waitUntil(() => Promise.all([
-                    Promise.all(targetCampaignIds.map(id => (
-                        request.get({
-                            url: api('/api/campaigns/' + id),
-                            json: true
-                        }).spread(campaign => (
-                            (
-                                moment(campaign.lastUpdated).isAfter(
-                                    moment().subtract(1, 'day'))
-                            ) && campaign
-                        ))
-                    )))
-                    .then(campaigns => 
-                        campaigns.every(campaign => !!campaign) && campaigns
-                    ),
-                    Promise.all(targetCampaignIds.map(id => {
-                        const campaign = ld.find(campaigns, { id });
+                return transactionCreatedEvent().then(function() {
+                    return waitUntil(() => Promise.all([
+                        Promise.all(targetCampaignIds.map(id => (
+                            request.get({
+                                url: api('/api/campaigns/' + id),
+                                json: true
+                            }).spread(campaign => (
+                                (
+                                    moment(campaign.lastUpdated).isAfter(
+                                        moment().subtract(1, 'day'))
+                                ) && campaign
+                            ))
+                        )))
+                        .then(campaigns => 
+                            campaigns.every(campaign => !!campaign) && campaigns
+                        ),
+                        Promise.all(targetCampaignIds.map(id => {
+                            const campaign = ld.find(campaigns, { id });
 
-                        return beeswax.api.campaigns.find(campaign.externalIds.beeswax)
+                            return beeswax.api.campaigns.find(campaign.externalIds.beeswax)
+                                .then(response => {
+                                    const beeswaxCampaign = response.payload;
+                                    const oldBeeswaxCampaign = ld.find(
+                                        beeswaxCampaigns, 
+                                        { campaign_id: beeswaxCampaign.campaign_id }
+                                    );
+
+                                    return (
+                                        beeswaxCampaign.campaign_budget !==
+                                            oldBeeswaxCampaign.campaign_budget
+                                    ) && beeswaxCampaign;
+                                });
+                        }))
+                        .then(beeswaxCampaigns => 
+                            beeswaxCampaigns.every(beeswaxCampaign => !!beeswaxCampaign)
+                                && beeswaxCampaigns
+                        ),
+                        Promise.all(targetCampaignIds.map(id => {
+                            const campaign = ld.find(campaigns, { id });
+
+                            return beeswax.api.lineItems.query({
+                                campaign_id : campaign.externalIds.beeswax
+                            })
                             .then(response => {
-                                const beeswaxCampaign = response.payload;
-                                const oldBeeswaxCampaign = ld.find(
-                                    beeswaxCampaigns, 
-                                    { campaign_id: beeswaxCampaign.campaign_id }
-                                );
-
-                                return (
-                                    beeswaxCampaign.campaign_budget !==
-                                        oldBeeswaxCampaign.campaign_budget
-                                ) && beeswaxCampaign;
+                                return response.payload;
                             });
-                    }))
-                    .then(beeswaxCampaigns => 
-                        beeswaxCampaigns.every(beeswaxCampaign => !!beeswaxCampaign)
-                            && beeswaxCampaigns
-                    ),
-                    Promise.all(targetCampaignIds.map(id => {
-                        const campaign = ld.find(campaigns, { id });
-
-                        return beeswax.api.lineItems.query({
-                            campaign_id : campaign.externalIds.beeswax
-                        })
-                        .then(response => {
-                            return response.payload;
-                        });
-                    }))
-                    .then(beeswaxLineItems => 
-                        beeswaxLineItems.every(
-                            item => (!!item && (item.length === 1) && item[0].active)
-                        ) && (beeswaxLineItems.length === 2 ) && beeswaxLineItems
-                    )
-                ]).then(items => items.every(item => !!item) && items)
-                ).spread(function(/*updatedCampaigns, updatedBeeswaxCampaigns*/) {
-                    updatedCampaigns = arguments[0];
-                    updatedBeeswaxCampaigns = arguments[1];
-                    updatedBeeswaxLineItems = arguments[2];
+                        }))
+                        .then(beeswaxLineItems => 
+                            beeswaxLineItems.every(
+                                item => (!!item && (item.length === 1) && item[0].active)
+                            ) && (beeswaxLineItems.length === 2 ) && beeswaxLineItems
+                        )
+                    ]).then(items => items.every(item => !!item) && items)
+                    ).spread(function(/*updatedCampaigns, updatedBeeswaxCampaigns*/) {
+                        updatedCampaigns = arguments[0];
+                        updatedBeeswaxCampaigns = arguments[1];
+                        updatedBeeswaxLineItems = arguments[2];
+                    });
                 });
             }).then(done, done.fail);
+        });
+
+        afterAll(done => {
+            cleanupSystem().then(done, done.fail);
         });
 
         it('should update each showcase campaign for the org', function() {
