@@ -16,7 +16,7 @@ describe('(action factory) check_payment_required', function() {
         parseURL = require('url').parse;
 
         JsonProducer = jasmine.createSpy('JsonProducer()').and.callFake(() => ({
-            produce: jasmine.createSpy('produce()').and.returnValue(q.defer().promise)
+            produce: jasmine.createSpy('produce()').and.callFake(options => q(options))
         }));
         CwrxRequest = jasmine.createSpy('CwrxRequest()').and.callFake(() => ({
             send: jasmine.createSpy('send()').and.returnValue(q.defer().promise),
@@ -251,8 +251,8 @@ describe('(action factory) check_payment_required', function() {
                             expect(watchmanStream.produce).not.toHaveBeenCalled();
                         });
 
-                        it('should reject the Promise', function() {
-                            expect(failure).toHaveBeenCalledWith(new Error('Org ' + data.org.id + ' has no payment methods.'));
+                        it('should fulfill the Promise', function() {
+                            expect(success).toHaveBeenCalled();
                         });
                     });
 
@@ -286,6 +286,27 @@ describe('(action factory) check_payment_required', function() {
                         });
                     });
 
+                    describe('if the paymentPlan is free', () => {
+                        beforeEach(done => {
+                            paymentPlan.price = 0;
+
+                            getPaymentMethodsDeferred.resolve([
+                                [paymentMethod],
+                                { statusCode: 200 }
+                            ]);
+                            getPaymentPlanDeferred.resolve([paymentPlan, { statusCode: 200 }]);
+                            setTimeout(done);
+                        });
+
+                        it('should not add a record to the watchmanStream', () => {
+                            expect(watchmanStream.produce).not.toHaveBeenCalled();
+                        });
+
+                        it('should fulfill the Promise', () => {
+                            expect(success).toHaveBeenCalled();
+                        });
+                    });
+
                     describe('if the org has a default paymentMethod', function() {
                         beforeEach(function(done) {
                             getPaymentMethodsDeferred.resolve([
@@ -314,6 +335,10 @@ describe('(action factory) check_payment_required', function() {
                                     date: data.date
                                 }
                             });
+                        });
+
+                        it('should fulfill the Promise', () => {
+                            expect(success).toHaveBeenCalled();
                         });
                     });
                 }));

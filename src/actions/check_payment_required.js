@@ -44,8 +44,27 @@ module.exports = function factory(config) {
             const paymentMethod = ld.find(paymentMethods, { default: true });
 
             if (!paymentMethod) {
-                throw new Error('Org ' + org.id + ' has no payment methods.');
+                log.info(
+                    'org(%1) has no payment method.',
+                    org.id
+                );
+
+                return undefined;
             }
+
+            if (!paymentPlan.price) {
+                log.info(
+                    'org(%1) has paymentPlan(%2) whice has a price of $%3. Doing nothing.',
+                    org.id, paymentPlan.id, paymentPlan.price
+                );
+
+                return undefined;
+            }
+
+            log.info(
+                'Producing "paymentRequired" for org(%1).',
+                org.id
+            );
 
             return watchmanStream.produce({
                 type: 'paymentRequired',
