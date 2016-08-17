@@ -94,7 +94,8 @@ describe('BeeswaxMiddleware(config)', function() {
                     platform: 'iOS',
                     categories : [ 'Music', 'Business' ],
                     websites   : [ 'https://1', 'https://2' ]
-                }
+                },
+                org: 'o-1234567'
             };
 
             placements = [
@@ -166,9 +167,11 @@ describe('BeeswaxMiddleware(config)', function() {
                     api: {
                         root: 'http://33.33.33.10/',
                         tracking: 'http://audit.rc.com/pixel.gif',
-                        placements:  { endpoint: '/api/placements' },
-                        campaigns:   { endpoint: '/api/campaigns' },
-                        advertisers: { endpoint: '/api/account/advertisers' }
+                        placements:   { endpoint: '/api/placements' },
+                        campaigns:    { endpoint: '/api/campaigns' },
+                        advertisers:  { endpoint: '/api/account/advertisers' },
+                        orgs:         { endpoint: '/api/account/orgs' },
+                        paymentPlans: { endpoint: '/api/payment-plans' }
                     },
                     creds : { key: 'watchman-dev', secret: 'dwei9fhj3489ghr7834909r' }
                 },
@@ -304,6 +307,8 @@ describe('BeeswaxMiddleware(config)', function() {
                 'http://33.33.33.10/api/campaigns');
             expect(middleWare.placementsEndpoint).toEqual(
                 'http://33.33.33.10/api/placements');
+            expect(middleWare.orgsEndpoint).toBe('http://33.33.33.10/api/account/orgs');
+            expect(middleWare.paymentPlansEndpoint).toBe('http://33.33.33.10/api/payment-plans');
             expect(middleWare.defaultTargetingTempl).toEqual({
                 inventory: [ {
                     include: {
@@ -1231,6 +1236,131 @@ describe('BeeswaxMiddleware(config)', function() {
             });
         });
 
+        describe('method: checkWithinCampaignLimit', function () {
+            beforeEach(function () {
+                this.mockOrg = {
+                    id: 'o-1234567',
+                    paymentPlanId: 'pp-1234567',
+                    status: 'active'
+                };
+                this.mockPaymentPlan = {
+                    id: 'pp-1234567',
+                    maxCampaigns: 10,
+                    label: 'The Best Payment Plan',
+                    status: 'active'
+                };
+                this.orgResponse = null;
+                this.paymentPlanResponse = null;
+                this.campaignResponse = null;
+                request.get.and.callFake(options => {
+                    const url = options.url;
+
+                    if (/orgs/.test(url)) {
+                        return this.orgResponse;
+                    }
+
+                    if (/payment-plans/.test(url)) {
+                        return this.paymentPlanResponse;
+                    }
+
+                    if (/campaigns/.test(url)) {
+                        return this.campaignResponse;
+                    }
+                });
+            });
+
+            it('should fetch the org of the campaign', function (done) {
+                this.orgResponse = Promise.resolve([this.mockOrg]);
+                this.paymentPlanResponse = Promise.resolve([this.mockPaymentPlan]);
+                this.campaignResponse = Promise.resolve([[]]);
+                middleWare.checkWithinCampaignLimit(campaign).then(() => {
+                    expect(request.get).toHaveBeenCalledWith({
+                        url: 'http://33.33.33.10/api/account/orgs/o-1234567'
+                    });
+                }).then(done, done.fail);
+            });
+
+            it('should reject if fetching the org fails', function (done) {
+                this.orgResponse = Promise.reject(new Error('epic fail'));
+                this.paymentPlanResponse = Promise.resolve([this.mockPaymentPlan]);
+                this.campaignResponse = Promise.resolve([[]]);
+                middleWare.checkWithinCampaignLimit(campaign).then(done.fail, error => {
+                    expect(error).toEqual(jasmine.any(Error));
+                    expect(error.message).toBe('epic fail');
+                }).then(done, done.fail);
+            });
+
+            it('should fetch the payment plan of the org', function (done) {
+                this.orgResponse = Promise.resolve([this.mockOrg]);
+                this.paymentPlanResponse = Promise.resolve([this.mockPaymentPlan]);
+                this.campaignResponse = Promise.resolve([[]]);
+                middleWare.checkWithinCampaignLimit(campaign).then(() => {
+                    expect(request.get).toHaveBeenCalledWith({
+                        url: 'http://33.33.33.10/api/payment-plans/pp-1234567'
+                    });
+                }).then(done, done.fail);
+            });
+
+            it('should reject if fetching the payment plan fails', function (done) {
+                this.orgResponse = Promise.resolve([this.mockOrg]);
+                this.paymentPlanResponse = Promise.reject(new Error('epic fail'));
+                this.campaignResponse = Promise.resolve([[]]);
+                middleWare.checkWithinCampaignLimit(campaign).then(done.fail, error => {
+                    expect(error).toEqual(jasmine.any(Error));
+                    expect(error.message).toBe('epic fail');
+                }).then(done, done.fail);
+            });
+
+            it('should fetch the number of active campaigns in the org', function (done) {
+                this.orgResponse = Promise.resolve([this.mockOrg]);
+                this.paymentPlanResponse = Promise.resolve([this.mockPaymentPlan]);
+                this.campaignResponse = Promise.resolve([[]]);
+                middleWare.checkWithinCampaignLimit(campaign).then(() => {
+                    expect(request.get).toHaveBeenCalledWith({
+                        url: 'http://33.33.33.10/api/campaigns',
+                        qs: {
+                            application: 'showcase',
+                            org: 'o-1234567',
+                            statuses: 'draft,new,pending,approved,rejected,active,paused,inactive,expired,outOfBudget,error'
+                        }
+                    });
+                }).then(done, done.fail);
+            });
+
+            it('should reject if fetching the campaigns fails', function (done) {
+                this.orgResponse = Promise.resolve([this.mockOrg]);
+                this.paymentPlanResponse = Promise.resolve([this.mockPaymentPlan]);
+                this.campaignResponse = Promise.reject(new Error('epic fail'));
+                middleWare.checkWithinCampaignLimit(campaign).then(done.fail, error => {
+                    expect(error).toEqual(jasmine.any(Error));
+                    expect(error.message).toBe('epic fail');
+                }).then(done, done.fail);
+            });
+
+            it('should resolve if the org is within their campaigns limit', function (done) {
+                const campaigns = new Array(10).fill({
+                    name: 'This is a campaign'
+                });
+                this.orgResponse = Promise.resolve([this.mockOrg]);
+                this.paymentPlanResponse = Promise.resolve([this.mockPaymentPlan]);
+                this.campaignResponse = Promise.resolve([campaigns]);
+                middleWare.checkWithinCampaignLimit(campaign).then(done, done.fail);
+            });
+
+            it('should reject if the org has exceeded their maximum number of campaigns', function (done) {
+                const campaigns = new Array(11).fill({
+                    name: 'This is a campaign'
+                });
+                this.orgResponse = Promise.resolve([this.mockOrg]);
+                this.paymentPlanResponse = Promise.resolve([this.mockPaymentPlan]);
+                this.campaignResponse = Promise.resolve([campaigns]);
+                middleWare.checkWithinCampaignLimit(campaign).then(done.fail, error => {
+                    expect(error).toEqual(jasmine.any(Error));
+                    expect(error.message).toBe('Campaign limit has been reached');
+                }).then(done, done.fail);
+            });
+        });
+
         describe('method: reactivateCampaign', function () {
             beforeEach(function () {
                 campaign.externalIds = { beeswax : 11 };
@@ -1277,13 +1407,23 @@ describe('BeeswaxMiddleware(config)', function() {
                         });
                         bwEditLineItemDeferred = q.defer();
                         bwEditLineItemDeferred.fulfill({ payload: { } });
+                        spyOn(middleWare, 'checkWithinCampaignLimit');
                     });
 
-                    it('should activate the campaign in beeswax', function (done) {
-                        middleWare.reactivateCampaign(campaign).then(function () {
+                    it('should be able to activate the campaign in beeswax', function (done) {
+                        middleWare.checkWithinCampaignLimit.and.returnValue(Promise.resolve(true));
+                        middleWare.reactivateCampaign(campaign).then(() => {
                             expect(beeswax.campaigns.edit).toHaveBeenCalledWith(11, {
                                 active: true
                             });
+                        }).then(done, done.fail);
+                    });
+
+                    it('should reject if checking the campaign limit rejects', function (done) {
+                        middleWare.checkWithinCampaignLimit.and.returnValue(Promise.reject(new Error('epic fail')));
+                        middleWare.reactivateCampaign(campaign).then(done.fail, error => {
+                            expect(error).toEqual(jasmine.any(Error));
+                            expect(error.message).toBe('epic fail');
                         }).then(done, done.fail);
                     });
                 });

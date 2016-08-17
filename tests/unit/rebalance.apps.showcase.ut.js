@@ -106,6 +106,9 @@ describe('(action factory) charge_payment_plan', () => {
                         },
                         advertisers: {
                             endpoint: '/api/account/advertisers'
+                        },
+                        paymentPlans: {
+                            endpoint: '/api/payment-plans'
                         }
                     }
                 },

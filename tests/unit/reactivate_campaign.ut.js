@@ -3,6 +3,7 @@
 const BeeswaxMiddleware = require('../../lib/BeeswaxMiddleware');
 const proxyquire = require('proxyquire');
 const logger = require('cwrx/lib/logger');
+const rcKinesis = require('rc-kinesis');
 
 describe('the reactivate campaign action', function () {
     beforeEach(function () {
@@ -26,6 +27,12 @@ describe('the reactivate campaign action', function () {
                     analytics: {
                         endpoint: 'analytics'
                     },
+                    orgs: {
+                        endpoint: 'orgs'
+                    },
+                    paymentPlans: {
+                        endpoint: 'payment-plans'
+                    },
                     tracking: 'tracking'
                 }
             },
@@ -40,7 +47,12 @@ describe('the reactivate campaign action', function () {
                     }
                 }
             },
-            appCreds: { }
+            appCreds: { },
+            kinesis: {
+                producer: {
+                    stream: 'stream'
+                }
+            }
         };
         this.event = {
             data: { },
@@ -58,6 +70,7 @@ describe('the reactivate campaign action', function () {
         };
         spyOn(logger, 'getLog').and.returnValue(this.mockLog);
         spyOn(BeeswaxMiddleware.prototype, 'reactivateCampaign');
+        spyOn(rcKinesis.JsonProducer.prototype, 'produce');
         this.factory = proxyquire('../../src/actions/showcase/apps/reactivate_campaign', {
             'beeswax-client': BeeswaxMiddleware,
             '../../../../lib/showcase': showcaseLib
@@ -80,6 +93,7 @@ describe('the reactivate campaign action', function () {
     it('should update the campaign status in beeswax', function (done) {
         this.event.data.campaign = this.campaign;
         BeeswaxMiddleware.prototype.reactivateCampaign.and.returnValue(Promise.resolve());
+        rcKinesis.JsonProducer.prototype.produce.and.returnValue(Promise.resolve());
         this.showcase.rebalance.and.returnValue(Promise.resolve());
         this.action(this.event).then(() => {
             expect(BeeswaxMiddleware.prototype.reactivateCampaign).toHaveBeenCalledWith(this.campaign);
@@ -89,28 +103,62 @@ describe('the reactivate campaign action', function () {
     it('should perform a rebalance of the campaign in beeswax', function (done) {
         this.event.data.campaign = this.campaign;
         BeeswaxMiddleware.prototype.reactivateCampaign.and.returnValue(Promise.resolve());
+        rcKinesis.JsonProducer.prototype.produce.and.returnValue(Promise.resolve());
         this.showcase.rebalance.and.returnValue(Promise.resolve());
         this.action(this.event).then(() => {
             expect(this.showcase.rebalance).toHaveBeenCalledWith('o-123');
         }).then(done, done.fail);
     });
 
-    it('should handle if there is a problem updating the campaign status in beeswax', function (done) {
+    it('should produce when campaign reactivation succeeds', function (done) {
         this.event.data.campaign = this.campaign;
-        BeeswaxMiddleware.prototype.reactivateCampaign.and.returnValue(Promise.reject(new Error('epic fail')));
+        BeeswaxMiddleware.prototype.reactivateCampaign.and.returnValue(Promise.resolve());
+        rcKinesis.JsonProducer.prototype.produce.and.returnValue(Promise.resolve());
+        this.showcase.rebalance.and.returnValue(Promise.resolve());
+        this.action(this.event).then(() => {
+            expect(rcKinesis.JsonProducer.prototype.produce).toHaveBeenCalledWith({
+                type: 'reactivateCampaignSuccess',
+                data: {
+                    campaign: this.campaign
+                }
+            });
+        }).then(done, done.fail);
+    });
+
+    it('should handle if there is a problem updating the campaign status in beeswax', function (done) {
+        const error = new Error('epic fail');
+        this.event.data.campaign = this.campaign;
+        BeeswaxMiddleware.prototype.reactivateCampaign.and.returnValue(Promise.reject(error));
+        rcKinesis.JsonProducer.prototype.produce.and.returnValue(Promise.resolve());
         this.showcase.rebalance.and.returnValue(Promise.resolve());
         this.action(this.event).then(() => {
             expect(this.showcase.rebalance).not.toHaveBeenCalled();
             expect(this.mockLog.error).toHaveBeenCalled();
+            expect(rcKinesis.JsonProducer.prototype.produce).toHaveBeenCalledWith({
+                type: 'reactivateCampaignFailure',
+                data: {
+                    campaign: this.campaign,
+                    error: error.message
+                }
+            });
         }).then(done, done.fail);
     });
 
     it('should handle if there is a problem performing the rebalance', function (done) {
+        const error = new Error('epic fail');
         this.event.data.campaign = this.campaign;
         BeeswaxMiddleware.prototype.reactivateCampaign.and.returnValue(Promise.resolve());
-        this.showcase.rebalance.and.returnValue(Promise.reject(new Error('epic fail')));
+        rcKinesis.JsonProducer.prototype.produce.and.returnValue(Promise.resolve());
+        this.showcase.rebalance.and.returnValue(Promise.reject(error));
         this.action(this.event).then(() => {
             expect(this.mockLog.error).toHaveBeenCalled();
+            expect(rcKinesis.JsonProducer.prototype.produce).toHaveBeenCalledWith({
+                type: 'reactivateCampaignFailure',
+                data: {
+                    campaign: this.campaign,
+                    error: error.message
+                }
+            });
         }).then(done, done.fail);
     });
 });

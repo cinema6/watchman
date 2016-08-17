@@ -111,6 +111,12 @@ describe('cleanUpCampaignFactory', function() {
                         },
                         advertisers: {
                             endpoint: '/api/account/advertisers'
+                        },
+                        orgs: {
+                            endpoint: '/api/account/orgs'
+                        },
+                        paymentPlans: {
+                            endpoint: '/api/payment-plans'
                         }
                     }
                 }
