@@ -68,7 +68,7 @@ EventProcessor.prototype = {
                 var key = dataKeys[i];
                 var regex = new RegExp(ifData[key]);
                 var dataProp = ld.get(event.data, key, null);
-                if(!dataProp || !regex.test(dataProp)) {
+                if(!regex.test(dataProp)) {
                     return false;
                 }
             }

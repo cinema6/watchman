@@ -51,9 +51,10 @@ module.exports = function factory(config) {
             }).then(() => watchmanStream.produce({
                 type: 'chargedPaymentPlan',
                 data: {
-                    org: org,
-                    paymentPlan: paymentPlan,
-                    payment: payment
+                    org,
+                    paymentPlan,
+                    payment,
+                    date: now.format()
                 }
             }), reason => log.error(
                 'Failed to update org(%1)\'s nextPaymentDate: %2.',

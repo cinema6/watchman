@@ -59,7 +59,7 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
     describe('when called', function() {
         var config, paymentPlan;
         var autoIncreaseBudget;
-        var request, beeswax, log;
+        var request, beeswax, log, watchmanStream;
 
         beforeEach(function() {
             paymentPlan = {
@@ -123,6 +123,7 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
 
             request = CwrxRequest.calls.mostRecent().returnValue;
             beeswax = BeeswaxMiddleware.calls.mostRecent().returnValue;
+            watchmanStream = JsonProducer.calls.mostRecent().returnValue;
         });
 
         it('should return the action Function', function() {
@@ -153,6 +154,10 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
             );
         });
 
+        it('should create a JsonProducer for watchman', function() {
+            expect(JsonProducer).toHaveBeenCalledWith(config.kinesis.producer.stream, config.kinesis.producer);
+        });
+
         describe('the action', function() {
             var data, options, event;
             var getCampaignsDeferred;
@@ -178,7 +183,8 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                         cycleStart: moment().format(),
                         cycleEnd: moment().add(1, 'month').subtract(1, 'day').format(),
                         description: JSON.stringify({ eventType: 'credit', source: 'braintree' })
-                    }
+                    },
+                    date: moment().utcOffset(0).format()
                 };
                 options = {
                     dailyLimit: 3,
@@ -424,7 +430,14 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                             setTimeout(done);
                         });
 
+                        it('should call upsertCampaignActiveLineItems',function(){
+                            expect(beeswax.upsertCampaignActiveLineItems.calls.count())
+                                .toEqual(2);
+                        });
+
                         describe('when the line item upserts succeed', function(){
+                            let produceDeferred;
+
                             beforeEach(function(done){
                                 upsertBeeswaxLineItemsDeferreds.forEach( (deferred, index) => {
                                     deferred.fulfill({
@@ -433,20 +446,54 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                                     });
                                 });
 
+                                produceDeferred = q.defer();
+                                watchmanStream.produce.and.returnValue(produceDeferred.promise);
+
                                 setTimeout(done);
                             });
 
-                            it('should call upsertCampaignActiveLineItems',function(){
-                                expect(beeswax.upsertCampaignActiveLineItems.calls.count())
-                                    .toEqual(2);
+                            it('should produce a record to the watchman stream', () => {
+                                expect(watchmanStream.produce).toHaveBeenCalledWith({
+                                    type: 'increasedCampaignBudgets',
+                                    data: {
+                                        transaction: data.transaction,
+                                        campaigns: request.put.calls.all().map(call => call.args[0].json),
+                                        date: moment(data.date).format()
+                                    }
+                                });
                             });
 
-                            it('should not log an error', function() {
-                                expect(log.error).not.toHaveBeenCalled();
+                            describe('if producing the record succeeds', () => {
+                                beforeEach(done => {
+                                    produceDeferred.resolve(watchmanStream.produce.calls.mostRecent().args[0]);
+                                    setTimeout(done);
+                                });
+
+                                it('should not log an error', function() {
+                                    expect(log.error).not.toHaveBeenCalled();
+                                });
+
+                                it('should fulfill with undefined', function() {
+                                    expect(success).toHaveBeenCalledWith(undefined);
+                                });
                             });
 
-                            it('should fulfill with undefined', function() {
-                                expect(success).toHaveBeenCalledWith(undefined);
+                            describe('if producing the record fails', function(){
+                                let reason;
+
+                                beforeEach(done => {
+                                    reason = new Error('I failed you.');
+                                    produceDeferred.reject(reason);
+                                    setTimeout(done);
+                                });
+
+                                it('should log an error', function() {
+                                    expect(log.error).toHaveBeenCalled();
+                                });
+
+                                it('should fulfill with undefined', function() {
+                                    expect(success).toHaveBeenCalledWith(undefined);
+                                });
                             });
                         });
 

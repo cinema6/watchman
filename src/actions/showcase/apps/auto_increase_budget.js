@@ -12,6 +12,8 @@ const Status = require('cwrx/lib/enums').Status;
 const logger = require('cwrx/lib/logger');
 const inspect = require('util').inspect;
 const BeeswaxMiddleware = require('../../../../lib/BeeswaxMiddleware');
+const JsonProducer = require('rc-kinesis').JsonProducer;
+const moment = require('moment');
 
 module.exports = function factory(config) {
     const log = logger.getLog();
@@ -22,6 +24,10 @@ module.exports = function factory(config) {
         { creds: config.appCreds, api: config.cwrx.api },
         { conversionMultipliers : get(config,'campaign.conversionMultipliers')  }
     );
+    const watchmanStream = new JsonProducer(
+        config.kinesis.producer.stream,
+        config.kinesis.producer
+    );
 
     const campaignsEndpoint = resolveURL(config.cwrx.api.root, config.cwrx.api.campaigns.endpoint);
 
@@ -29,6 +35,7 @@ module.exports = function factory(config) {
         const data = event.data;
         const options = event.options;
         const transaction = data.transaction;
+        const now = moment(data.date);
         const dailyLimit = options.dailyLimit;
         const paymentPlan = config.paymentPlans[transaction.paymentPlanId];
 
@@ -82,8 +89,11 @@ module.exports = function factory(config) {
                     })
                 })
                 .spread(newCampaign => {
-                    log.trace('Adjust campaign(%1) in beeswax by %2 impressions',
-                        campaign.id, externalImpressions);
+                    log.trace(
+                        'Adjust campaign(%1) in beeswax by %2 impressions',
+                        campaign.id, externalImpressions
+                    );
+
                     return beeswax.adjustCampaignBudget(newCampaign,externalImpressions)
                         .spread((beeswaxCampaign, updatedBeeswaxCampaign) => {
                             log.info(
@@ -103,23 +113,25 @@ module.exports = function factory(config) {
                                 endDate   : transaction.cycleEnd
                             });
                         })
-                        .then(function(result){
-                            result.createdLineItems.forEach(function(item){
-                                log.info(
-                                    'Created lineItem (%1) for campaign %2 (%3)',
-                                        item.line_item_id, item.campaign_id,
-                                        newCampaign.id
-                                        );
-                            });
-                            result.updatedLineItems.forEach(function(item){
-                                log.info(
-                                    'Updated lineItem (%1) for campaign %2 (%3)',
-                                        item.line_item_id, item.campaign_id,
-                                        newCampaign.id
-                                        );
-                            });
-                        });
+                        .then(result => {
+                            result.createdLineItems.forEach(item => log.info(
+                                'Created lineItem (%1) for campaign %2 (%3)',
+                                item.line_item_id, item.campaign_id, newCampaign.id
+                            ));
+                            result.updatedLineItems.forEach(item => log.info(
+                                'Updated lineItem (%1) for campaign %2 (%3)',
+                                item.line_item_id, item.campaign_id, newCampaign.id
+                            ));
+                        })
+                        .then(() => newCampaign);
                 });
+            })).then(newCampaigns => watchmanStream.produce({
+                type: 'increasedCampaignBudgets',
+                data: {
+                    transaction,
+                    campaigns: newCampaigns,
+                    date: now.format()
+                }
             }));
         });
     }).catch(reason => (

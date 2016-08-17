@@ -200,7 +200,8 @@ describe('(action factory) charge_payment_plan', function() {
                             data: {
                                 org: data.org,
                                 paymentPlan: data.paymentPlan,
-                                payment: postPaymentDeferred.promise.inspect().value[0]
+                                payment: postPaymentDeferred.promise.inspect().value[0],
+                                date: moment(data.date).format()
                             }
                         });
                     });

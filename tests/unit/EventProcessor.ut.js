@@ -207,32 +207,6 @@ describe('EventProcessor.js', function() {
                     expect(self.mockBadAction).toHaveBeenCalled();
                 }).then(done, done.fail);
             });
-
-            it('should filter actions who do not have the properties required by ifData', function(done) {
-                var self = this;
-                self.eventProcessor.handleEvent({
-                    name: 'tick',
-                    data: { }
-                }, {
-                    actions: [
-                        {
-                            name: 'good_action',
-                            ifData: {
-                                foo: '.*'
-                            }
-                        },
-                        {
-                            name: 'bad_action',
-                            ifData: {
-                                foo: '.*'
-                            }
-                        }
-                    ]
-                }).then(function() {
-                    expect(self.mockGoodAction).not.toHaveBeenCalled();
-                    expect(self.mockBadAction).not.toHaveBeenCalled();
-                }).then(done, done.fail);
-            });
         });
 
         it('should perform the configured list of actions', function(done) {

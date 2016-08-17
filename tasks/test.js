@@ -48,6 +48,7 @@ module.exports = function(grunt) {
             var timeStream = options.timeStream;
             var watchmanStream = options.watchmanStream;
             var cwrxStream = options.cwrxStream;
+            var cwrxStream2 = options.cwrxStream2;
             var mongoHost = grunt.option('dbHost') || options.mongoHost;
             var apiRoot = grunt.option('apiRoot') || options.apiRoot;
             var watchmanHost = grunt.option('watchmanHost') || options.watchmanHost;
@@ -76,6 +77,9 @@ module.exports = function(grunt) {
                                 break;
                             case 'cwrxStream':
                                 cwrxStream = output.OutputValue;
+                                break;
+                            case 'cwrxStream2':
+                                cwrxStream2 = output.OutputValue;
                                 break;
                             case 'watchman':
                                 watchmanHost = output.OutputValue;
@@ -132,6 +136,9 @@ module.exports = function(grunt) {
                 process.env.timeStream = timeStream;
                 process.env.watchmanStream = watchmanStream;
                 process.env.cwrxStream = cwrxStream;
+                if (cwrxStream2) {
+                    process.env.cwrxStream2 = cwrxStream2;
+                }
                 process.env.watchmanHost = watchmanHost;
                 process.env.appPrefix = appPrefix;
                 process.env.sshUser = sshUser;
