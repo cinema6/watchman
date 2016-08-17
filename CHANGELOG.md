@@ -7,6 +7,8 @@
     upgrading
   * [FEATURE]: Added updating of lineItems to upsertCampaignActiveLineItems
   * [FEATURE]: Add support for bonus view promotions
+  * [FEATURE]: Automatically archive the user's oldest campaigns when
+    their subscription is downgraded
   * **Extra Deployment Steps**:
     * Update postmark template config with new weekly stats templates
     * Deploy new postmark weekly stats templates
@@ -16,6 +18,7 @@
       transactions with a `paymentPlanId` property
     * Update environment with `showcase/apps/rebalance` action
     * Update environment with `fulfill_bonus_views` action
+    * Update environment with `showcase/apps/auto_archive_campaigns` action
 
 ## v1.6.0 (August 11, 2016)
 * *[v1.6.0-rc1]*
