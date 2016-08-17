@@ -10,12 +10,12 @@ const BeeswaxHelper = require('../helpers/BeeswaxHelper');
 const testUtils = require('cwrx/test/e2e/testUtils');
 const resolveURL = require('url').resolve;
 const CwrxRequest = require('../../lib/CwrxRequest');
-const waiter = require('../helpers/waiter');
 
 const API_ROOT = process.env.apiRoot;
 const APP_CREDS = JSON.parse(process.env.appCreds);
 const AWS_CREDS = JSON.parse(process.env.awsCreds);
 const CWRX_STREAM = process.env.cwrxStream;
+const WATCHMAN_STREAM = process.env.watchmanStream;
 const PREFIX = process.env.appPrefix;
 
 function createId(prefix) {
@@ -225,7 +225,7 @@ describe('cwrxStream campaignStateChange', function() {
         ]).then(done, done.fail);
     });
 
-    beforeAll(function() {
+    beforeAll(function(done) {
         const awsConfig = ld.assign({ region: 'us-east-1' }, AWS_CREDS || {});
 
         jasmine.DEFAULT_TIMEOUT_INTERVAL = 60000;
@@ -233,6 +233,11 @@ describe('cwrxStream campaignStateChange', function() {
         producer = new JsonProducer(CWRX_STREAM, awsConfig);
         beeswax = new BeeswaxHelper();
         request = new CwrxRequest(APP_CREDS);
+
+        this.mockman = new testUtils.Mockman({
+            streamName: WATCHMAN_STREAM
+        });
+        this.mockman.start().then(done, done.fail);
     });
 
     beforeAll(function(done) {
@@ -361,8 +366,15 @@ describe('cwrxStream campaignStateChange', function() {
         .then(done,done.fail);
     });
 
+    afterEach(function () {
+        this.mockman.removeAllListeners();
+    });
+
     afterAll(function(done){
-        beeswax.cleanupAdvertiser(advertiser.externalIds.beeswax).then(done,done.fail);
+        Promise.all([
+            beeswax.cleanupAdvertiser(advertiser.externalIds.beeswax),
+            this.mockman.stop()
+        ]).then(done, done.fail);
     });
 
     describe('for a showcase (apps) campaign', function() {
@@ -751,13 +763,6 @@ describe('cwrxStream campaignStateChange', function() {
                     }));
                 }).then(lineItems => {
                     this.beeswaxEntities.lineItems = lineItems;
-                    // Deactivate the line items
-                    return Promise.all(lineItems.map(lineItem => {
-                        return beeswax.api.lineItems.edit(lineItem.line_item_id, {
-                            active: false
-                        });
-                    }));
-                }).then(() => {
                     // Deactivate the campaign
                     return beeswax.api.campaigns.edit(this.beeswaxEntities.campaign.campaign_id, {
                         active: false
@@ -790,26 +795,76 @@ describe('cwrxStream campaignStateChange', function() {
                     }
                 });
             }).then(() => {
-                // Wait for the line items in beeswax to be rebalanced
-                return waiter.waitFor(() => {
-                    return beeswax.api.lineItems.queryAll({
+                // Wait for the action to fail
+                return new Promise(resolve => {
+                    this.mockman.once('reactivateCampaignSuccess', event => resolve(event));
+                });
+            }).then(event => {
+                return Promise.all([
+                    event,
+                    beeswax.api.campaigns.find(this.beeswaxEntities.campaign.campaign_id),
+                    beeswax.api.lineItems.queryAll({
                         campaign_id: this.beeswaxEntities.campaign.campaign_id
-                    }).then(result => {
-                        return result.payload.reduce((rebalanced, lineItem) => {
-                            return rebalanced && lineItem.line_item_budget === 2500;
-                        }, true) && result.payload;
-                    });
-                });
-            }).then(lineItems => {
-                // Find the campaign in beeswax
-                return beeswax.api.campaigns.find(this.beeswaxEntities.campaign.campaign_id).then(result => {
-                    return [result.payload, lineItems];
-                });
-            }).then(ld.spread((campaign, lineItems) => {
-                expect(campaign.active).toBe(true);
-                lineItems.forEach(lineItem => {
-                    expect(lineItem.active).toBe(true);
+                    })
+                ]);
+            }).then(ld.spread((event, campaignResult, lineItemsResult) => {
+                expect(event.data.campaign).toBeDefined();
+                expect(campaignResult.payload.active).toBe(true);
+                lineItemsResult.payload.forEach(lineItem => {
                     expect(lineItem.line_item_budget).toBe(2500);
+                });
+            })).then(done, done.fail);
+        });
+
+        it('should not reactive the campaign if the org has reached their campaigns limit', function (done) {
+            return this.initializeBeeswaxCampaign().then(() => {
+                const campaigns = [
+                    this.campaign,
+                    {
+                        id: createId('cam'),
+                        status: 'active',
+                        application: 'showcase',
+                        product: {
+                            type: 'app'
+                        },
+                        externalIds: {
+                            beeswax: null
+                        },
+                        org: org.id,
+                        advertiserId: advertiser.id
+                    }
+                ];
+
+                // Exceed the campaigns limit for the org
+                return testUtils.resetCollection('campaigns', campaigns);
+            }).then(() => {
+                // Produce the kinesis event
+                return producer.produce({
+                    type: 'campaignStateChange',
+                    data: {
+                        campaign: this.campaign,
+                        previousState: 'canceled',
+                        currentState: 'active'
+                    }
+                });
+            }).then(() => {
+                // Wait for the action to fail
+                return new Promise(resolve => {
+                    this.mockman.once('reactivateCampaignFailure', event => resolve(event));
+                });
+            }).then(event => {
+                return Promise.all([
+                    event,
+                    beeswax.api.campaigns.find(this.beeswaxEntities.campaign.campaign_id),
+                    beeswax.api.lineItems.queryAll({
+                        campaign_id: this.beeswaxEntities.campaign.campaign_id
+                    })
+                ]);
+            }).then(ld.spread((event, campaignResult, lineItemsResult) => {
+                expect(event.data.error).toBe('Campaign limit has been reached');
+                expect(campaignResult.payload.active).toBe(false);
+                lineItemsResult.payload.forEach(lineItem => {
+                    expect(lineItem.line_item_budget).not.toBe(2500);
                 });
             })).then(done, done.fail);
         });
