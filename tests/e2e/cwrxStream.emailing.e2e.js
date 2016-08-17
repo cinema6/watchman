@@ -4,11 +4,13 @@ var Configurator = require('../helpers/Configurator.js');
 var JsonProducer = require('rc-kinesis').JsonProducer;
 var Q = require('q');
 var testUtils = require('cwrx/test/e2e/testUtils.js');
+const rcUuid = require('rc-uuid');
 
 var API_ROOT = process.env.apiRoot;
 var APP_CREDS = JSON.parse(process.env.appCreds);
 var AWS_CREDS = JSON.parse(process.env.awsCreds);
 var CWRX_STREAM = process.env.cwrxStream;
+var WATCHMAN_STREAM = process.env.watchmanStream;
 var PREFIX = process.env.appPrefix;
 var WAIT_TIME = 1000;
 var EMAIL_TIMEOUT = 60000;
@@ -218,6 +220,9 @@ describe('cwrxStream', function() {
                             name: 'message/campaign_email',
                             options: {
                                 type: 'paymentMade'
+                            },
+                            ifData: {
+                                target: '^selfie$'
                             }
                         }
                     ]
@@ -316,6 +321,19 @@ describe('cwrxStream', function() {
                             name: 'create_promotion_credit'
                         }
                     ]
+                },
+                chargedPaymentPlan: {
+                    actions: [
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'paymentMade'
+                            },
+                            ifData: {
+                                target: '^showcase$'
+                            }
+                        }
+                    ]
                 }
             }
         };
@@ -336,16 +354,21 @@ describe('cwrxStream', function() {
         })).then(done, done.fail);
     });
 
-    beforeEach(function() {
+    beforeEach(function(done) {
         jasmine.DEFAULT_TIMEOUT_INTERVAL = 120000;
         var awsConfig = {
             region: 'us-east-1'
         };
+        const orgId = `o-${rcUuid.createUuid()}`;
         if(AWS_CREDS) {
             awsConfig.accessKeyId = AWS_CREDS.accessKeyId;
             awsConfig.secretAccessKey = AWS_CREDS.secretAccessKey;
         }
         producer = new JsonProducer(CWRX_STREAM, awsConfig);
+        this.producers = {
+            cwrx: producer,
+            watchman: new JsonProducer(WATCHMAN_STREAM, awsConfig)
+        };
         mockCampaign = {
             id: 'c-123',
             name: 'Cooltastic Campaign',
@@ -356,11 +379,17 @@ describe('cwrxStream', function() {
             email: 'c6e2etester@gmail.com',
             id: 'u-123',
             firstName: 'Terry',
-            lastName: 'Fakeuser'
+            lastName: 'Fakeuser',
+            org: orgId
         };
         mockUpdateRequest = {
             rejectionReason: 'your campaign is bad'
         };
+        this.mockOrg = {
+            id: orgId,
+            status: 'active'
+        };
+        testUtils.resetCollection('users', [mockUser]).then(done, done.fail);
     });
 
     // Setup watchman app
@@ -666,7 +695,7 @@ describe('cwrxStream', function() {
         });
     });
 
-    describe('when handling a paymentMade event', function() {
+    describe('sending a paymentMade email receipt', function() {
         var mockPayment, msgRegexes;
 
         beforeEach(function() {
@@ -697,7 +726,8 @@ describe('cwrxStream', function() {
                     data: {
                         payment: mockPayment,
                         user: mockUser,
-                        balance: 9001.12
+                        balance: 9001.12,
+                        target: 'selfie'
                     }
                 }).then(function() {
                     mailman.once('Your payment has been approved', function(msg) {
@@ -726,7 +756,8 @@ describe('cwrxStream', function() {
                     data: {
                         payment: mockPayment,
                         user: mockUser,
-                        balance: 9001.12
+                        balance: 9001.12,
+                        target: 'selfie'
                     }
                 }).then(function() {
                     mailman.once('Your payment has been approved', function(msg) {
@@ -753,15 +784,19 @@ describe('cwrxStream', function() {
                     /Billing Period :(.|\n)+Monday, April 04, 2016 to Tuesday, May 03, 2016/,
                     /Payment Date:(.|\n)+Monday, April 04, 2016/
                 ];
+                this.mockPaymentPlan = {
+                    label: 'The Best Payment Plan'
+                };
             });
 
             it('should send a receipt email for payments made with a credit card', function(done) {
-                producer.produce({
-                    type: 'paymentMade',
+                this.producers.watchman.produce({
+                    type: 'chargedPaymentPlan',
                     data: {
+                        org: this.mockOrg,
+                        paymentPlan: this.mockPaymentPlan,
                         payment: mockPayment,
-                        user: mockUser,
-                        balance: 9001.12,
+                        date: Date.now(),
                         target: 'showcase'
                     }
                 }).then(function() {
@@ -772,7 +807,8 @@ describe('cwrxStream', function() {
                             /Payment Method[\s\S]+Credit Card/,
                             /Cardholder Name: Johnny Testmonkey/,
                             /Card Type: Visa/,
-                            /Last 4 Digits: 1234/
+                            /Last 4 Digits: 1234/,
+                            /The Best Payment Plan/
                         ]).forEach(function(regex) {
                             expect(regex.test(msg.text)).toBeTruthy('Expected text to match ' + regex);
                             expect(regex.test(msg.html)).toBeTruthy('Expected html to match ' + regex);
@@ -786,12 +822,13 @@ describe('cwrxStream', function() {
             it('should send a receipt email for payments made with a paypal account', function(done) {
                 mockPayment.method = { type: 'paypal', email: 'johnny@testmonkey.com' };
 
-                producer.produce({
-                    type: 'paymentMade',
+                this.producers.watchman.produce({
+                    type: 'chargedPaymentPlan',
                     data: {
+                        org: this.mockOrg,
+                        paymentPlan: this.mockPaymentPlan,
                         payment: mockPayment,
-                        user: mockUser,
-                        balance: 9001.12,
+                        date: Date.now(),
                         target: 'showcase'
                     }
                 }).then(function() {
@@ -800,7 +837,8 @@ describe('cwrxStream', function() {
                         expect(msg.to[0].address.toLowerCase()).toBe('c6e2etester@gmail.com');
                         msgRegexes.concat([
                             /Payment Method[\s\S]+PayPal/,
-                            /Email: johnny@testmonkey\.com/
+                            /Email: johnny@testmonkey\.com/,
+                            /The Best Payment Plan/
                         ]).forEach(function(regex) {
                             expect(regex.test(msg.text)).toBeTruthy('Expected text to match ' + regex);
                             expect(regex.test(msg.html)).toBeTruthy('Expected html to match ' + regex);
