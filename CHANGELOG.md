@@ -9,6 +9,7 @@
   * [FEATURE]: Add support for bonus view promotions
   * [FEATURE]: Automatically archive the user's oldest campaigns when
     their subscription is downgraded
+  * [FIX]: Ensure we don't try to charge a user for a subscription of $0
   * **Extra Deployment Steps**:
     * Update postmark template config with new weekly stats templates
     * Deploy new postmark weekly stats templates
