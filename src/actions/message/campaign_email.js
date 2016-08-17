@@ -167,10 +167,11 @@ module.exports = function factory(config) {
                     method          : data.payment.method,
                     date            : moment(new Date(data.payment.createdAt))
                                         .format('dddd, MMMM DD, YYYY'),
-                    balance         : `\$${data.balance.toFixed(2)}`,
+                    balance         : ('balance' in data) ? `\$${data.balance.toFixed(2)}` : null,
                     firstName       : data.user.firstName,
                     billingEndDate  : moment(new Date(data.payment.createdAt)).add(1, 'month')
-                                        .subtract(1, 'day').format('dddd, MMMM DD, YYYY')
+                                        .subtract(1, 'day').format('dddd, MMMM DD, YYYY'),
+                    planName        : ('paymentPlan' in data) ? data.paymentPlan.label : null
                 },
                 attachments: getAttachments(data)
             };
