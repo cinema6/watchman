@@ -774,6 +774,10 @@ describe('cwrxStream campaignStateChange', function() {
             };
         });
 
+        afterEach(function (done) {
+            beeswax.cleanupAdvertiser(this.beeswaxEntities.advertiser.advertiser_id).then(done, done.fail);
+        });
+
         it('should reactivate the campaign in beeswax', function (done) {
             this.initializeBeeswaxCampaign().then(() => {
                 // Produce the kinesis event
