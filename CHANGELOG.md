@@ -1,6 +1,10 @@
 # Watchman
 
 ## v1.7.0 (August 18, 2016)
+* *[v1.7.0-rc2]*
+  * [FIX]: Handle advertisers with the same name [159] (https://github.com/cinema6/watchman/issues/159)
+  * [FIX]: Do not decrease beeswax campaign budgets [160] (https://github.com/cinema6/watchman/issues/160)
+
 * *[v1.7.0-rc1]*
   * [FEATURE]: Added the ability to reactivate campaigns in beeswax
   * [FEATURE]: Added the ability for weekly stats emails to include stats for multiple apps
