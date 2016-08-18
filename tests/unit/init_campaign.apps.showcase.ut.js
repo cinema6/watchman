@@ -77,6 +77,12 @@ describe('(action factory) showcase/apps/init_campaign', function() {
                         analytics: {
                             endpoint: '/api/analytics'
                         },
+                        orgs: {
+                            endpoint: '/api/account/orgs'
+                        },
+                        paymentPlans: {
+                            endpoint: '/api/payment-plans'
+                        },
                         tracking: 'https://audit.cinema6.com/pixel.gif'
                     }
                 },

@@ -36,25 +36,26 @@ describe('BeeswaxMiddleware(config)', function() {
                     get : function() { return null; }
                 };
             });
-           
+
             BeeswaxClient = jasmine.createSpy('BeeswaxClient()').and.callFake(function(){
                 return {
                     advertisers : { create : function() { return null; }},
-                    campaigns : { 
+                    campaigns : {
                         create : function() { return null; },
                         edit : function() { return null; },
                         find : function() { return null; }
                     },
-                    creatives : { 
+                    creatives : {
                         create : function() { return null; },
-                        find  : function() { return null; } 
+                        find  : function() { return null; }
                     },
-                    lineItems : { 
-                        create : function() { return null; },
-                        edit   : function() { return null; },
-                        query  : function() { return null; } 
+                    lineItems : {
+                        create   : function() { return null; },
+                        edit     : function() { return null; },
+                        query    : function() { return null; },
+                        queryAll : function() { return null; }
                     },
-                    targetingTemplates : { 
+                    targetingTemplates : {
                         create : function() { return null; }
                     },
                     creativeLineItems : {
@@ -69,7 +70,7 @@ describe('BeeswaxMiddleware(config)', function() {
                 './CwrxRequest' : CwrxRequest
             });
         });
-        
+
         afterAll(function() {
             jasmine.clock().uninstall();
         });
@@ -93,7 +94,8 @@ describe('BeeswaxMiddleware(config)', function() {
                     platform: 'iOS',
                     categories : [ 'Music', 'Business' ],
                     websites   : [ 'https://1', 'https://2' ]
-                }
+                },
+                org: 'o-1234567'
             };
 
             placements = [
@@ -165,13 +167,15 @@ describe('BeeswaxMiddleware(config)', function() {
                     api: {
                         root: 'http://33.33.33.10/',
                         tracking: 'http://audit.rc.com/pixel.gif',
-                        placements:  { endpoint: '/api/placements' },
-                        campaigns:   { endpoint: '/api/campaigns' },
-                        advertisers: { endpoint: '/api/account/advertisers' }
+                        placements:   { endpoint: '/api/placements' },
+                        campaigns:    { endpoint: '/api/campaigns' },
+                        advertisers:  { endpoint: '/api/account/advertisers' },
+                        orgs:         { endpoint: '/api/account/orgs' },
+                        paymentPlans: { endpoint: '/api/payment-plans' }
                     },
                     creds : { key: 'watchman-dev', secret: 'dwei9fhj3489ghr7834909r' }
                 },
-                { 
+                {
                     conversionMultipliers : {
                         external : 2
                     }
@@ -204,54 +208,54 @@ describe('BeeswaxMiddleware(config)', function() {
             updatedCampaign             = {};
             updatedPlacement            = [{},{}];
             result                      = null;
-            
+
             spyOn(beeswax.advertisers,'create')
                 .and.returnValue(bwCreateAdvertiserDeferred.promise);
 
             spyOn(beeswax.campaigns,'create')
                 .and.returnValue(bwCreateCampaignDeferred.promise);
-            
+
             spyOn(beeswax.campaigns,'edit').and.callFake(function(){
                 return bwEditCampaignDeferred.promise;
             });
-            
+
             spyOn(beeswax.campaigns,'find').and.callFake(function(){
                 return bwFindCampaignDeferred.promise;
             });
-            
+
             spyOn(beeswax,'uploadCreativeAsset').and.callFake(function(opts){
                 var def = bwUploadAssetDeferred[ ld.findIndex( placements,
                     function(v) { return v.thumbnail === opts.sourceUrl; }) ];
 
-                return def !== undefined ? def.promise : q.reject( 
+                return def !== undefined ? def.promise : q.reject(
                     new Error('Unexpected creative url: ' + opts.sourceUrl));
             });
 
             spyOn(beeswax.lineItems,'create').and.callFake(function(){
                 return bwCreateLineItemDeferred.promise;
             });
-            
+
             spyOn(beeswax.lineItems,'edit').and.callFake(function(){
                 return bwEditLineItemDeferred.promise;
             });
-            
+
             spyOn(beeswax.lineItems,'query').and.callFake(function(){
                 return bwQueryLineItemDeferred.promise;
             });
-            
+
             spyOn(beeswax.targetingTemplates,'create').and.callFake(function(){
                 return bwCreateTargetingTemplDeferred.promise;
             });
-            
+
             spyOn(beeswax.creativeLineItems,'create').and.callFake(function(){
                 return bwCreateLineItemCreativeDeferred.promise;
             });
-            
+
             spyOn(beeswax.creatives,'create').and.callFake(function(opts){
                 var def = bwCreateCreativeDeferred[ld.findIndex( placements,
                     function(v) { return v.id === opts.alternative_id; })];
 
-                return def !== undefined ? def.promise : q.reject( 
+                return def !== undefined ? def.promise : q.reject(
                     new Error('Unexpected placment id: ' + opts.alternative_id));
             });
 
@@ -262,7 +266,7 @@ describe('BeeswaxMiddleware(config)', function() {
                     }
                     return q.reject('Unexpected GET');
                 });
-            
+
             spyOn(request, 'put').and.callFake(function(opts){
                 var id, index;
                 if(opts.url.match(/\/api\/placements/)){
@@ -272,12 +276,12 @@ describe('BeeswaxMiddleware(config)', function() {
                     ld.assign(updatedPlacement[index],placements[index],opts.json);
                     return putPlacementDeferred[index].promise;
                 }
-                
+
                 if(opts.url.match(/\/api\/account\/advertisers/)){
                     ld.assign(updatedAdvert,advertiser,opts.json);
                     return putAdvertiserDeferred.promise;
                 }
-                
+
                 if(opts.url.match(/\/api\/campaigns/)){
                     ld.assign(updatedCampaign,campaign,opts.json);
                     return putCampaignDeferred.promise;
@@ -285,7 +289,7 @@ describe('BeeswaxMiddleware(config)', function() {
 
                 return q.reject('Unexpected PUT');
             });
-            
+
         });
 
         it('is properly initialized',function(){
@@ -301,7 +305,7 @@ describe('BeeswaxMiddleware(config)', function() {
             expect(middleWare.defaultTargetingTempl).toEqual({
                 inventory: [ {
                     include: {
-                        inventory_source: [ 3, 0 ], interstitial: [ true ], 
+                        inventory_source: [ 3, 0 ], interstitial: [ true ],
                         environment_type: [ 1 ]
                     }
                 } ],
@@ -339,7 +343,7 @@ describe('BeeswaxMiddleware(config)', function() {
                 putAdvertiserDeferred.fulfill([updatedAdvert]);
                 process.nextTick(done);
             });
-            
+
             describe('from c6 Advertiser with no beeswax ids',function(){
                 beforeEach(function(done){
                     delete advertiser.externalIds;
@@ -370,7 +374,7 @@ describe('BeeswaxMiddleware(config)', function() {
                 });
 
             });
-            
+
             describe('from c6 Advertiser with old beeswax id structure',function(){
                 beforeEach(function(done){
                     delete advertiser.externalIds;
@@ -391,7 +395,7 @@ describe('BeeswaxMiddleware(config)', function() {
                         json : { externalIds : { beeswax : 2 } }
                     });
                 });
-                
+
                 it('returns an updated advertiser',function(){
                     expect(result.advertiser.externalIds.beeswax).toEqual(2);
                 });
@@ -422,7 +426,7 @@ describe('BeeswaxMiddleware(config)', function() {
                 beforeEach(function(){
                     getAdvertiserDeferred       = q.defer();
                     request.get.and.returnValue( getAdvertiserDeferred.promise);
-                    
+
                     bwCreateAdvertiserDeferred  = q.defer();
                     beeswax.advertisers.create
                         .and.returnValue(bwCreateAdvertiserDeferred.promise);
@@ -432,7 +436,7 @@ describe('BeeswaxMiddleware(config)', function() {
                     getAdvertiserDeferred.reject(new Error('Failed c6 advertiser lookup!'));
                     middleWare.createAdvertiser( { advertiser : { id : 'a-1234567' } })
                     .then(done.fail, function(e){
-                        expect(e.message).toEqual('Failed c6 advertiser lookup!');    
+                        expect(e.message).toEqual('Failed c6 advertiser lookup!');
                         expect(beeswax.advertisers.create).not.toHaveBeenCalled();
                         expect(request.put).not.toHaveBeenCalled();
                     })
@@ -445,7 +449,7 @@ describe('BeeswaxMiddleware(config)', function() {
                     bwCreateAdvertiserDeferred.reject(new Error('Failed beeswax create!'));
                     middleWare.createAdvertiser( { advertiser : { id : 'a-1234567' } })
                     .then(done.fail, function(e){
-                        expect(e.message).toEqual('Failed beeswax create!');    
+                        expect(e.message).toEqual('Failed beeswax create!');
                         expect(request.put).not.toHaveBeenCalled();
                     })
                     .then(done,done.fail);
@@ -463,7 +467,7 @@ describe('BeeswaxMiddleware(config)', function() {
             it('creates a beeswax campaign',function(done){
                 bwCreateCampaignDeferred.fulfill({ payload : {campaign_id:11}});
                 middleWare.createCampaign({ campaign: campaign, advertiser : advertiser})
-                .then(function(res){ 
+                .then(function(res){
                     expect(beeswax.campaigns.create).toHaveBeenCalledWith({
                         advertiser_id : 22,
                         alternative_id : 'c-1234567',
@@ -482,7 +486,7 @@ describe('BeeswaxMiddleware(config)', function() {
             it('handles a create failure',function(done){
                 bwCreateCampaignDeferred.reject(new Error('Failed beeswax create!'));
                 middleWare.createCampaign({ campaign: campaign, advertiser : advertiser})
-                .then(done.fail,function(e){ 
+                .then(done.fail,function(e){
                     expect(beeswax.campaigns.create).toHaveBeenCalled();
                     expect(request.put).not.toHaveBeenCalled();
                     expect(e.message).toEqual('Failed beeswax create!');
@@ -506,7 +510,7 @@ describe('BeeswaxMiddleware(config)', function() {
                     bwCreateCreativeDeferred.forEach(function(def,idx){
                         def.fulfill( { payload : { creative_id : (idx+1) } } );
                     });
-                    
+
                     putPlacementDeferred.forEach(function(def,idx){
                         def.fulfill( [ updatedPlacement[idx] ] );
                     });
@@ -549,9 +553,9 @@ describe('BeeswaxMiddleware(config)', function() {
                             );
                         expect(req.creative_attributes.advertiser).toEqual({
                             advertiser_domain : [ 'https://1' ],
-                            landing_page_url: [ 
+                            landing_page_url: [
                                 'https://itunes.apple.com/us/app/revex/id1093924230'
-                            ], 
+                            ],
                             advertiser_category: [ 'IAB1_6', 'IAB3_4' ]
                         });
                     });
@@ -609,20 +613,20 @@ describe('BeeswaxMiddleware(config)', function() {
                                 { id : 'p-2222222', externalIds : { beeswax : 2 }}
                             )
                         );
-                        
+
                         var req = beeswax.creatives.create.calls.argsFor(0)[0];
                         expect(req.creative_attributes.advertiser).toEqual({
                             advertiser_domain : [ 'https://itunes.apple.com' ],
-                            landing_page_url: [ 
+                            landing_page_url: [
                                 'https://itunes.apple.com/us/app/revex/id1093924230'
-                            ], 
+                            ],
                             advertiser_category: [ 'IAB1_6', 'IAB3_4' ]
                         });
                         expect(log.warn.calls.mostRecent().args).toEqual([
                             'Campaign %1 (%2) has no product.websites, falling ' +
                             'back to product.uri, but this may cause issues with Mopub. '+
                             'Replace advertiser_domain with actual site ASAP.',
-                            'c-1234567', 'Revengus Extremis'         
+                            'c-1234567', 'Revengus Extremis'
                         ]);
                     });
                 });
@@ -705,7 +709,7 @@ describe('BeeswaxMiddleware(config)', function() {
                     bwCreateCreativeDeferred.forEach(function(def,idx){
                         def.fulfill( { payload : { creative_id : (idx+1) } } );
                     });
-                    
+
                     putPlacementDeferred.forEach(function(def,idx){
                         def.fulfill( [ updatedPlacement[idx] ] );
                     });
@@ -714,7 +718,7 @@ describe('BeeswaxMiddleware(config)', function() {
                         path_to_asset : '/all/paths/lead/to/rome-1.jpg'
                     });
                     bwUploadAssetDeferred[1].reject(new Error('Fail.'));
-                    
+
                     middleWare.createCreatives({
                         campaign   : campaign,
                         advertiser : advertiser,
@@ -734,7 +738,7 @@ describe('BeeswaxMiddleware(config)', function() {
                         });
                     });
                     bwCreateCreativeDeferred[0].reject(new Error('Fail.'));
-                    bwCreateCreativeDeferred[1].fulfill( 
+                    bwCreateCreativeDeferred[1].fulfill(
                         { payload : { creative_id : 1 } } );
                     middleWare.createCreatives({
                         campaign   : campaign,
@@ -754,11 +758,11 @@ describe('BeeswaxMiddleware(config)', function() {
             beforeEach(function(){
                 bwCreateCampaignDeferred.fulfill({ payload : {campaign_id:11}});
                 bwCreateAdvertiserDeferred.fulfill({ payload : {advertiser_id:21}});
-                
+
                 getAdvertiserDeferred.fulfill([advertiser]);
                 putAdvertiserDeferred.fulfill([updatedAdvert]);
                 putCampaignDeferred.fulfill([updatedCampaign]);
-                
+
                 bwUploadAssetDeferred.forEach(function(def,idx){
                     def.fulfill({
                         path_to_asset : '/all/paths/lead/to/rome-' + (idx+1) + '.jpg'
@@ -768,7 +772,7 @@ describe('BeeswaxMiddleware(config)', function() {
                 bwCreateCreativeDeferred.forEach(function(def,idx){
                     def.fulfill( { payload : { creative_id : (idx+100) } } );
                 });
-                
+
                 putPlacementDeferred.forEach(function(def,idx){
                     def.fulfill( [ updatedPlacement[idx] ] );
                 });
@@ -779,11 +783,11 @@ describe('BeeswaxMiddleware(config)', function() {
             });
 
             it('intializes all related entities',function(done){
-                middleWare.initShowcaseAppsCampaign({ 
+                middleWare.initShowcaseAppsCampaign({
                     campaign    : campaign,
                     placements  : placements
                 })
-                .then(function(res){ 
+                .then(function(res){
                     var sorted;
                     expect(middleWare.createAdvertiser).toHaveBeenCalled();
                     expect(middleWare.createCampaign).toHaveBeenCalled();
@@ -808,11 +812,11 @@ describe('BeeswaxMiddleware(config)', function() {
             it('complains if there are no beeswax placements',function(done){
                 placements[0].tagParams.container = 'not-beeswax';
                 placements[1].tagType = 'other';
-                middleWare.initShowcaseAppsCampaign({ 
+                middleWare.initShowcaseAppsCampaign({
                     campaign    : campaign,
                     placements  : placements
                 })
-                .then(done.fail,function(e){ 
+                .then(done.fail,function(e){
                     expect(e.message).toEqual(
                         'Cannot initShowcaseAppsCampaign without beeswax placement.'
                     );
@@ -823,14 +827,14 @@ describe('BeeswaxMiddleware(config)', function() {
                 .then(done,done.fail);
             });
         });
-        
+
         describe('method: adjustCampaignBudget', function(){
             beforeEach(function(){
                 delete campaign.externalIds;
                 delete campaign.externalCampaigns;
 
                 bwFindCampaignDeferred = q.defer();
-                bwFindCampaignDeferred.fulfill({ 
+                bwFindCampaignDeferred.fulfill({
                     payload : {
                         campaign_id : 11,
                         campaign_budget : 1000
@@ -842,7 +846,7 @@ describe('BeeswaxMiddleware(config)', function() {
 
             it('increases campaign budgets',function(done){
                 campaign.externalIds = { beeswax : 11 };
-                bwEditCampaignDeferred.fulfill({ payload : { 
+                bwEditCampaignDeferred.fulfill({ payload : {
                     campaign_id: 11, campaign_budget: 1500 } });
                 middleWare.adjustCampaignBudget(campaign,500)
                 .then(function(){
@@ -855,7 +859,7 @@ describe('BeeswaxMiddleware(config)', function() {
 
             it('decreases campaign budgets',function(done){
                 campaign.externalCampaigns = { beeswax : { externalId : 11 } };
-                bwEditCampaignDeferred.fulfill({ payload : { 
+                bwEditCampaignDeferred.fulfill({ payload : {
                     campaign_id: 11, campaign_budget: 500 } });
                 middleWare.adjustCampaignBudget(campaign,-500)
                 .then(function(){
@@ -878,12 +882,12 @@ describe('BeeswaxMiddleware(config)', function() {
                         }
                         return q.reject('Unexpected GET');
                     });
-                
+
                 spyOn(beeswax.creatives,'find').and.callFake(function(){
                     var idx = beeswax.creatives.find.calls.count() - 1;
                     return bwFindCreativeDeferred[idx].promise;
                 });
-            
+
 
                 campaign.externalIds = { beeswax : 11 };
                 args = {
@@ -891,7 +895,7 @@ describe('BeeswaxMiddleware(config)', function() {
                     startDate : '2016-07-01T00:00:00.000Z',
                     endDate : '2016-07-31T23:59:59.999Z'
                 };
-                bwFindCampaignDeferred.fulfill({ 
+                bwFindCampaignDeferred.fulfill({
                     payload : {
                         campaign_id : 11,
                         advertiser_id : 55,
@@ -901,22 +905,22 @@ describe('BeeswaxMiddleware(config)', function() {
                         budget_type : 1
                     }
                 });
-                bwFindCreativeDeferred[0].fulfill({ 
+                bwFindCreativeDeferred[0].fulfill({
                     payload : { creative_id : 1000, advertiser_id : 55, active : true }
                 });
-                bwFindCreativeDeferred[1].fulfill({ 
+                bwFindCreativeDeferred[1].fulfill({
                     payload : { creative_id : 2000, advertiser_id : 55, active : true }
                 });
                 bwQueryLineItemDeferred.fulfill({
                     payload : [
-                        { 
+                        {
                             line_item_id : 100,
                             line_item_budget : 1000,
                             budget_type : 1
-                        } 
+                        }
                     ]
                 });
-                
+
                 bwEditLineItemDeferred.fulfill({
                     payload : { line_item_id : 111, active : true }
                 });
@@ -990,7 +994,7 @@ describe('BeeswaxMiddleware(config)', function() {
                 })
                 .then(done,done.fail);
             });
-            
+
             it('looks up the beeswax campaign line items',function(done){
                 middleWare.upsertCampaignActiveLineItems(args)
                 .then(function (){
@@ -1024,7 +1028,7 @@ describe('BeeswaxMiddleware(config)', function() {
                 })
                 .then(done,done.fail);
             });
-            
+
             it('complains if it cannot find the placements',function(done){
                 getPlacementDeferred = q.defer();
                 getPlacementDeferred.fulfill([[]]);
@@ -1066,7 +1070,7 @@ describe('BeeswaxMiddleware(config)', function() {
             it('complains if it cannot find active beeswax creatives',function(done){
                 bwFindCreativeDeferred = [ q.defer(), q.defer() ];
                 bwFindCreativeDeferred[0].fulfill({ success: true, payload : undefined });
-                bwFindCreativeDeferred[1].fulfill({ 
+                bwFindCreativeDeferred[1].fulfill({
                     payload : { creative_id : 1000, advertiser_id : 55 }
                 });
                 middleWare.upsertCampaignActiveLineItems(args)
@@ -1084,7 +1088,7 @@ describe('BeeswaxMiddleware(config)', function() {
                     bwCreateLineItemDeferred = q.defer();
                     bwEditLineItemDeferred = q.defer();
                     bwCreateTargetingTemplDeferred = q.defer();
-                    
+
                     bwQueryLineItemDeferred.fulfill({ payload : [] });
                     bwCreateTargetingTemplDeferred.fulfill({
                         payload : { targeting_template_id : 999 }
@@ -1117,7 +1121,7 @@ describe('BeeswaxMiddleware(config)', function() {
                         expect(beeswax.creatives.find).toHaveBeenCalledWith(1000);
                         expect(beeswax.lineItems.query).toHaveBeenCalledWith({
                             campaign_id : 11,
-                            active : true, 
+                            active : true,
                             end_date : '2016-07-31 19:59:59'
                         });
                         expect(beeswax.targetingTemplates.create).toHaveBeenCalledWith({
@@ -1125,7 +1129,7 @@ describe('BeeswaxMiddleware(config)', function() {
                             targeting : {
                                 inventory: [ {
                                     include: {
-                                        inventory_source: [ 3, 0 ], interstitial: [ true ], 
+                                        inventory_source: [ 3, 0 ], interstitial: [ true ],
                                         environment_type: [ 1 ]
                                     }
                                 } ],
@@ -1148,8 +1152,8 @@ describe('BeeswaxMiddleware(config)', function() {
                             line_item_name: 'my campaign 2016-06-30',
                             line_item_budget: 1000,
                             budget_type : 1,
-                            bidding : { 
-                                bidding_strategy: 'CPM_PACED', 
+                            bidding : {
+                                bidding_strategy: 'CPM_PACED',
                                 values : { cpm_bid : 11 }
                             },
                             start_date : '2016-01-26 19:00:00',
@@ -1181,17 +1185,17 @@ describe('BeeswaxMiddleware(config)', function() {
                 beforeEach(function(){
                     // bw campaign has budget of 1000 impressions
                     args.campaign.targetUsers = 2000;
-                    
+
                     bwQueryLineItemDeferred = q.defer();
                     bwEditLineItemDeferred = q.defer();
-                    
+
                     bwQueryLineItemDeferred.fulfill({
                         payload : [
-                            { 
+                            {
                                 line_item_id : 100,
                                 line_item_budget : 1000,
                                 budget_type : 1
-                            } 
+                            }
                         ]
                     });
 
@@ -1212,15 +1216,57 @@ describe('BeeswaxMiddleware(config)', function() {
                         expect(beeswax.creatives.find).toHaveBeenCalledWith(1000);
                         expect(beeswax.lineItems.query).toHaveBeenCalledWith({
                             campaign_id : 11,
-                            active : true, 
+                            active : true,
                             end_date : '2016-07-31 19:59:59'
                         });
-                        expect(beeswax.lineItems.edit).toHaveBeenCalledWith(100, { 
+                        expect(beeswax.lineItems.edit).toHaveBeenCalledWith(100, {
                             line_item_budget: 4000
                         });
                         expect(res.updatedLineItems.length).toEqual(1);
                     })
                     .then(done,done.fail);
+                });
+            });
+        });
+
+        describe('method: reactivateCampaign', function () {
+            beforeEach(function () {
+                campaign.externalIds = { beeswax : 11 };
+            });
+
+            ['canceled', 'deleted'].forEach(status => {
+                describe(`for ${status} campaigns`, function () {
+                    beforeEach(function () {
+                        campaign.status = status;
+                    });
+
+                    it('should do nothing', function (done) {
+                        middleWare.reactivateCampaign(campaign).then(function () {
+                            expect(beeswax.campaigns.edit).not.toHaveBeenCalled();
+                        }).then(done, done.fail);
+                    });
+                });
+            });
+
+            ['draft','new','pending','approved','rejected','active','paused','inactive','expired','outOfBudget','error'].forEach(status => {
+                describe(`for ${status} campaigns`, function () {
+                    beforeEach(function () {
+                        campaign.status = status;
+                        bwEditCampaignDeferred = q.defer();
+                        bwEditCampaignDeferred.fulfill({
+                            payload: {
+                                campaign_id: 11
+                            }
+                        });
+                    });
+
+                    it('should be able to activate the campaign in beeswax', function (done) {
+                        middleWare.reactivateCampaign(campaign).then(() => {
+                            expect(beeswax.campaigns.edit).toHaveBeenCalledWith(11, {
+                                active: true
+                            });
+                        }).then(done, done.fail);
+                    });
                 });
             });
         });

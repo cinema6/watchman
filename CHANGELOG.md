@@ -1,6 +1,7 @@
 # Watchman
 
 * *[v1.7.0-rc1]*
+  * [FEATURE]: Added the ability to reactivate campaigns in beeswax
   * [FEATURE]: Added the ability for weekly stats emails to include stats for multiple apps
   * [FEATURE]: Added the ability to transition payment plans for an org
   * [FEATURE]: Start a user's new payment plan immediately upon
@@ -11,6 +12,7 @@
     their subscription is downgraded
   * [FIX]: Ensure we don't try to charge a user for a subscription of $0
   * **Extra Deployment Steps**:
+    * Update environment with `reactivate_campaign` action
     * Update postmark template config with new weekly stats templates
     * Deploy new postmark weekly stats templates
     * Update environment with `transition_payment_plans` action
