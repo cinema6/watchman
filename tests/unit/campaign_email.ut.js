@@ -1003,13 +1003,13 @@ describe('campaign_email.js', function() {
                 email: 'somedude@fake.com',
                 firstName: 'Randy'
             };
-            this.event.data.balance = 9001.9876;
             this.event.options.type = 'paymentMade';
         });
 
         describe('selfie payment receipts', function() {
             beforeEach(function() {
                 this.event.data.target = 'selfie';
+                this.event.data.balance = 9001.9876;
             });
 
             it('should handle payments from credit cards', function(done) {
@@ -1029,7 +1029,8 @@ describe('campaign_email.js', function() {
                         date: 'Monday, April 04, 2016',
                         billingEndDate: 'Tuesday, May 03, 2016',
                         balance: '$9001.99',
-                        firstName: 'Randy'
+                        firstName: 'Randy',
+                        planName: null
                     });
                     expect(self.mockTransport.sendMail).toHaveBeenCalledWith({
                         to: 'somedude@fake.com',
@@ -1062,7 +1063,8 @@ describe('campaign_email.js', function() {
                         date: 'Monday, April 04, 2016',
                         billingEndDate: 'Tuesday, May 03, 2016',
                         balance: '$9001.99',
-                        firstName: 'Randy'
+                        firstName: 'Randy',
+                        planName: null
                     });
                     expect(self.mockTransport.sendMail).toHaveBeenCalledWith({
                         to: 'somedude@fake.com',
@@ -1083,6 +1085,9 @@ describe('campaign_email.js', function() {
         describe('showcase payment receipts', function() {
             beforeEach(function() {
                 this.event.data.target = 'showcase';
+                this.event.data.paymentPlan = {
+                    label: 'The Best Payment Plan'
+                };
             });
 
             it('should handle payments from credit cards', function(done) {
@@ -1101,8 +1106,9 @@ describe('campaign_email.js', function() {
                         },
                         date: 'Monday, April 04, 2016',
                         billingEndDate: 'Tuesday, May 03, 2016',
-                        balance: '$9001.99',
-                        firstName: 'Randy'
+                        balance: null,
+                        firstName: 'Randy',
+                        planName: 'The Best Payment Plan'
                     });
                     expect(self.mockTransport.sendMail).toHaveBeenCalledWith({
                         to: 'somedude@fake.com',
@@ -1130,8 +1136,9 @@ describe('campaign_email.js', function() {
                         },
                         date: 'Monday, April 04, 2016',
                         billingEndDate: 'Tuesday, May 03, 2016',
-                        balance: '$9001.99',
-                        firstName: 'Randy'
+                        balance: null,
+                        firstName: 'Randy',
+                        planName: 'The Best Payment Plan'
                     });
                     expect(self.mockTransport.sendMail).toHaveBeenCalledWith({
                         to: 'somedude@fake.com',
@@ -1147,6 +1154,7 @@ describe('campaign_email.js', function() {
 
         it('should be able to send using postmark', function(done) {
             this.event.data.target = 'selfie';
+            this.event.data.balance = 9001.9876;
             this.event.options.provider = 'postmark';
             this.email(this.event).then(function() {
                 expect(postmark.Client.prototype.sendEmailWithTemplate).toHaveBeenCalledWith({
@@ -1164,7 +1172,8 @@ describe('campaign_email.js', function() {
                         date: 'Monday, April 04, 2016',
                         billingEndDate: 'Tuesday, May 03, 2016',
                         balance: '$9001.99',
-                        firstName: 'Randy'
+                        firstName: 'Randy',
+                        planName: null
                     },
                     InlineCss: true,
                     From: 'e2eSender@fake.com',

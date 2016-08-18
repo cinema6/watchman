@@ -54,7 +54,8 @@ module.exports = function factory(config) {
                     org,
                     paymentPlan,
                     payment,
-                    date: now.format()
+                    date: now.format(),
+                    target: 'showcase'
                 }
             }), reason => log.error(
                 'Failed to update org(%1)\'s nextPaymentDate: %2.',
@@ -67,7 +68,8 @@ module.exports = function factory(config) {
                     data: {
                         org: org,
                         paymentPlan: paymentPlan,
-                        paymentMethod: paymentMethod
+                        paymentMethod: paymentMethod,
+                        target: 'showcase'
                     }
                 });
             }
