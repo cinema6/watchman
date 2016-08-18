@@ -478,7 +478,7 @@ describe('cwrxStream paymentPlanChanged', () => {
 
         it('should update the org\'s nextPaymentDate', done => {
             request.get({ url: api(`/api/account/orgs/${org.id}`) }).spread(org => {
-                expect(org.nextPaymentDate).toBe(moment('2016-09-12T00:00:00Z').utcOffset(0).format());
+                expect(moment(org.nextPaymentDate).utcOffset(0).format()).toBe(moment('2016-09-12T00:00:00+00:00').utcOffset(0).format());
             }).then(done, done.fail);
         });
     });
