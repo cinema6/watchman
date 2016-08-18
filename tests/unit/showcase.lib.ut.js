@@ -47,6 +47,12 @@ describe('showcase lib', function() {
                     },
                     analytics: {
                         endpoint: '/api/analytics'
+                    },
+                    orgs: {
+                        endpoint: '/api/account/orgs'
+                    },
+                    paymentPlans: {
+                        endpoint: '/api/payment-plans'
                     }
                 }
             },
@@ -94,7 +100,7 @@ describe('showcase lib', function() {
     });
 
     it('should create a BeeswaxMiddleware', function() {
-        expect(BeeswaxMiddleware).toHaveBeenCalledWith( 
+        expect(BeeswaxMiddleware).toHaveBeenCalledWith(
             {
                 apiRoot: config.beeswax.apiRoot,
                 creds  : config.state.secrets.beeswax,
@@ -186,7 +192,7 @@ describe('showcase lib', function() {
 
         it('should get the org\'s current payment transaction', function() {
             expect(request.get).toHaveBeenCalledWith({
-                url: resolveURL(config.cwrx.api.root, 
+                url: resolveURL(config.cwrx.api.root,
                         `${config.cwrx.api.transactions.endpoint}/showcase/current-payment`),
                 qs: {
                     org: orgId
@@ -467,7 +473,7 @@ describe('showcase lib', function() {
                             },
                             {
                                 campaign_id: targetCampaigns[2].externalCampaigns.beeswax.externalId,
-                                campaign_budget: 416 
+                                campaign_budget: 416
                             }
                         ]
                     ];
@@ -476,7 +482,7 @@ describe('showcase lib', function() {
                         analytics[index],
                         { statusCode: 200 }
                     ]));
-        
+
                     setTimeout(done);
                 });
 
@@ -538,7 +544,7 @@ describe('showcase lib', function() {
 
                         expect(beeswax.adjustCampaignBudget)
                             .toHaveBeenCalledWith(updatedCampaigns[1], -209 );
-                        
+
                         expect(beeswax.adjustCampaignBudget)
                             .toHaveBeenCalledWith(updatedCampaigns[2], 416 );
 
@@ -557,23 +563,23 @@ describe('showcase lib', function() {
                         it('should upsert the external line items', function() {
                             expect(beeswax.upsertCampaignActiveLineItems)
                                 .toHaveBeenCalledWith({
-                                    campaign : updatedCampaigns[0], 
+                                    campaign : updatedCampaigns[0],
                                     startDate : transaction.cycleStart,
-                                    endDate : transaction.cycleEnd 
+                                    endDate : transaction.cycleEnd
                                 });
 
                             expect(beeswax.upsertCampaignActiveLineItems)
                                 .toHaveBeenCalledWith({
-                                    campaign : updatedCampaigns[1], 
+                                    campaign : updatedCampaigns[1],
                                     startDate : transaction.cycleStart,
-                                    endDate : transaction.cycleEnd 
+                                    endDate : transaction.cycleEnd
                                 });
 
                             expect(beeswax.upsertCampaignActiveLineItems)
                                 .toHaveBeenCalledWith({
-                                    campaign : updatedCampaigns[2], 
+                                    campaign : updatedCampaigns[2],
                                     startDate : transaction.cycleStart,
-                                    endDate : transaction.cycleEnd 
+                                    endDate : transaction.cycleEnd
                                 });
 
                             expect(beeswax.upsertCampaignActiveLineItems.calls.count())
@@ -599,6 +605,132 @@ describe('showcase lib', function() {
                     });
                 });
             });
+        });
+    });
+
+    describe('method: checkWithinCampaignLimit', function () {
+        beforeEach(function () {
+            spyOn(request, 'get');
+            this.mockOrg = {
+                id: 'o-1234567',
+                paymentPlanId: 'pp-1234567',
+                status: 'active'
+            };
+            this.mockPaymentPlan = {
+                id: 'pp-1234567',
+                maxCampaigns: 10,
+                label: 'The Best Payment Plan',
+                status: 'active'
+            };
+            this.orgResponse = null;
+            this.paymentPlanResponse = null;
+            this.campaignResponse = null;
+            request.get.and.callFake(options => {
+                const url = options.url;
+
+                if (/orgs/.test(url)) {
+                    return this.orgResponse;
+                }
+
+                if (/payment-plans/.test(url)) {
+                    return this.paymentPlanResponse;
+                }
+
+                if (/campaigns/.test(url)) {
+                    return this.campaignResponse;
+                }
+            });
+        });
+
+        it('should fetch the org of the campaign', function (done) {
+            this.orgResponse = Promise.resolve([this.mockOrg]);
+            this.paymentPlanResponse = Promise.resolve([this.mockPaymentPlan]);
+            this.campaignResponse = Promise.resolve([[]]);
+            showcase.checkWithinCampaignLimit(this.mockOrg.id).then(() => {
+                expect(request.get).toHaveBeenCalledWith({
+                    url: 'http://33.33.33.10/api/account/orgs/o-1234567'
+                });
+            }).then(done, done.fail);
+        });
+
+        it('should reject if fetching the org fails', function (done) {
+            this.orgResponse = Promise.reject(new Error('epic fail'));
+            this.paymentPlanResponse = Promise.resolve([this.mockPaymentPlan]);
+            this.campaignResponse = Promise.resolve([[]]);
+            showcase.checkWithinCampaignLimit(this.mockOrg.id).then(done.fail, error => {
+                expect(error).toEqual(jasmine.any(Error));
+                expect(error.message).toBe('epic fail');
+            }).then(done, done.fail);
+        });
+
+        it('should fetch the payment plan of the org', function (done) {
+            this.orgResponse = Promise.resolve([this.mockOrg]);
+            this.paymentPlanResponse = Promise.resolve([this.mockPaymentPlan]);
+            this.campaignResponse = Promise.resolve([[]]);
+            showcase.checkWithinCampaignLimit(this.mockOrg.id).then(() => {
+                expect(request.get).toHaveBeenCalledWith({
+                    url: 'http://33.33.33.10/api/payment-plans/pp-1234567'
+                });
+            }).then(done, done.fail);
+        });
+
+        it('should reject if fetching the payment plan fails', function (done) {
+            this.orgResponse = Promise.resolve([this.mockOrg]);
+            this.paymentPlanResponse = Promise.reject(new Error('epic fail'));
+            this.campaignResponse = Promise.resolve([[]]);
+            showcase.checkWithinCampaignLimit(this.mockOrg.id).then(done.fail, error => {
+                expect(error).toEqual(jasmine.any(Error));
+                expect(error.message).toBe('epic fail');
+            }).then(done, done.fail);
+        });
+
+        it('should fetch the number of active campaigns in the org', function (done) {
+            this.orgResponse = Promise.resolve([this.mockOrg]);
+            this.paymentPlanResponse = Promise.resolve([this.mockPaymentPlan]);
+            this.campaignResponse = Promise.resolve([[]]);
+            showcase.checkWithinCampaignLimit(this.mockOrg.id).then(() => {
+                expect(request.get).toHaveBeenCalledWith({
+                    url: 'http://33.33.33.10/api/campaigns',
+                    qs: {
+                        application: 'showcase',
+                        org: 'o-1234567',
+                        statuses: 'draft,new,pending,approved,rejected,active,paused,inactive,expired,outOfBudget,error'
+                    }
+                });
+            }).then(done, done.fail);
+        });
+
+        it('should reject if fetching the campaigns fails', function (done) {
+            this.orgResponse = Promise.resolve([this.mockOrg]);
+            this.paymentPlanResponse = Promise.resolve([this.mockPaymentPlan]);
+            this.campaignResponse = Promise.reject(new Error('epic fail'));
+            showcase.checkWithinCampaignLimit(this.mockOrg.id).then(done.fail, error => {
+                expect(error).toEqual(jasmine.any(Error));
+                expect(error.message).toBe('epic fail');
+            }).then(done, done.fail);
+        });
+
+        it('should resolve if the org is within their campaigns limit', function (done) {
+            const campaigns = new Array(10).fill({
+                name: 'This is a campaign'
+            });
+            this.orgResponse = Promise.resolve([this.mockOrg]);
+            this.paymentPlanResponse = Promise.resolve([this.mockPaymentPlan]);
+            this.campaignResponse = Promise.resolve([campaigns]);
+            showcase.checkWithinCampaignLimit(this.mockOrg.id).then(done, done.fail);
+        });
+
+        it('should reject if the org has exceeded their maximum number of campaigns', function (done) {
+            const campaigns = new Array(11).fill({
+                name: 'This is a campaign'
+            });
+            this.orgResponse = Promise.resolve([this.mockOrg]);
+            this.paymentPlanResponse = Promise.resolve([this.mockPaymentPlan]);
+            this.campaignResponse = Promise.resolve([campaigns]);
+            showcase.checkWithinCampaignLimit(this.mockOrg.id).then(done.fail, error => {
+                expect(error).toEqual(jasmine.any(Error));
+                expect(error.message).toBe('Campaign limit has been reached');
+            }).then(done, done.fail);
         });
     });
 });

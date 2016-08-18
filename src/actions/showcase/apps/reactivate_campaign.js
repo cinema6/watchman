@@ -21,7 +21,9 @@ module.exports = function factory(config) {
         const data = event.data;
         const campaign = data.campaign;
 
-        return beeswax.reactivateCampaign(campaign).then(() =>
+        return showcase.checkWithinCampaignLimit(campaign.org).then(() =>
+            beeswax.reactivateCampaign(campaign)
+        ).then(() =>
             showcase.rebalance(campaign.org)
         ).then(() =>
             producer.produce({
