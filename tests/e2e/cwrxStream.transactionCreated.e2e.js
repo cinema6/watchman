@@ -11,30 +11,12 @@ var uuid = require('rc-uuid');
 var moment = require('moment-timezone');
 var Status = require('cwrx/lib/enums').Status;
 var BeeswaxHelper = require('../helpers/BeeswaxHelper');
-const delay = require('../helpers/waiter').delay;
 
 var API_ROOT = process.env.apiRoot;
 var APP_CREDS = JSON.parse(process.env.appCreds);
 var AWS_CREDS = JSON.parse(process.env.awsCreds);
 var CWRX_STREAM = process.env.cwrxStream;
-const CWRX_STREAM_2 = process.env.cwrxStream2;
 var PREFIX = process.env.appPrefix;
-
-const mockman = new testUtils.Mockman({
-    streamName: CWRX_STREAM_2 || CWRX_STREAM
-});
-
-function waitForMockman(eventType, n) {
-    var records = [];
-    return new Promise(resolve => {
-        mockman.on(eventType, function(record) {
-            records.push(record);
-            if(records.length === n) {
-                resolve(records);
-            }
-        });
-    });
-}
 
 function toBeeswaxDate(dt){
     return moment(dt).tz('America/New_York').format('YYYY-MM-DD HH:mm:ss');
@@ -624,8 +606,6 @@ describe('cwrxStream transactionCreated', function() {
 
         beforeAll(done => {
             initSystem().then(() => {
-                const configurator = new Configurator();
-
                 promotion = {
                     id: createId('pro'),
                     status: 'active',
@@ -654,36 +634,12 @@ describe('cwrxStream transactionCreated', function() {
                     return Promise.all([
                         testUtils.resetCollection('promotions', [promotion]),
                         testUtils.resetCollection('orgs', [org]),
-                        testUtils.resetPGTable('fct.billing_transactions'),
-                        mockman.start()
+                        testUtils.resetPGTable('fct.billing_transactions')
                     ]);
-                }).then(() => {
-                    // First remove all cwrx event handlers before seeding braintree with a payment
-                    return configurator.updateConfig(`${PREFIX}CwrxStreamApplication`, sharedConfig, {
-                        eventHandlers: {}
-                    });
                 }).then(() => {
                     return createPaymentMethod({ user });
                 }).then(paymentMethod => {
-                    createPayment({ user, paymentMethod, paymentPlan });
-
-                    return waitForMockman('transactionCreated', 1);
-                }).then(() => delay(2000)).then(() => {
-                    return request.get({
-                        url: api('/api/transactions'),
-                        qs: { org: org.id }
-                    }).spread(transactions => transactions[0]);
-                }).then(transaction => {
-                    // Restore cwrx config now that the payment/transaction has been created.
-                    return configurator.updateConfig(`${PREFIX}CwrxStreamApplication`, sharedConfig, cwrxConfig).then(() => {
-                        return producer.produce({
-                            type: 'transactionCreated',
-                            data: {
-                                transaction,
-                                date: moment().format()
-                            }
-                        });
-                    });
+                    return createPayment({ user, paymentMethod, paymentPlan });
                 }).then(() => waitUntil(() => {
                     return Promise.resolve().then(() => {
                         return request.get({
@@ -713,9 +669,7 @@ describe('cwrxStream transactionCreated', function() {
 
         afterAll(done => {
             cleanupSystem().then(() => {
-                return Promise.all([
-                    mockman.stop()
-                ]).then(done, done.fail);
+
             }).then(done, done.fail);
         });
 

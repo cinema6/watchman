@@ -154,8 +154,8 @@ describe('cwrxStream paymentPlanChanged', () => {
             status: 'active',
             name: 'The Best Org',
             paymentPlanId: paymentPlans[3],
-            paymentPlanStart: moment('2016-07-27T00:00:00').format(),
-            nextPaymentDate: moment('2016-07-28T00:00:00').format()
+            paymentPlanStart: moment('2016-07-27T00:00:00+00:00').utcOffset(0).format(),
+            nextPaymentDate: moment('2016-07-28T00:00:00+00:00').utcOffset(0).format()
         };
 
         policy = {
@@ -421,7 +421,7 @@ describe('cwrxStream paymentPlanChanged', () => {
                     type: '_paymentPlanChanged',
                     data: {
                         org,
-                        date: moment('2016-08-12T17:23:11').format(),
+                        date: moment('2016-08-12T17:23:11+00:00').utcOffset(0).format(),
                         currentPaymentPlanId: paymentPlans[3].id,
                         previousPaymentPlanId: paymentPlans[1].id
                     }
@@ -458,7 +458,7 @@ describe('cwrxStream paymentPlanChanged', () => {
                     transaction_id: jasmine.any(String),
                     transaction_ts: jasmine.any(Date),
                     org_id: 'o-e2e',
-                    amount: '477.1100',
+                    amount: '476.9600',
                     sign: 1,
                     units: 1,
                     campaign_id: null,
@@ -472,7 +472,7 @@ describe('cwrxStream paymentPlanChanged', () => {
                     application: 'showcase'
                 }));
 
-                expect(moment(transaction.cycle_start).utcOffset(0).format()).toBe(moment('2016-08-12T00:00:00Z').utcOffset(0).format());
+                expect(moment(transaction.cycle_start).utcOffset(0).format()).toBe(moment('2016-08-12T00:00:00+00:00').utcOffset(0).format());
             }).then(done, done.fail);
         });
 
