@@ -1,5 +1,6 @@
 # Watchman
 
+## v1.7.0 (August 18, 2016)
 * *[v1.7.0-rc1]*
   * [FEATURE]: Added the ability to reactivate campaigns in beeswax
   * [FEATURE]: Added the ability for weekly stats emails to include stats for multiple apps
@@ -22,6 +23,7 @@
     * Update environment with `showcase/apps/rebalance` action
     * Update environment with `fulfill_bonus_views` action
     * Update environment with `showcase/apps/auto_archive_campaigns` action
+* *[/v1.7.0-rc1]*
 
 ## v1.6.0 (August 11, 2016)
 * *[v1.6.0-rc1]*
