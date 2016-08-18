@@ -2,8 +2,11 @@
 
 ## v1.7.0 (August 18, 2016)
 * *[v1.7.0-rc2]*
+  * [FEATURE]: Include payment plan information in showcase payment receipts
   * [FIX]: Handle advertisers with the same name [159] (https://github.com/cinema6/watchman/issues/159)
   * [FIX]: Do not decrease beeswax campaign budgets [160] (https://github.com/cinema6/watchman/issues/160)
+  * **Extra Deployment Steps**:
+    * Update environment with extra payment receipt email config
 
 * *[v1.7.0-rc1]*
   * [FEATURE]: Added the ability to reactivate campaigns in beeswax
