@@ -454,6 +454,34 @@ describe('BeeswaxMiddleware(config)', function() {
                     })
                     .then(done,done.fail);
                 });
+                
+                it('beeswax duplicate advertiser name failure',function(done){
+                    beeswax.advertisers.create.and.callFake(() => {
+                        if (beeswax.advertisers.create.calls.count() === 1) {
+                            return q.reject(new Error('dupe!'));
+                        } else {
+                            return q.resolve({
+                                payload : { advertiser_id : 99}
+                            });
+                        }
+                    });
+                    delete advertiser.externalIds;
+                    getAdvertiserDeferred.fulfill([advertiser]);
+                    middleWare.createAdvertiser( { advertiser : { id : 'a-1234567' } })
+                    .then((result) => {
+                        expect(beeswax.advertisers.create.calls.count()).toEqual(2);
+                        expect(beeswax.advertisers.create.calls.argsFor(0)[0])
+                            .toEqual(jasmine.objectContaining({
+                                advertiser_name : 'ACME TNT'
+                            }));
+                        expect(beeswax.advertisers.create.calls.argsFor(1)[0])
+                            .toEqual(jasmine.objectContaining({
+                                advertiser_name : 'ACME TNT (a-1234567)'
+                            }));
+                        expect(result.advertiser.externalIds.beeswax).toEqual(99);
+                    })
+                    .then(done,done.fail);
+                });
             });
         });
 
@@ -857,15 +885,14 @@ describe('BeeswaxMiddleware(config)', function() {
                 .then(done,done.fail);
             });
 
-            it('decreases campaign budgets',function(done){
+            it('does not decrease campaign budgets',function(done){
                 campaign.externalCampaigns = { beeswax : { externalId : 11 } };
                 bwEditCampaignDeferred.fulfill({ payload : {
                     campaign_id: 11, campaign_budget: 500 } });
                 middleWare.adjustCampaignBudget(campaign,-500)
                 .then(function(){
                     expect(beeswax.campaigns.find).toHaveBeenCalledWith(11);
-                    expect(beeswax.campaigns.edit).toHaveBeenCalledWith(11,
-                        { campaign_budget: 500});
+                    expect(beeswax.campaigns.edit).not.toHaveBeenCalled();
                 })
                 .then(done,done.fail);
             });

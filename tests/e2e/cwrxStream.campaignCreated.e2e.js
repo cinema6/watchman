@@ -1175,15 +1175,6 @@ describe('cwrxStream campaignCreated', function() {
                     ])
                     .then((items) =>  items.every(item => (!!item)) && items)
                 ))),
-                Promise.all(beeswaxCampaigns.map(beeswaxCampaign => (
-                    beeswax.api.campaigns.find(beeswaxCampaign.campaign_id).then(response => {
-                        const updatedBeeswaxCampaign = response.payload;
-
-                        return (
-                            updatedBeeswaxCampaign.campaign_budget < beeswaxCampaign.campaign_budget
-                        ) && updatedBeeswaxCampaign;
-                    })
-                ))).then(beeswaxCampaigns => beeswaxCampaigns.every(beeswaxCampaign => !!beeswaxCampaign) && beeswaxCampaigns),
                 Promise.all(beeswaxCampaigns.map(beeswaxCampaign => {
                     return beeswax.api.lineItems.query({
                         campaign_id : beeswaxCampaign.campaign_id
@@ -1197,6 +1188,10 @@ describe('cwrxStream campaignCreated', function() {
                         })
                         .then(result => {
                             lineItem.mappings = result.payload;
+                            return beeswax.api.campaigns.find(lineItem.campaign_id);
+                        })
+                        .then(result => {
+                            lineItem.campaign = result.payload;
                             return lineItem;
                         })
                     );
@@ -1211,8 +1206,9 @@ describe('cwrxStream campaignCreated', function() {
                 campaigns = arguments[1];
                 beeswaxCampaign = arguments[2][0];
                 beeswaxLineItem = arguments[2][1];
-                beeswaxCampaigns = arguments[3];
-                beeswaxLineItems = arguments[4];
+                beeswaxLineItems = arguments[3];
+                beeswaxCampaigns = beeswaxLineItems.map(item => item.campaign);
+
             })).then(done, done.fail);
         });
 
@@ -1244,8 +1240,8 @@ describe('cwrxStream campaignCreated', function() {
         });
 
         it('should increase the budget of the beeswax campaigns', function() {
-            expect(beeswaxCampaigns[0].campaign_budget).toBe(4250);
-            expect(beeswaxCampaigns[1].campaign_budget).toBe(2291);
+            expect(beeswaxCampaigns[0].campaign_budget).toBe(4500);
+            expect(beeswaxCampaigns[1].campaign_budget).toBe(2500);
             expect(beeswaxCampaign.campaign_budget).toBe(417);
             expect(beeswaxLineItem.line_item_budget).toBe(416);
             expect(beeswaxLineItem.mappings.length).toEqual(1);
