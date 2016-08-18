@@ -48,7 +48,7 @@ module.exports = function factory(config) {
             qs: {
                 org: transaction.org,
                 application: 'showcase',
-                status: [
+                statuses: [
                     Status.Draft, Status.New, Status.Pending, Status.Approved, Status.Rejected,
                     Status.Active, Status.Paused, Status.Inactive, Status.Expired,
                     Status.OutOfBudget, Status.Error

@@ -219,7 +219,7 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                     qs: {
                         org: data.transaction.org,
                         application: 'showcase',
-                        status: [
+                        statuses: [
                             Status.Draft, Status.New, Status.Pending, Status.Approved, Status.Rejected, Status.Active, Status.Paused,
                             Status.Inactive, Status.Expired, Status.OutOfBudget, Status.Error
                         ].join(',')

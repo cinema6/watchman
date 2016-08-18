@@ -1,6 +1,6 @@
 {
   "name": "watchman",
-  "version": "1.7.0-rc1",
+  "version": "1.7.0-rc2",
   "description": "",
   "scripts": {
     "preinstall": "sh ./scripts/preinstall.sh"
