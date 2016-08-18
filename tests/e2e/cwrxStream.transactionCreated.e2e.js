@@ -44,7 +44,7 @@ describe('cwrxStream transactionCreated', function() {
     let sharedConfig, cwrxConfig, timeConfig, watchmanConfig;
     var producer, request, beeswax, cookies;
     var advertiser, campaigns, beeswaxCampaigns, org, paymentPlan, user, policy,
-        targetCampaignIds, otherCampaignIds, ourCampaignIds;
+        targetCampaignIds, otherCampaignIds, ourCampaignIds, canceledCampaignId;
     var targetOrg, transaction;
 
     function api(endpoint) {
@@ -316,6 +316,7 @@ describe('cwrxStream transactionCreated', function() {
             targetOrg = org.id;
 
             targetCampaignIds = [createId('cam'), createId('cam')];
+            canceledCampaignId = createId('cam');
             campaigns = [
                 // Another org's selfie campaign
                 {
@@ -428,6 +429,25 @@ describe('cwrxStream transactionCreated', function() {
                     product: {
                         type: 'ecommerce'
                     }
+                },
+                // Our org's canceled showcase campaign
+                {
+                    id: canceledCampaignId,
+                    status: Status.Active,
+                    application: 'showcase',
+                    created: moment().subtract(1, 'year').toDate(),
+                    lastUpdated: moment().subtract(1, 'month').toDate(),
+                    pricing: {
+                        model: 'cpv',
+                        cost: 0.01,
+                        budget: 1.25,
+                        dailyLimit: 1
+                    },
+                    org: targetOrg,
+                    advertiserId: advertiser.id,
+                    product: {
+                        type: 'app'
+                    }
                 }
             ].map(function(campaign) {
                 return ld.assign({}, campaign, {
@@ -455,6 +475,7 @@ describe('cwrxStream transactionCreated', function() {
                 var isOurs = ourCampaignIds.indexOf(campaign.id) > -1;
 
                 return ld.assign({}, campaign, {
+                    status: campaign.id === canceledCampaignId ? Status.Canceled : campaign.status,
                     created: moment().subtract(1, 'year').toDate(),
                     lastUpdated: moment().subtract(1, 'month').toDate(),
                     org: isOurs ? targetOrg : campaign.org
