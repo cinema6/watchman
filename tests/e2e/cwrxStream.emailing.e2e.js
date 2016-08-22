@@ -5,6 +5,7 @@ var JsonProducer = require('rc-kinesis').JsonProducer;
 var Q = require('q');
 var testUtils = require('cwrx/test/e2e/testUtils.js');
 const rcUuid = require('rc-uuid');
+const waiter = require('../helpers/waiter');
 
 var API_ROOT = process.env.apiRoot;
 var APP_CREDS = JSON.parse(process.env.appCreds);
@@ -122,7 +123,8 @@ describe('cwrxStream', function() {
                     'failedLogins--app': '672904',
                     passwordReset: '672905',
                     'passwordReset--app': '672906',
-                    campaignSubmitted: '672810'
+                    campaignSubmitted: '672810',
+                    paymentPlanCanceled: '855802'
                 }
             }
         };
@@ -304,6 +306,29 @@ describe('cwrxStream', function() {
                             name: 'message/campaign_email',
                             options: {
                                 type: 'activateAccount'
+                            }
+                        }
+                    ]
+                },
+                paymentPlanChanged: {
+                    actions: [
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'paymentPlanChanged'
+                            }
+                        }
+                    ]
+                },
+                paymentPlanPending: {
+                    actions: [
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'paymentPlanCanceled'
+                            },
+                            ifData: {
+                                'pendingPaymentPlan.price': '^0$'
                             }
                         }
                     ]
@@ -1360,5 +1385,31 @@ describe('cwrxStream', function() {
                 done();
             });
         }).catch(done.fail);
+    });
+
+    it('should be able to send a payment plan canceled email', function (done) {
+        producer.produce({
+            type: 'paymentPlanPending',
+            data: {
+                pendingPaymentPlan: {
+                    price: 0
+                },
+                org: this.mockOrg,
+                effectiveDate: new Date()
+            }
+        }).then(() => {
+            return waiter.waitFor(() => {
+                return new Promise(resolve => {
+                    mailman.once('Your subscription has been cancelled', msg => resolve(msg));
+                });
+            });
+        }).then(msg => {
+            expect(msg.from[0].address).toBe('support@cinema6.com');
+            expect(msg.to[0].address).toBe('c6e2etester@gmail.com');
+            var regex = /plan will be cancelled/;
+            expect(msg.text).toMatch(regex);
+            expect(msg.html).toMatch(regex);
+            expect(new Date() - msg.date).toBeLessThan(EMAIL_TIMEOUT);
+        }).then(done, done.fail);
     });
 });
