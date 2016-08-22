@@ -121,7 +121,8 @@ describe('campaign_email.js', function() {
                     'promotionEnded--app': 'promotionEnded--app-template-id',
                     'weeklyStats1': 'weekOneStats--app-template-id',
                     'weeklyStatsDefault': 'weekTwoStats--app-template-id',
-                    paymentPlanCanceled: 'paymentPlanCanceled-template-id'
+                    paymentPlanCanceled: 'paymentPlanCanceled-template-id',
+                    paymentPlanDowngraded: 'paymentPlanDowngraded-template-id'
                 }
             },
             state: {
@@ -2545,6 +2546,56 @@ describe('campaign_email.js', function() {
                     From: 'e2eSender@fake.com',
                     To: 'somedude@fake.com',
                     Tag: 'paymentPlanCanceled',
+                    TrackOpens: true,
+                    Attachments: this.showcasePostmarkAttachments
+                }, jasmine.any(Function));
+            }).then(done, done.fail);
+        });
+    });
+
+    describe('sending a payment plan downgraded email', function () {
+        beforeEach(function () {
+            this.event.data.org = {
+                id: 'o-123'
+            };
+            this.event.data.currentPaymentPlan = {
+                label: 'Better Plan'
+            };
+            this.event.data.pendingPaymentPlan = {
+                label: 'Worse Plan',
+                maxCampaigns: 2
+            };
+            this.event.options.type = 'paymentPlanDowngraded';
+            this.event.options.provider = 'postmark';
+            requestUtils.makeSignedRequest.and.returnValue(Promise.resolve({
+                response: {
+                    statusCode: 200
+                },
+                body: [{
+                    email: 'somedude@fake.com',
+                    firstName: 'Charlie'
+                }]
+            }));
+        });
+
+        it('should be able to send with postmark', function (done) {
+            const date = new Date(2014, 7, 22);
+            this.event.data.effectiveDate = date;
+            this.email(this.event).then(() => {
+                expect(postmark.Client.prototype.sendEmailWithTemplate).toHaveBeenCalledWith({
+                    TemplateId: 'paymentPlanDowngraded-template-id',
+                    TemplateModel: {
+                        firstName: 'Charlie',
+                        contact: 'e2eSupport@fake.com',
+                        date: 'Aug 22, 2014',
+                        currentPlanName: 'Better Plan',
+                        pendingPlanName: 'Worse Plan',
+                        pendingPlanApps: 2
+                    },
+                    InlineCss: true,
+                    From: 'e2eSender@fake.com',
+                    To: 'somedude@fake.com',
+                    Tag: 'paymentPlanDowngraded',
                     TrackOpens: true,
                     Attachments: this.showcasePostmarkAttachments
                 }, jasmine.any(Function));

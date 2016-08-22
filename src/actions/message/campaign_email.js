@@ -556,6 +556,25 @@ module.exports = function factory(config) {
                     target: 'showcase'
                 })
             };
+        },
+        paymentPlanDowngraded: data => {
+            const currentPlan = data.currentPaymentPlan;
+            const pendingPlan = data.pendingPaymentPlan;
+
+            return {
+                template: 'paymentPlanDowngraded',
+                data: {
+                    firstName: data.user.firstName,
+                    date:  moment(data.effectiveDate).format('MMM D, YYYY'),
+                    contact: emailConfig.supportAddress,
+                    currentPlanName: currentPlan.label,
+                    pendingPlanName: pendingPlan.label,
+                    pendingPlanApps: pendingPlan.maxCampaigns
+                },
+                attachments: getAttachments({
+                    target: 'showcase'
+                })
+            };
         }
     };
 
