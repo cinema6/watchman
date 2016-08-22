@@ -120,7 +120,8 @@ describe('campaign_email.js', function() {
                     'campaignActive--app': 'campaignActive--app-template-id',
                     'promotionEnded--app': 'promotionEnded--app-template-id',
                     'weeklyStats1': 'weekOneStats--app-template-id',
-                    'weeklyStatsDefault': 'weekTwoStats--app-template-id'
+                    'weeklyStatsDefault': 'weekTwoStats--app-template-id',
+                    paymentPlanCanceled: 'paymentPlanCanceled-template-id'
                 }
             },
             state: {
@@ -2507,6 +2508,46 @@ describe('campaign_email.js', function() {
             this.email(this.event).then(() => {
                 expect(this.CwrxRequest.prototype.get).toHaveBeenCalledWith('https://root/analytics/campaigns/showcase/apps/cam-123');
                 expect(postmark.Client.prototype.sendEmailWithTemplate.calls.mostRecent().args[0].TemplateId).toBe('weekTwoStats--app-template-id');
+            }).then(done, done.fail);
+        });
+    });
+
+    describe('sending a payment plan canceled email', function () {
+        beforeEach(function () {
+            this.event.data.org = {
+                id: 'o-123'
+            };
+            this.event.options.type = 'paymentPlanCanceled';
+            this.event.options.provider = 'postmark';
+            requestUtils.makeSignedRequest.and.returnValue(Promise.resolve({
+                response: {
+                    statusCode: 200
+                },
+                body: [{
+                    email: 'somedude@fake.com',
+                    firstName: 'Charlie'
+                }]
+            }));
+        });
+
+        it('should be able to send with postmark', function (done) {
+            const date = new Date(2014, 7, 22);
+            this.event.data.effectiveDate = date;
+            this.email(this.event).then(() => {
+                expect(postmark.Client.prototype.sendEmailWithTemplate).toHaveBeenCalledWith({
+                    TemplateId: 'paymentPlanCanceled-template-id',
+                    TemplateModel: {
+                        firstName: 'Charlie',
+                        contact: 'e2eSupport@fake.com',
+                        date: 'Aug 22, 2014'
+                    },
+                    InlineCss: true,
+                    From: 'e2eSender@fake.com',
+                    To: 'somedude@fake.com',
+                    Tag: 'paymentPlanCanceled',
+                    TrackOpens: true,
+                    Attachments: this.showcasePostmarkAttachments
+                }, jasmine.any(Function));
             }).then(done, done.fail);
         });
     });

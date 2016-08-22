@@ -543,6 +543,19 @@ module.exports = function factory(config) {
                     });
                 });
             }));
+        },
+        paymentPlanCanceled: data => {
+            return {
+                template: 'paymentPlanCanceled',
+                data: {
+                    firstName: data.user.firstName,
+                    date:  moment(data.effectiveDate).format('MMM D, YYYY'),
+                    contact: emailConfig.supportAddress
+                },
+                attachments: getAttachments({
+                    target: 'showcase'
+                })
+            };
         }
     };
 
