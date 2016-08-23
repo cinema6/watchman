@@ -273,7 +273,7 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
                             },
                             conversionMultipliers: {
                                 internal: 1.25,
-                                external: 1.50
+                                external: 1.5005
                             },
                             product: {
                                 type: 'app'
@@ -412,7 +412,7 @@ describe('(action factory) showcase/apps/auto_increase_budget', function() {
 
                         expect(beeswax.adjustCampaignBudget).toHaveBeenCalledWith(
                             putCampaignDeferreds[campaigns[1].id].promise.inspect().value[0],
-                            1500);
+                            1501);
                         
                         expect(beeswax.adjustCampaignBudget).toHaveBeenCalledWith(
                             putCampaignDeferreds[campaigns[2].id].promise.inspect().value[0],
