@@ -1,6 +1,12 @@
 # Watchman
 
 ## v1.7.0 (August 18, 2016)
+* *[v1.7.0-rc3]*
+  * [FIX]: Round beeswax campaign impressions when increasing a
+    campaign's budget.
+  * [FIX]: Fail with a better error message if a beeswax campaign can't
+    be found.
+
 * *[v1.7.0-rc2]*
   * [FEATURE]: Include payment plan information in showcase payment receipts
   * [FIX]: Handle advertisers with the same name [159] (https://github.com/cinema6/watchman/issues/159)
