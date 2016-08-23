@@ -897,6 +897,17 @@ describe('BeeswaxMiddleware(config)', function() {
                 .then(done,done.fail);
             });
 
+            it('rejects if the beeswax campaign can\'t be found', done => {
+                campaign.externalIds = { beeswax : 11 };
+                bwFindCampaignDeferred = q.defer();
+                bwFindCampaignDeferred.resolve({ payload: undefined });
+                middleWare.adjustCampaignBudget(campaign,500)
+                .then(() => done.fail('adjustCampaignBudget() succeeded'))
+                .catch(function(reason){
+                    expect(reason).toEqual(new Error('Couldn\'t find beeswax campaign(11).'));
+                })
+                .then(done,done.fail);
+            });
         });
 
         describe('method: upsertCampaignActiveLineItems', function(){
