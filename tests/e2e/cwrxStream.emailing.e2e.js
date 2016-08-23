@@ -72,6 +72,9 @@ describe('cwrxStream', function() {
                     },
                     campaigns: {
                         endpoint: '/api/campaigns'
+                    },
+                    paymentPlans: {
+                        endpoint: '/api/payment-plans'
                     }
                 }
             },
@@ -125,7 +128,8 @@ describe('cwrxStream', function() {
                     'passwordReset--app': '672906',
                     campaignSubmitted: '672810',
                     paymentPlanCanceled: '855802',
-                    paymentPlanDowngraded: '855921'
+                    paymentPlanDowngraded: '855921',
+                    paymentPlanUpgraded: '855922'
                 }
             }
         };
@@ -316,7 +320,7 @@ describe('cwrxStream', function() {
                         {
                             name: 'message/campaign_email',
                             options: {
-                                type: 'paymentPlanChanged'
+                                type: 'paymentPlanUpgraded'
                             }
                         }
                     ]
@@ -1450,6 +1454,50 @@ describe('cwrxStream', function() {
             expect(msg.from[0].address).toBe('support@cinema6.com');
             expect(msg.to[0].address).toBe('c6e2etester@gmail.com');
             const regex = /downgrading your plan/;
+            expect(msg.text).toMatch(regex);
+            expect(msg.html).toMatch(regex);
+            expect(new Date() - msg.date).toBeLessThan(EMAIL_TIMEOUT);
+        }).then(done, done.fail);
+    });
+
+    it('should be able to send a payment plan upgraded email', function (done) {
+        const paymentPlans = [
+            {
+                id: `pp-${rcUuid.createUuid()}`,
+                price: 0,
+                maxCampaigns: 0,
+                viewsPerMonth: 0,
+                label: '--canceled--',
+                status: 'active'
+            },
+            {
+                id: `pp-${rcUuid.createUuid()}`,
+                price: 49.99,
+                maxCampaigns: 1,
+                viewsPerMonth: 2000,
+                label: 'Starter',
+                status: 'active'
+            }
+        ];
+        testUtils.resetCollection('paymentPlans', paymentPlans).then(() => {
+            return producer.produce({
+                type: 'paymentPlanChanged',
+                data: {
+                    previousPaymentPlanId: paymentPlans[0].id,
+                    currentPaymentPlanId: paymentPlans[1].id,
+                    org: this.mockOrg
+                }
+            });
+        }).then(() => {
+            return waiter.waitFor(() => {
+                return new Promise(resolve => {
+                    mailman.once('Your plan has been upgraded', msg => resolve(msg));
+                });
+            });
+        }).then(msg => {
+            expect(msg.from[0].address).toBe('support@cinema6.com');
+            expect(msg.to[0].address).toBe('c6e2etester@gmail.com');
+            const regex = /upgraded your plan/;
             expect(msg.text).toMatch(regex);
             expect(msg.html).toMatch(regex);
             expect(new Date() - msg.date).toBeLessThan(EMAIL_TIMEOUT);
