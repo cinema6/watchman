@@ -27,6 +27,8 @@ module.exports = function factory(config) {
     const chartComposer = new ChartComposer();
     const campaignsEndpoint = url.resolve(config.cwrx.api.root,
         config.cwrx.api.campaigns.endpoint);
+    const paymentPlansEndpoint = url.resolve(config.cwrx.api.root,
+        config.cwrx.api.paymentPlans.endpoint);
     const releventStatuses = ld.values(enums.Status)
         .filter(value => value !== enums.Status.Canceled && value !== enums.Status.Deleted);
     const log = logger.getLog();
@@ -543,6 +545,67 @@ module.exports = function factory(config) {
                     });
                 });
             }));
+        },
+        paymentPlanCanceled: data => {
+            return {
+                template: 'paymentPlanCanceled',
+                data: {
+                    firstName: data.user.firstName,
+                    date:  moment(data.effectiveDate).format('MMM D, YYYY'),
+                    contact: emailConfig.supportAddress
+                },
+                attachments: getAttachments({
+                    target: 'showcase'
+                })
+            };
+        },
+        paymentPlanDowngraded: data => {
+            const currentPlan = data.currentPaymentPlan;
+            const pendingPlan = data.pendingPaymentPlan;
+
+            return {
+                template: 'paymentPlanDowngraded',
+                data: {
+                    firstName: data.user.firstName,
+                    date:  moment(data.effectiveDate).format('MMM D, YYYY'),
+                    contact: emailConfig.supportAddress,
+                    currentPlanName: currentPlan.label,
+                    pendingPlanName: pendingPlan.label,
+                    pendingPlanApps: pendingPlan.maxCampaigns
+                },
+                attachments: getAttachments({
+                    target: 'showcase'
+                })
+            };
+        },
+        paymentPlanUpgraded: data => {
+            return Promise.all([
+                cwrxRequest.get({ url: `${paymentPlansEndpoint}/${data.previousPaymentPlanId}` }),
+                cwrxRequest.get({ url: `${paymentPlansEndpoint}/${data.currentPaymentPlanId}` })
+            ]).then(ld.spread((previousPlanResult, currentPlanResult) => {
+                const previousPlan = previousPlanResult[0];
+                const currentPlan = currentPlanResult[0];
+
+                if (previousPlan.price >= currentPlan.price) {
+                    return { send: false };
+                }
+
+                return {
+                    template: 'paymentPlanUpgraded',
+                    data: {
+                        firstName: data.user.firstName,
+                        contact: emailConfig.supportAddress,
+                        dashboardLink: emailConfig.dashboardLinks['showcase'],
+                        previousPlanName: previousPlan.label,
+                        currentPlanName: currentPlan.label,
+                        currentPlanApps: currentPlan.maxCampaigns,
+                        currentPlanViews: currentPlan.viewsPerMonth
+                    },
+                    attachments: getAttachments({
+                        target: 'showcase'
+                    })
+                };
+            }));
         }
     };
 
@@ -719,13 +782,15 @@ module.exports = function factory(config) {
                 email.to = recipient;
                 email.from = emailConfig.sender;
 
-                switch(provider) {
-                case 'ses':
-                    return sesAdapter(email);
-                case 'postmark':
-                    return postmarkAdapter(email);
-                default:
-                    throw new Error(`Unrecognized provider ${provider}`);
+                if (!('send' in email) || email.send) {
+                    switch(provider) {
+                    case 'ses':
+                        return sesAdapter(email);
+                    case 'postmark':
+                        return postmarkAdapter(email);
+                    default:
+                        throw new Error(`Unrecognized provider ${provider}`);
+                    }
                 }
             });
         });

@@ -86,6 +86,9 @@ describe('campaign_email.js', function() {
                     },
                     campaigns: {
                         endpoint: '/campaigns'
+                    },
+                    paymentPlans: {
+                        endpoint: '/api/payment-plans'
                     }
                 }
             },
@@ -120,7 +123,10 @@ describe('campaign_email.js', function() {
                     'campaignActive--app': 'campaignActive--app-template-id',
                     'promotionEnded--app': 'promotionEnded--app-template-id',
                     'weeklyStats1': 'weekOneStats--app-template-id',
-                    'weeklyStatsDefault': 'weekTwoStats--app-template-id'
+                    'weeklyStatsDefault': 'weekTwoStats--app-template-id',
+                    paymentPlanCanceled: 'paymentPlanCanceled-template-id',
+                    paymentPlanDowngraded: 'paymentPlanDowngraded-template-id',
+                    paymentPlanUpgraded: 'paymentPlanUpgraded-template-id'
                 }
             },
             state: {
@@ -2507,6 +2513,194 @@ describe('campaign_email.js', function() {
             this.email(this.event).then(() => {
                 expect(this.CwrxRequest.prototype.get).toHaveBeenCalledWith('https://root/analytics/campaigns/showcase/apps/cam-123');
                 expect(postmark.Client.prototype.sendEmailWithTemplate.calls.mostRecent().args[0].TemplateId).toBe('weekTwoStats--app-template-id');
+            }).then(done, done.fail);
+        });
+    });
+
+    describe('sending a payment plan canceled email', function () {
+        beforeEach(function () {
+            this.event.data.org = {
+                id: 'o-123'
+            };
+            this.event.options.type = 'paymentPlanCanceled';
+            this.event.options.provider = 'postmark';
+            requestUtils.makeSignedRequest.and.returnValue(Promise.resolve({
+                response: {
+                    statusCode: 200
+                },
+                body: [{
+                    email: 'somedude@fake.com',
+                    firstName: 'Charlie'
+                }]
+            }));
+        });
+
+        it('should be able to send with postmark', function (done) {
+            const date = new Date(2014, 7, 22);
+            this.event.data.effectiveDate = date;
+            this.email(this.event).then(() => {
+                expect(postmark.Client.prototype.sendEmailWithTemplate).toHaveBeenCalledWith({
+                    TemplateId: 'paymentPlanCanceled-template-id',
+                    TemplateModel: {
+                        firstName: 'Charlie',
+                        contact: 'e2eSupport@fake.com',
+                        date: 'Aug 22, 2014'
+                    },
+                    InlineCss: true,
+                    From: 'e2eSender@fake.com',
+                    To: 'somedude@fake.com',
+                    Tag: 'paymentPlanCanceled',
+                    TrackOpens: true,
+                    Attachments: this.showcasePostmarkAttachments
+                }, jasmine.any(Function));
+            }).then(done, done.fail);
+        });
+    });
+
+    describe('sending a payment plan downgraded email', function () {
+        beforeEach(function () {
+            this.event.data.org = {
+                id: 'o-123'
+            };
+            this.event.data.currentPaymentPlan = {
+                label: 'Better Plan'
+            };
+            this.event.data.pendingPaymentPlan = {
+                label: 'Worse Plan',
+                maxCampaigns: 2
+            };
+            this.event.options.type = 'paymentPlanDowngraded';
+            this.event.options.provider = 'postmark';
+            requestUtils.makeSignedRequest.and.returnValue(Promise.resolve({
+                response: {
+                    statusCode: 200
+                },
+                body: [{
+                    email: 'somedude@fake.com',
+                    firstName: 'Charlie'
+                }]
+            }));
+        });
+
+        it('should be able to send with postmark', function (done) {
+            const date = new Date(2014, 7, 22);
+            this.event.data.effectiveDate = date;
+            this.email(this.event).then(() => {
+                expect(postmark.Client.prototype.sendEmailWithTemplate).toHaveBeenCalledWith({
+                    TemplateId: 'paymentPlanDowngraded-template-id',
+                    TemplateModel: {
+                        firstName: 'Charlie',
+                        contact: 'e2eSupport@fake.com',
+                        date: 'Aug 22, 2014',
+                        currentPlanName: 'Better Plan',
+                        pendingPlanName: 'Worse Plan',
+                        pendingPlanApps: 2
+                    },
+                    InlineCss: true,
+                    From: 'e2eSender@fake.com',
+                    To: 'somedude@fake.com',
+                    Tag: 'paymentPlanDowngraded',
+                    TrackOpens: true,
+                    Attachments: this.showcasePostmarkAttachments
+                }, jasmine.any(Function));
+            }).then(done, done.fail);
+        });
+    });
+
+    describe('sending a payment plan upgraded email', function () {
+        beforeEach(function () {
+            this.event.data.org = {
+                id: 'o-123'
+            };
+            this.event.data.previousPaymentPlanId = 'pp-123';
+            this.event.data.currentPaymentPlanId = 'pp-456';
+            this.event.options.type = 'paymentPlanUpgraded';
+            this.event.options.provider = 'postmark';
+            this.planResponses = { };
+            this.CwrxRequest.prototype.get.and.callFake(options => {
+                const url = options.url;
+                const id = url.match(/pp-\d+/)[0];
+                return this.planResponses[id];
+            });
+            requestUtils.makeSignedRequest.and.returnValue(Promise.resolve({
+                response: {
+                    statusCode: 200
+                },
+                body: [{
+                    email: 'somedude@fake.com',
+                    firstName: 'Charlie'
+                }]
+            }));
+        });
+
+        it('should fetch the payment plans which are involved in the change', function (done) {
+            this.planResponses['pp-123'] = Promise.resolve([{ id: 'pp-123' }]);
+            this.planResponses['pp-456'] = Promise.resolve([{ id: 'pp-456' }]);
+            this.email(this.event).then(() => {
+                expect(this.CwrxRequest.prototype.get).toHaveBeenCalledWith({
+                    url: 'https://root/api/payment-plans/pp-123'
+                });
+                expect(this.CwrxRequest.prototype.get).toHaveBeenCalledWith({
+                    url: 'https://root/api/payment-plans/pp-456'
+                });
+            }).then(done, done.fail);
+        });
+
+        it('should reject if fetching the payment plans fails', function (done) {
+            this.planResponses['pp-123'] = Promise.reject(new Error('epic fail'));
+            this.planResponses['pp-456'] = Promise.reject(new Error('epic fail'));
+            this.email(this.event).then(done.fail, error => {
+                expect(error).toEqual(jasmine.any(Error));
+                expect(error.message).toBe('epic fail');
+            }).then(done, done.fail);
+        });
+
+        it('should be able to send with postmark', function (done) {
+            this.planResponses['pp-123'] = Promise.resolve([{
+                id: 'pp-123',
+                price: 0,
+                label: 'Worse Plan'
+            }]);
+            this.planResponses['pp-456'] = Promise.resolve([{
+                id: 'pp-456',
+                price: 49.99,
+                label: 'Better Plan',
+                maxCampaigns: 10,
+                viewsPerMonth: 25500
+            }]);
+            this.email(this.event).then(() => {
+                expect(postmark.Client.prototype.sendEmailWithTemplate).toHaveBeenCalledWith({
+                    TemplateId: 'paymentPlanUpgraded-template-id',
+                    TemplateModel: {
+                        firstName: 'Charlie',
+                        contact: 'e2eSupport@fake.com',
+                        dashboardLink: 'showcase dashboard link',
+                        previousPlanName: 'Worse Plan',
+                        currentPlanName: 'Better Plan',
+                        currentPlanApps: 10,
+                        currentPlanViews: 25500
+                    },
+                    InlineCss: true,
+                    From: 'e2eSender@fake.com',
+                    To: 'somedude@fake.com',
+                    Tag: 'paymentPlanUpgraded',
+                    TrackOpens: true,
+                    Attachments: this.showcasePostmarkAttachments
+                }, jasmine.any(Function));
+            }).then(done, done.fail);
+        });
+
+        it('should not send if the payment plan has not been upgraded', function (done) {
+            this.planResponses['pp-123'] = Promise.resolve([{
+                id: 'pp-123',
+                price: 49.99
+            }]);
+            this.planResponses['pp-456'] = Promise.resolve([{
+                id: 'pp-456',
+                price: 0
+            }]);
+            this.email(this.event).then(() => {
+                expect(postmark.Client.prototype.sendEmailWithTemplate).not.toHaveBeenCalled();
             }).then(done, done.fail);
         });
     });
