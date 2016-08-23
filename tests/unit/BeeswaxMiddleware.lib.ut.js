@@ -572,7 +572,7 @@ describe('BeeswaxMiddleware(config)', function() {
                         var req = beeswax.creatives.create.calls.argsFor(0)[0];
                         expect(req.advertiser_id).toEqual(33);
                         expect(req.creative_name).toEqual('MRAID Inter: Revengus Extremis');
-                        expect(req.creative_content.ADDITIONAL_PIXELS[0].PIXEL_URL)
+                        expect(req.pixels[0])
                             .toEqual(
                                 'http://audit.rc.com/pixel.gif?placement=p-2222222' +
                                 '&campaign=c-1234567&card=rc-2222222&container=beeswax&' +

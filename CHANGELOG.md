@@ -35,6 +35,12 @@
     * Update environment with `showcase/apps/auto_archive_campaigns` action
 * *[/v1.7.0-rc1]*
 
+## v1.6.1 (August 23, 2016)
+* *[v1.6.1-rc1]*
+  * [FIX]: Update creative creation to account for Beeswax's breaking
+    API change
+* *[/v1.6.1-rc1]*
+
 ## v1.6.0 (August 11, 2016)
 * *[v1.6.0-rc1]*
   * [FEATURE]: Added the ability to add payment plan information to HubSpot
