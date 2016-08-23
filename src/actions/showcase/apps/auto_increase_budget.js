@@ -72,7 +72,7 @@ module.exports = function factory(config) {
 
                 const targetUsers = round(transaction.targetUsers / totalCampaigns);
                 const budget = round(transaction.amount / totalCampaigns, 2);
-                const externalImpressions = targetUsers * externalMultiplier;
+                const externalImpressions = round(targetUsers * externalMultiplier);
                 const cost = round(budget / (targetUsers * internalMultiplier), 3);
 
                 return request.put({
