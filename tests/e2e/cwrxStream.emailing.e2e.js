@@ -124,7 +124,8 @@ describe('cwrxStream', function() {
                     passwordReset: '672905',
                     'passwordReset--app': '672906',
                     campaignSubmitted: '672810',
-                    paymentPlanCanceled: '855802'
+                    paymentPlanCanceled: '855802',
+                    paymentPlanDowngraded: '855921'
                 }
             }
         };
@@ -329,6 +330,15 @@ describe('cwrxStream', function() {
                             },
                             ifData: {
                                 'pendingPaymentPlan.price': '^0$'
+                            }
+                        },
+                        {
+                            name: 'message/campaign_email',
+                            options: {
+                                type: 'paymentPlanDowngraded'
+                            },
+                            ifData: {
+                                'pendingPaymentPlan.price': '^[1-9].+$'
                             }
                         }
                     ]
@@ -1406,7 +1416,40 @@ describe('cwrxStream', function() {
         }).then(msg => {
             expect(msg.from[0].address).toBe('support@cinema6.com');
             expect(msg.to[0].address).toBe('c6e2etester@gmail.com');
-            var regex = /plan will be cancelled/;
+            const regex = /plan will be cancelled/;
+            expect(msg.text).toMatch(regex);
+            expect(msg.html).toMatch(regex);
+            expect(new Date() - msg.date).toBeLessThan(EMAIL_TIMEOUT);
+        }).then(done, done.fail);
+    });
+
+    it('should be able to send a payment plan downgraded email', function (done) {
+        producer.produce({
+            type: 'paymentPlanPending',
+            data: {
+                currentPaymentPlan: {
+                    label: 'Better Plan',
+                    price: 149.99,
+                    maxCampaigns: 3
+                },
+                pendingPaymentPlan: {
+                    label: 'Worse Plan',
+                    price: 49.99,
+                    maxCampaigns: 1
+                },
+                org: this.mockOrg,
+                effectiveDate: new Date()
+            }
+        }).then(() => {
+            return waiter.waitFor(() => {
+                return new Promise(resolve => {
+                    mailman.once('Your plan is being downgraded', msg => resolve(msg));
+                });
+            });
+        }).then(msg => {
+            expect(msg.from[0].address).toBe('support@cinema6.com');
+            expect(msg.to[0].address).toBe('c6e2etester@gmail.com');
+            const regex = /downgrading your plan/;
             expect(msg.text).toMatch(regex);
             expect(msg.html).toMatch(regex);
             expect(new Date() - msg.date).toBeLessThan(EMAIL_TIMEOUT);
