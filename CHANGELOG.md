@@ -2,10 +2,16 @@
 
 ## v1.7.0 (August 18, 2016)
 * *[v1.7.0-rc3]*
+  * [FEATURE]: Support email notification on payment plan upgrade
+  * [FEATURE]: Support email notification on payment plan downgrade request
+  * [FEATURE]: Support email notification on payment plan cancel request
   * [FIX]: Round beeswax campaign impressions when increasing a
     campaign's budget.
   * [FIX]: Fail with a better error message if a beeswax campaign can't
     be found.
+  * **Extra Deployment Steps**:
+    * Update environment with new payment plan emailing actions
+* *[/v1.7.0-rc3]*
 
 * *[v1.7.0-rc2]*
   * [FEATURE]: Include payment plan information in showcase payment receipts
