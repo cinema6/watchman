@@ -38,6 +38,9 @@ describe('timeStream weeklyStats', function () {
                     },
                     transactions: {
                         endpoint: '/api/transactions'
+                    },
+                    paymentPlans: {
+                        endpoint: '/api/payment-plans'
                     }
                 }
             },

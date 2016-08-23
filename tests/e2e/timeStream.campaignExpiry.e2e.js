@@ -40,6 +40,9 @@ describe('timeStream', function() {
                     },
                     users: {
                         endpoint: '/api/account/users'
+                    },
+                    paymentPlans: {
+                        endpoint: '/api/payment-plans'
                     }
                 }
             },

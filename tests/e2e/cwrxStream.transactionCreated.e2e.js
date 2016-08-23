@@ -758,7 +758,7 @@ describe('cwrxStream transactionCreated', function() {
             ))))
             .then(beeswaxCampaigns => {
                 expect(beeswaxCampaigns[0].campaign_budget).toBe(9250);
-                expect(beeswaxCampaigns[1].campaign_budget).toBe(6062.5);
+                expect(beeswaxCampaigns[1].campaign_budget).toBe(6063);
             })
             .then(done, done.fail);
         });
@@ -815,7 +815,7 @@ describe('cwrxStream transactionCreated', function() {
                                 ) && campaign
                             ))
                         )))
-                        .then(campaigns => 
+                        .then(campaigns =>
                             campaigns.every(campaign => !!campaign) && campaigns
                         ),
                         Promise.all(targetCampaignIds.map(id => {
@@ -825,7 +825,7 @@ describe('cwrxStream transactionCreated', function() {
                                 .then(response => {
                                     const beeswaxCampaign = response.payload;
                                     const oldBeeswaxCampaign = ld.find(
-                                        beeswaxCampaigns, 
+                                        beeswaxCampaigns,
                                         { campaign_id: beeswaxCampaign.campaign_id }
                                     );
 
@@ -835,7 +835,7 @@ describe('cwrxStream transactionCreated', function() {
                                     ) && beeswaxCampaign;
                                 });
                         }))
-                        .then(beeswaxCampaigns => 
+                        .then(beeswaxCampaigns =>
                             beeswaxCampaigns.every(beeswaxCampaign => !!beeswaxCampaign)
                                 && beeswaxCampaigns
                         ),
@@ -849,7 +849,7 @@ describe('cwrxStream transactionCreated', function() {
                                 return response.payload;
                             });
                         }))
-                        .then(beeswaxLineItems => 
+                        .then(beeswaxLineItems =>
                             beeswaxLineItems.every(
                                 item => (!!item && (item.length === 1) && item[0].active)
                             ) && (beeswaxLineItems.length === 2 ) && beeswaxLineItems
