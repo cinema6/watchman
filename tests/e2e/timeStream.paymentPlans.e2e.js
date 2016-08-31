@@ -752,7 +752,7 @@ describe('timeStream payment plan billing', function() {
         producer.produce({
             type: 'hourly',
             data: {
-                date: moment().add(1, 'month').toDate(),
+                date: moment().add(2, 'months').toDate(),
                 hour: '4'
             }
         }).then(() => {

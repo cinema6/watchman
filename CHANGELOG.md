@@ -1,5 +1,11 @@
 # Watchman
 
+## v1.7.1 (August 31, 2016)
+* *[v1.7.1-rc1]*
+  * [FIX]: Only warn about an org's `nextPaymentPlanId` if they should
+    be billed
+* *[/v1.7.1-rc1]*
+
 ## v1.7.0 (August 18, 2016)
 * *[v1.7.0-rc3]*
   * [FEATURE]: Support email notification on payment plan upgrade

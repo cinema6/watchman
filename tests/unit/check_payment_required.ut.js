@@ -123,23 +123,11 @@ describe('(action factory) check_payment_required', function() {
                 spyOn(request, 'get').and.returnValue(q.defer().promise);
             });
 
-            it('should handle if the the org unexpectedly has a next payment plan', function (done) {
-                data.org.nextPaymentPlanId = 'pp-123';
-                checkPaymentRequired(event).then(success, failure);
-                setTimeout(() => {
-                    expect(success).toHaveBeenCalled();
-                    expect(failure).not.toHaveBeenCalled();
-                    expect(this.mockLog.warn).toHaveBeenCalled();
-                    expect(request.get).not.toHaveBeenCalled();
-                    expect(watchmanStream.produce).not.toHaveBeenCalled();
-                    done();
-                });
-            });
-
             describe('if the org has no nextPaymentDate', function() {
                 beforeEach(function(done) {
                     delete data.org.nextPaymentDate;
                     data.org.paymentPlanId = 'pp-0Ek5Na02vCohpPgw';
+                    data.org.nextPaymentPlanId = `pp-${uuid.createUuid()}`;
 
                     checkPaymentRequired(event).then(success, failure);
                     setTimeout(done);
@@ -147,6 +135,10 @@ describe('(action factory) check_payment_required', function() {
 
                 it('should not fetch any payments', function() {
                     expect(request.get).not.toHaveBeenCalled();
+                });
+
+                it('should not log any warnings', function() {
+                    expect(this.mockLog.warn).not.toHaveBeenCalled();
                 });
 
                 it('should return a promise resolved to undefined', function() {
@@ -167,6 +159,7 @@ describe('(action factory) check_payment_required', function() {
                         lastUpdated: '2016-07-05T14:28:57.336Z',
                         status: 'active'
                     };
+                    data.org.nextPaymentPlanId = `pp-${uuid.createUuid()}`;
                 });
 
                 describe('that is after today', function() {
@@ -183,6 +176,10 @@ describe('(action factory) check_payment_required', function() {
 
                     it('should not produce anything', function() {
                         expect(watchmanStream.produce).not.toHaveBeenCalled();
+                    });
+
+                    it('should not log any warnings', function() {
+                        expect(this.mockLog.warn).not.toHaveBeenCalled();
                     });
 
                     it('should fulfill the promise', function() {
@@ -204,6 +201,7 @@ describe('(action factory) check_payment_required', function() {
 
                     beforeEach(function(done) {
                         data.org.nextPaymentDate = moment(data.date).subtract(testConfig.dateOffset, 'days').format();
+                        delete data.org.nextPaymentPlanId;
 
                         request.get.and.callFake(requestConfig => {
                             const url = parseURL(requestConfig.url);
@@ -233,6 +231,35 @@ describe('(action factory) check_payment_required', function() {
                     it('should get the org\'s payment plan', function() {
                         expect(request.get).toHaveBeenCalledWith({
                             url: `${resolveURL(config.cwrx.api.root, config.cwrx.api.paymentPlans.endpoint)}/${data.org.paymentPlanId}`
+                        });
+                    });
+
+                    describe('if the org has a nextPaymentPlanId', function() {
+                        beforeEach(function(done) {
+                            data.org.nextPaymentPlanId = `pp-${uuid.createUuid()}`;
+
+                            success.calls.reset();
+                            failure.calls.reset();
+                            request.get.calls.reset();
+
+                            checkPaymentRequired(event).then(success, failure);
+                            setTimeout(done);
+                        });
+
+                        it('should log a warning', function() {
+                            expect(this.mockLog.warn).toHaveBeenCalled();
+                        });
+
+                        it('should not get anything', function() {
+                            expect(request.get).not.toHaveBeenCalled();
+                        });
+
+                        it('should not produce anything', function() {
+                            expect(watchmanStream.produce).not.toHaveBeenCalled();
+                        });
+
+                        it('should fulfill with undefined', function() {
+                            expect(success).toHaveBeenCalledWith(undefined);
                         });
                     });
 
