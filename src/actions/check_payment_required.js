@@ -27,13 +27,13 @@ module.exports = function factory(config) {
         const now = moment(data.date);
         const nextPaymentDate = org.nextPaymentDate && moment(org.nextPaymentDate);
 
-        if (org.nextPaymentPlanId) {
-            log.warn(`Org ${org.id} has pending next payment plan ${org.nextPaymentPlanId}` +
-                ' which should have been transitioned');
+        if (!nextPaymentDate || nextPaymentDate.isAfter(now)) {
             return undefined;
         }
 
-        if (!nextPaymentDate || nextPaymentDate.isAfter(now)) {
+        if (org.nextPaymentPlanId) {
+            log.warn(`Org ${org.id} has pending next payment plan ${org.nextPaymentPlanId}` +
+                ' which should have been transitioned');
             return undefined;
         }
 
