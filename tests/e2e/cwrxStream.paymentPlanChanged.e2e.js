@@ -104,6 +104,7 @@ describe('cwrxStream paymentPlanChanged', () => {
     let cycle;
     let advertiser;
     let campaigns;
+    let now;
 
     function initSystem() {
         paymentPlans = [
@@ -149,13 +150,15 @@ describe('cwrxStream paymentPlanChanged', () => {
             }
         ];
 
+        now = moment().utcOffset(0).hour(17).minute(23).second(11);
+
         org = {
             id: 'o-e2e',
             status: 'active',
             name: 'The Best Org',
             paymentPlanId: paymentPlans[3],
-            paymentPlanStart: moment('2016-07-27T00:00:00+00:00').utcOffset(0).format(),
-            nextPaymentDate: moment('2016-07-28T00:00:00+00:00').utcOffset(0).format()
+            paymentPlanStart: moment(now).utcOffset(0).subtract(16, 'days').format(),
+            nextPaymentDate: moment(now).utcOffset(0).add(1, 'day').startOf('day').format()
         };
 
         policy = {
@@ -421,18 +424,18 @@ describe('cwrxStream paymentPlanChanged', () => {
                     type: '_paymentPlanChanged',
                     data: {
                         org,
-                        date: moment('2016-08-12T17:23:11+00:00').utcOffset(0).format(),
+                        date: now.format(),
                         currentPaymentPlanId: paymentPlans[3].id,
                         previousPaymentPlanId: paymentPlans[1].id
                     }
                 }).then(() => waitFor(() => (
                     request.get({
                         url: api(`/api/account/orgs/${org.id}`)
-                    }).spread(org => (
+                    }).spread(org => {
                         // Updating the org's nextPaymentDate is the last thing watchman will do,
                         // so that's what I'm waiting for.
-                        moment(org.nextPaymentDate).isSame(moment('2016-09-12T00:00:00Z').utcOffset(0), 'day')
-                    ))
+                        return moment(org.nextPaymentDate).utcOffset(0).isSame(moment(now).utcOffset(0).add(1, 'month'), 'day');
+                    })
                 )))
             )).then(done, done.fail);
         });
@@ -458,7 +461,7 @@ describe('cwrxStream paymentPlanChanged', () => {
                     transaction_id: jasmine.any(String),
                     transaction_ts: jasmine.any(Date),
                     org_id: 'o-e2e',
-                    amount: '476.9600',
+                    amount: '476.4100',
                     sign: 1,
                     units: 1,
                     campaign_id: null,
@@ -472,13 +475,13 @@ describe('cwrxStream paymentPlanChanged', () => {
                     application: 'showcase'
                 }));
 
-                expect(moment(transaction.cycle_start).utcOffset(0).format()).toBe(moment('2016-08-12T00:00:00+00:00').utcOffset(0).format());
+                expect(moment(transaction.cycle_start).utcOffset(0).format()).toBe(moment(now).utcOffset(0).startOf('day').format());
             }).then(done, done.fail);
         });
 
         it('should update the org\'s nextPaymentDate', done => {
             request.get({ url: api(`/api/account/orgs/${org.id}`) }).spread(org => {
-                expect(moment(org.nextPaymentDate).utcOffset(0).format()).toBe(moment('2016-09-12T00:00:00+00:00').utcOffset(0).format());
+                expect(moment(org.nextPaymentDate).utcOffset(0).format()).toBe(moment(now).utcOffset(0).startOf('day').add(1, 'month').format());
             }).then(done, done.fail);
         });
     });

@@ -1,6 +1,10 @@
 # Watchman
 
 ## v1.7.1 (August 31, 2016)
+* *[v1.7.1-rc2]*
+  * [FIX]: Fix some E2E tests
+* *[/v1.7.1-rc2]*
+
 * *[v1.7.1-rc1]*
   * [FIX]: Only warn about an org's `nextPaymentPlanId` if they should
     be billed
